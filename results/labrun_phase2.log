@@ -2302,3 +2302,19 @@ sigma_iso_p64_s0p005          search isotropic          64             0.0625   
               oracle          oracle                     0             0.1250                 NaN            NaN       NaN                  NaN                  NaN              NaN
  sigma_iso_p64_s0p02          search isotropic          64             0.0625             0.00000       0.502273 16.072739                  NaN                  NaN              NaN
       search_iso_p64          search isotropic          64             0.0625             0.00000       0.499594 15.987010                  NaN                  NaN              NaN
+[main 16711f7] Add phase2 report
+ 8 files changed, 536 insertions(+), 9 deletions(-)
+ create mode 100644 results/report/best_of_n.png
+ create mode 100644 results/report/candidate_scores.csv
+ rewrite results/report/candidate_sec.png (98%)
+ rewrite results/report/report.md (98%)
+ create mode 100644 results/report/score_histograms.png
+ create mode 100644 results/report/tokens_per_sec.png
+To https://github.com/plugyawn/randopt-lora-lab.git
+ ! [rejected]        main -> main (fetch first)
+error: failed to push some refs to 'https://github.com/plugyawn/randopt-lora-lab.git'
+hint: Updates were rejected because the remote contains work that you do
+hint: not have locally. This is usually caused by another repository pushing
+hint: to the same ref. You may want to first integrate the remote changes
+hint: (e.g., 'git pull ...') before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
