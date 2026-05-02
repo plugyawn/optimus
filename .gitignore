@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+results/
+wandb/
+*.log
+*.safetensors
+*.pt
+*.pth
+hf_cache/

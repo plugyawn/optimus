@@ -1,0 +1,19 @@
+[project]
+name = "randopt-lora-lab"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "torch",
+  "transformers>=4.48",
+  "peft>=0.13",
+  "accelerate",
+  "datasets",
+  "numpy",
+  "pandas",
+  "matplotlib",
+  "sympy",
+  "tqdm",
+]
+
+[tool.setuptools.packages.find]
+include = ["randopt_lora_lab*"]
