@@ -1,6 +1,14 @@
 run,kind,family,population,base_screen_exact,best_holdout_exact,candidate_sec,pair_sec,prompt_eval_savings,best_tokens_per_sec,best_batch_size
 search_anzo_p32,search,anzo,32,0.0625,0.125,0.4523577358781101,14.475447548099524,,,
+vllm_base_probe,vllm_base_probe,,0,,,,,,,
+sigma_iso_p64_s0p01,search,isotropic,64,0.0625,0.15625,0.49918016675053206,15.973765336017026,,,
 search_anzo_p64,search,anzo,64,0.0625,0.125,0.4981467389841842,15.940695647493895,,,
 search_iso_p32,search,isotropic,32,0.0625,0.0,0.47324650642030824,15.143888205449864,,,
+sigma_iso_p64_s0p04,search,isotropic,64,0.0625,0.0,0.49925188784210595,15.97606041094739,,,
+halving_iso_p128,halving,isotropic,128,0.0625,0.0,0.8167123248652334,,0.6060606060606061,,
+sigma_iso_p64_s0p005,search,isotropic,64,0.0625,0.125,0.5054203531864688,16.173451301967003,,,
+halving_anzo_p128,halving,anzo,128,0.0625,0.125,0.8169427071217635,,0.6060606060606061,,
+sysbench_tf3b,sysbench,isotropic,0,,,,,,1034.964922614999,32.0
 oracle,oracle,,0,0.125,,,,,,
+sigma_iso_p64_s0p02,search,isotropic,64,0.0625,0.0,0.5022730805048479,16.072738576155132,,,
 search_iso_p64,search,isotropic,64,0.0625,0.0,0.4995940757338628,15.987010423483609,,,
