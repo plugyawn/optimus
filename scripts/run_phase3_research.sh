@@ -5,6 +5,11 @@ export HF_HOME=${HF_HOME:-/root/hf_cache}
 export TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE:-/root/hf_cache}
 export PYTHONUNBUFFERED=1
 
+if [ -d .venv ]; then
+  # shellcheck disable=SC1091
+  . .venv/bin/activate
+fi
+
 git_pull() {
   if [ -f /root/.gh_token_randopt_lora_lab ]; then
     local token basic
