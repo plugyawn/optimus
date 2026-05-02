@@ -1,0 +1,97 @@
+{
+  "base_holdout_exact": 0.0625,
+  "base_screen_exact": 0.0625,
+  "candidate_sec": 0.3155448393442792,
+  "family": "anzo",
+  "holdout_prompts": 64,
+  "kind": "search",
+  "max_new_tokens": 32,
+  "pair_sec": 10.097434859016934,
+  "population": 512,
+  "screen_prompts": 32,
+  "stop_at_answer": false,
+  "top_holdout": [
+    {
+      "answer_closed_mean": 1.0,
+      "candidate": "anzo:seed1836185689:s0.015:sign-1",
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 6.100905418395996,
+      "exact_mean": 0.15625,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.014746665954589844,
+      "output_tokens": 1984
+    },
+    {
+      "answer_closed_mean": 1.0,
+      "candidate": "anzo:seed47984941:s0.015:sign-1",
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 6.096240043640137,
+      "exact_mean": 0.15625,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.013345956802368164,
+      "output_tokens": 1984
+    },
+    {
+      "answer_closed_mean": 1.0,
+      "candidate": "anzo:seed246609405:s0.015:sign-1",
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 6.321133613586426,
+      "exact_mean": 0.125,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.013229131698608398,
+      "output_tokens": 1984
+    },
+    {
+      "answer_closed_mean": 1.0,
+      "candidate": "anzo:seed2003551283:s0.015:sign1",
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 6.3674421310424805,
+      "exact_mean": 0.125,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.013319015502929688,
+      "output_tokens": 1984
+    }
+  ],
+  "top_screen": [
+    {
+      "answer_closed_mean": 1.0,
+      "candidate": "anzo:seed1836185689:s0.015:sign-1",
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 3.0057060718536377,
+      "exact_mean": 0.15625,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.013345956802368164,
+      "output_tokens": 992
+    },
+    {
+      "answer_closed_mean": 1.0,
+      "candidate": "anzo:seed47984941:s0.015:sign-1",
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 2.996138095855713,
+      "exact_mean": 0.15625,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.013313770294189453,
+      "output_tokens": 992
+    },
+    {
+      "answer_closed_mean": 1.0,
+      "candidate": "anzo:seed246609405:s0.015:sign-1",
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 3.0501227378845215,
+      "exact_mean": 0.15625,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.01340484619140625,
+      "output_tokens": 992
+    },
+    {
+      "answer_closed_mean": 1.0,
+      "candidate": "anzo:seed2003551283:s0.015:sign1",
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 3.2168822288513184,
+      "exact_mean": 0.125,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.015722036361694336,
+      "output_tokens": 992
+    }
+  ]
+}
