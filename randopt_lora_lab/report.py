@@ -8,6 +8,18 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
+def read_jsonl(path: Path) -> list[dict]:
+    rows = []
+    if not path.exists():
+        return rows
+    with path.open() as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--root", required=True)
@@ -53,6 +65,48 @@ def main():
         ax.set_ylabel("tokens/sec")
         plt.tight_layout()
         plt.savefig(out / "tokens_per_sec.png", dpi=160)
+        plt.close()
+    candidate_frames = []
+    for run_dir in sorted(root.iterdir()):
+        if not run_dir.is_dir():
+            continue
+        rows = read_jsonl(run_dir / "candidate_summary.jsonl")
+        if not rows:
+            rows = read_jsonl(run_dir / "stage_candidate_summary.jsonl")
+        if not rows:
+            continue
+        cdf = pd.DataFrame(rows)
+        if "exact_mean" not in cdf:
+            continue
+        cdf["run"] = run_dir.name
+        cdf["ordinal"] = range(1, len(cdf) + 1)
+        cdf["best_so_far"] = cdf["exact_mean"].cummax()
+        candidate_frames.append(cdf[["run", "candidate", "ordinal", "exact_mean", "best_so_far"]])
+    if candidate_frames:
+        candidates = pd.concat(candidate_frames, ignore_index=True)
+        candidates.to_csv(out / "candidate_scores.csv", index=False)
+        plt.figure(figsize=(9, 5))
+        for run, g in candidates.groupby("run"):
+            plt.plot(g["ordinal"], g["best_so_far"], label=run)
+        plt.xlabel("candidates evaluated")
+        plt.ylabel("best screen exact")
+        plt.legend(fontsize=7)
+        plt.tight_layout()
+        plt.savefig(out / "best_of_n.png", dpi=160)
+        plt.close()
+        pivot_runs = candidates["run"].unique()
+        cols = min(3, len(pivot_runs))
+        rows_n = (len(pivot_runs) + cols - 1) // cols
+        fig, axes = plt.subplots(rows_n, cols, figsize=(4 * cols, 3 * rows_n), squeeze=False)
+        for ax, run in zip(axes.ravel(), pivot_runs):
+            g = candidates[candidates["run"] == run]
+            ax.hist(g["exact_mean"], bins=8)
+            ax.set_title(run, fontsize=8)
+            ax.set_xlabel("screen exact")
+        for ax in axes.ravel()[len(pivot_runs) :]:
+            ax.axis("off")
+        plt.tight_layout()
+        plt.savefig(out / "score_histograms.png", dpi=160)
         plt.close()
     (out / "report.md").write_text("# RandOpt LoRA Lab Report\n\n" + df.to_markdown(index=False) + "\n")
     print(df.to_string(index=False))
