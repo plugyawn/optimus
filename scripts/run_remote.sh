@@ -7,7 +7,8 @@ export PYTHONUNBUFFERED=1
 
 push_results() {
   local msg="$1"
-  git add results README.md randopt_lora_lab scripts pyproject.toml || true
+  git add README.md randopt_lora_lab scripts pyproject.toml || true
+  git add -f results || true
   if git diff --cached --quiet; then
     return 0
   fi
