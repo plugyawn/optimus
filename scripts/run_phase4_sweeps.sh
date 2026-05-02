@@ -83,6 +83,21 @@ run_vllm_lora_count() {
 
 git_pull
 
+if enough_time 1200; then
+  python -m randopt_lora_lab.experiments halving \
+    --out results/halving_iso_s0p01_p256 \
+    --family isotropic \
+    --population 256 \
+    --sigma 0.01 \
+    --prompts 32 \
+    --stage-prompts 8 \
+    --survivors 32 \
+    --holdout-prompts 32 \
+    --batch-size 16 \
+    --antithetic
+  push_results "Add isotropic sigma 0.01 halving run"
+fi
+
 for sigma in 0.005 0.01 0.02 0.04; do
   safe_sigma=${sigma//./p}
   if enough_time 900; then
