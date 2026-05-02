@@ -22,7 +22,18 @@ push_results() {
   fi
 }
 
-git pull --ff-only || true
+git_pull() {
+  if [ -f /root/.gh_token_randopt_lora_lab ]; then
+    local token basic
+    token=$(cat /root/.gh_token_randopt_lora_lab)
+    basic=$(printf "x-access-token:%s" "$token" | base64 -w0)
+    git -c http.extraHeader="AUTHORIZATION: basic $basic" pull --ff-only || true
+  else
+    git pull --ff-only || true
+  fi
+}
+
+git_pull
 
 python -m randopt_lora_lab.experiments oracle --out results/oracle --prompts 16 --batch-size 16
 push_results "Add oracle run"
