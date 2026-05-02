@@ -55,10 +55,23 @@ push_results() {
   fi
 }
 
+run_optional() {
+  local msg="$1"
+  shift
+  set +e
+  "$@"
+  local rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] optional command failed rc=$rc: $msg"
+  fi
+  push_results "$msg"
+}
+
 git_pull
 
 if enough_time 900; then
-  python -m randopt_lora_lab.vllm_lora_bench \
+  run_optional "Add stop-at-answer mixed LoRA bench" python -m randopt_lora_lab.vllm_lora_bench \
     --out results/vllm_lora_mixed_stop_a16_p32 \
     --model Qwen/Qwen2.5-3B-Instruct \
     --adapters 16 \
@@ -70,11 +83,10 @@ if enough_time 900; then
     --preload \
     --mixed-batch \
     --stop-at-answer
-  push_results "Add stop-at-answer mixed LoRA bench"
 fi
 
 if enough_time 900; then
-  python -m randopt_lora_lab.vllm_lora_bench \
+  run_optional "Add 32-adapter mixed LoRA bench" python -m randopt_lora_lab.vllm_lora_bench \
     --out results/vllm_lora_mixed_stop_a32_p32 \
     --model Qwen/Qwen2.5-3B-Instruct \
     --adapters 32 \
@@ -86,11 +98,10 @@ if enough_time 900; then
     --preload \
     --mixed-batch \
     --stop-at-answer
-  push_results "Add 32-adapter mixed LoRA bench"
 fi
 
 if enough_time 900; then
-  python -m randopt_lora_lab.vllm_lora_bench \
+  run_optional "Add 64-prompt mixed LoRA bench" python -m randopt_lora_lab.vllm_lora_bench \
     --out results/vllm_lora_mixed_stop_a16_p64 \
     --model Qwen/Qwen2.5-3B-Instruct \
     --adapters 16 \
@@ -102,11 +113,10 @@ if enough_time 900; then
     --preload \
     --mixed-batch \
     --stop-at-answer
-  push_results "Add 64-prompt mixed LoRA bench"
 fi
 
 if enough_time 1200; then
-  python -m randopt_lora_lab.vllm_lora_search \
+  run_optional "Add vLLM mixed LoRA P512 search" python -m randopt_lora_lab.vllm_lora_search \
     --out results/vllm_lora_search_iso_s0p01_p512_stop \
     --model Qwen/Qwen2.5-3B-Instruct \
     --family isotropic \
@@ -123,11 +133,10 @@ if enough_time 1200; then
     --max-cpu-loras 1024 \
     --antithetic \
     --stop-at-answer
-  push_results "Add vLLM mixed LoRA P512 search"
 fi
 
 if enough_time 1200; then
-  python -m randopt_lora_lab.vllm_lora_search \
+  run_optional "Add vLLM mixed LoRA sigma 0.0075 search" python -m randopt_lora_lab.vllm_lora_search \
     --out results/vllm_lora_search_iso_s0p0075_p512_stop \
     --model Qwen/Qwen2.5-3B-Instruct \
     --family isotropic \
@@ -144,7 +153,6 @@ if enough_time 1200; then
     --max-cpu-loras 1024 \
     --antithetic \
     --stop-at-answer
-  push_results "Add vLLM mixed LoRA sigma 0.0075 search"
 fi
 
 if enough_time 2700; then

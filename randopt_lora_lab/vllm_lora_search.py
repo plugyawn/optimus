@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import platform
 import shutil
+import sys
 import time
+import traceback
 from dataclasses import asdict
+from importlib import metadata
 from pathlib import Path
 
 import numpy as np
@@ -268,6 +273,33 @@ def run_search(args) -> dict:
     return summary
 
 
+def package_version(name: str) -> str | None:
+    try:
+        return metadata.version(name)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def diagnostic_payload(args, exc: BaseException) -> dict:
+    return {
+        "kind": "vllm_lora_search_failure",
+        "argv": sys.argv,
+        "args": vars(args) if args is not None else None,
+        "error_type": type(exc).__name__,
+        "error": str(exc),
+        "traceback": traceback.format_exc(),
+        "python": sys.version,
+        "platform": platform.platform(),
+        "cwd": os.getcwd(),
+        "versions": {
+            "vllm": package_version("vllm"),
+            "torch": package_version("torch"),
+            "transformers": package_version("transformers"),
+            "safetensors": package_version("safetensors"),
+        },
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Run mixed-batch vLLM LoRA RandOpt search.")
     p.add_argument("--out", required=True)
@@ -300,8 +332,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    run_search(args)
-    return 0
+    out = Path(args.out)
+    try:
+        run_search(args)
+        return 0
+    except Exception as exc:
+        payload = diagnostic_payload(args, exc)
+        out.mkdir(parents=True, exist_ok=True)
+        write_json(out / "diagnostic.json", payload)
+        write_json(out / "summary.json", payload)
+        shutil.rmtree(out / "adapters", ignore_errors=True)
+        print(json.dumps(payload, indent=2, sort_keys=True), file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
