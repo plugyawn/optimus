@@ -1,0 +1,79 @@
+{
+  "base_holdout_exact": 0.0625,
+  "base_screen_exact": 0.0625,
+  "candidate_sec": 0.49918016675053206,
+  "family": "isotropic",
+  "holdout_prompts": 32,
+  "kind": "search",
+  "pair_sec": 15.973765336017026,
+  "population": 64,
+  "screen_prompts": 32,
+  "top_holdout": [
+    {
+      "candidate": "isotropic:seed1113402598:s0.01:sign1",
+      "elapsed_s": 1.8823981285095215,
+      "exact_mean": 0.15625,
+      "malformed_mean": 0.03125,
+      "mutation_s": 0.005938291549682617,
+      "output_tokens": 993
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.01:sign1",
+      "elapsed_s": 1.8790836334228516,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.00594782829284668,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "isotropic:seed561980201:s0.01:sign-1",
+      "elapsed_s": 1.883702039718628,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0625,
+      "mutation_s": 0.005990505218505859,
+      "output_tokens": 1008
+    },
+    {
+      "candidate": "isotropic:seed685255715:s0.01:sign1",
+      "elapsed_s": 1.8802130222320557,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.03125,
+      "mutation_s": 0.00605010986328125,
+      "output_tokens": 993
+    }
+  ],
+  "top_screen": [
+    {
+      "candidate": "isotropic:seed1113402598:s0.01:sign1",
+      "elapsed_s": 1.8740389347076416,
+      "exact_mean": 0.15625,
+      "malformed_mean": 0.03125,
+      "mutation_s": 0.00602412223815918,
+      "output_tokens": 993
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.01:sign1",
+      "elapsed_s": 1.8788883686065674,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.007124423980712891,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "isotropic:seed561980201:s0.01:sign-1",
+      "elapsed_s": 1.877676010131836,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0625,
+      "mutation_s": 0.005898714065551758,
+      "output_tokens": 1008
+    },
+    {
+      "candidate": "isotropic:seed685255715:s0.01:sign1",
+      "elapsed_s": 1.8801867961883545,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.03125,
+      "mutation_s": 0.005932331085205078,
+      "output_tokens": 993
+    }
+  ]
+}
