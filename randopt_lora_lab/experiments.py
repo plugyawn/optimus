@@ -34,10 +34,16 @@ def evaluate_candidate(backend, candidate: Candidate | None, examples, family_st
     rows = []
     exact = []
     malformed = []
-    for ex, text in zip(examples, result.texts):
+    cap_hits = []
+    answer_closed = []
+    for ex, text, output_tokens in zip(examples, result.texts, result.token_counts):
         score = score_completion(text, ex)
         exact.append(score["exact"])
         malformed.append(float(score["malformed"]))
+        cap_hit = float(output_tokens >= backend.max_new_tokens)
+        closed = float("</answer>" in text)
+        cap_hits.append(cap_hit)
+        answer_closed.append(closed)
         rows.append(
             {
                 "candidate": key,
@@ -45,6 +51,9 @@ def evaluate_candidate(backend, candidate: Candidate | None, examples, family_st
                 "numbers": list(ex.numbers),
                 "target": ex.target,
                 "text": text,
+                "output_tokens": output_tokens,
+                "cap_hit": cap_hit,
+                "answer_closed": closed,
                 **score,
             }
         )
@@ -52,6 +61,8 @@ def evaluate_candidate(backend, candidate: Candidate | None, examples, family_st
         "candidate": key,
         "exact_mean": float(np.mean(exact)),
         "malformed_mean": float(np.mean(malformed)),
+        "cap_hit_mean": float(np.mean(cap_hits)),
+        "answer_closed_mean": float(np.mean(answer_closed)),
         "output_tokens": result.output_tokens,
         "elapsed_s": result.elapsed_s,
         "mutation_s": mutation_s,
@@ -67,6 +78,7 @@ def make_backend(args):
         max_new_tokens=args.max_new_tokens,
         batch_size=args.batch_size,
         dtype=args.dtype,
+        stop_at_answer=args.stop_at_answer,
     )
 
 
@@ -176,6 +188,8 @@ def run_search(args):
         "base_holdout_exact": base_holdout["exact_mean"],
         "candidate_sec": len(candidates) / total_s,
         "pair_sec": len(candidates) * len(screen) / total_s,
+        "max_new_tokens": args.max_new_tokens,
+        "stop_at_answer": args.stop_at_answer,
         "top_screen": top,
         "top_holdout": holdout_rows,
     }
@@ -240,6 +254,8 @@ def run_halving(args):
         "effective_prompt_evals": effective_prompt_evals,
         "full_prompt_evals": full_prompt_evals,
         "prompt_eval_savings": 1.0 - (effective_prompt_evals / full_prompt_evals),
+        "max_new_tokens": args.max_new_tokens,
+        "stop_at_answer": args.stop_at_answer,
         "top_stage": sorted(stage_rows, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(stage_rows))],
         "top_screen": top,
         "top_holdout": holdout_rows,
@@ -300,6 +316,8 @@ def run_sysbench(args):
         "best_prompts_per_sec": best.get("prompts_per_sec"),
         "best_batch_size": best.get("batch_size"),
         "best_prompt_count": best.get("prompt_count"),
+        "max_new_tokens": args.max_new_tokens,
+        "stop_at_answer": args.stop_at_answer,
         "rows": rows,
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
@@ -324,6 +342,7 @@ def main():
         sp.add_argument("--max-new-tokens", type=int, default=32)
         sp.add_argument("--batch-size", type=int, default=16)
         sp.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
+        sp.add_argument("--stop-at-answer", action="store_true")
         sp.add_argument("--family", default="isotropic", choices=["isotropic", "anzo"])
         sp.add_argument("--population", type=int, default=32)
         sp.add_argument("--promote", type=int, default=4)

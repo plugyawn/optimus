@@ -20,6 +20,11 @@ def read_jsonl(path: Path) -> list[dict]:
     return rows
 
 
+def max_present(rows: list[dict], key: str):
+    values = [x[key] for x in rows if key in x and x[key] is not None]
+    return max(values) if values else None
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--root", required=True)
@@ -37,21 +42,42 @@ def main():
     for row in summaries:
         top_holdout = row.get("top_holdout") or []
         best_holdout = max((x.get("exact_mean", 0.0) for x in top_holdout), default=None)
-        tokens_per_sec = row.get("best_tokens_per_sec", row.get("tokens_per_sec"))
-        prompts_per_sec = row.get("best_prompts_per_sec", row.get("prompts_per_sec"))
+        tokens_per_sec = (
+            row.get("mixed_tokens_per_sec")
+            or row.get("lora_tokens_per_sec")
+            or row.get("best_tokens_per_sec")
+            or row.get("tokens_per_sec")
+        )
+        prompts_per_sec = (
+            row.get("mixed_prompts_per_sec")
+            or row.get("lora_prompts_per_sec")
+            or row.get("best_prompts_per_sec")
+            or row.get("prompts_per_sec")
+        )
+        if row.get("mixed_tokens_per_sec"):
+            throughput_mode = "mixed_lora"
+        elif row.get("lora_tokens_per_sec"):
+            throughput_mode = "sequential_lora"
+        else:
+            throughput_mode = "native"
         flat.append(
             {
                 "run": row["run"],
                 "kind": row.get("kind"),
                 "family": row.get("family", ""),
                 "population": row.get("population", 0),
+                "stop_at_answer": row.get("stop_at_answer"),
+                "max_new_tokens": row.get("max_new_tokens"),
                 "base_screen_exact": row.get("base_screen_exact", row.get("base_exact")),
                 "best_holdout_exact": best_holdout,
+                "best_cap_hit_mean": max_present(top_holdout, "cap_hit_mean"),
+                "best_answer_closed_mean": max_present(top_holdout, "answer_closed_mean"),
                 "candidate_sec": row.get("candidate_sec"),
                 "pair_sec": row.get("pair_sec"),
                 "prompt_eval_savings": row.get("prompt_eval_savings"),
                 "best_tokens_per_sec": tokens_per_sec,
                 "best_prompts_per_sec": prompts_per_sec,
+                "throughput_mode": throughput_mode,
                 "best_batch_size": row.get("best_batch_size"),
             }
         )

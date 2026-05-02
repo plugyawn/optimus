@@ -247,17 +247,24 @@ def score_rows(
     candidate: str,
     examples: list[CountdownExample],
     outputs,
+    max_new_tokens: int,
 ) -> tuple[list[dict], dict]:
     rows = []
     exact = []
     malformed = []
+    cap_hits = []
+    answer_closed = []
     output_tokens = 0
     for ex, item in zip(examples, outputs):
         text, tokens = extract_output(item)
         output_tokens += tokens
         score = score_completion(text, ex)
+        cap_hit = float(tokens >= max_new_tokens)
+        closed = float("</answer>" in text)
         exact.append(float(score["exact"]))
         malformed.append(float(score["malformed"]))
+        cap_hits.append(cap_hit)
+        answer_closed.append(closed)
         rows.append(
             {
                 "mode": mode,
@@ -267,12 +274,16 @@ def score_rows(
                 "target": ex.target,
                 "text": text,
                 "output_tokens": tokens,
+                "cap_hit": cap_hit,
+                "answer_closed": closed,
                 **score,
             }
         )
     metrics = {
         "exact_mean": sum(exact) / max(len(exact), 1),
         "malformed_mean": sum(malformed) / max(len(malformed), 1),
+        "cap_hit_mean": sum(cap_hits) / max(len(cap_hits), 1),
+        "answer_closed_mean": sum(answer_closed) / max(len(answer_closed), 1),
         "output_tokens": output_tokens,
     }
     return rows, metrics
@@ -284,10 +295,13 @@ def score_mixed_rows(
     outputs,
     specs: list[AdapterSpec],
     prompts_per_adapter: int,
+    max_new_tokens: int,
 ) -> tuple[list[dict], dict]:
     rows = []
     exact = []
     malformed = []
+    cap_hits = []
+    answer_closed = []
     output_tokens = 0
     by_candidate: dict[str, dict] = {}
     for idx, item in enumerate(outputs):
@@ -298,14 +312,20 @@ def score_mixed_rows(
         text, tokens = extract_output(item)
         output_tokens += tokens
         score = score_completion(text, ex)
+        cap_hit = float(tokens >= max_new_tokens)
+        closed = float("</answer>" in text)
         exact.append(float(score["exact"]))
         malformed.append(float(score["malformed"]))
+        cap_hits.append(cap_hit)
+        answer_closed.append(closed)
         bucket = by_candidate.setdefault(
             spec.candidate,
-            {"exact": [], "malformed": [], "output_tokens": 0},
+            {"exact": [], "malformed": [], "cap_hit": [], "answer_closed": [], "output_tokens": 0},
         )
         bucket["exact"].append(float(score["exact"]))
         bucket["malformed"].append(float(score["malformed"]))
+        bucket["cap_hit"].append(cap_hit)
+        bucket["answer_closed"].append(closed)
         bucket["output_tokens"] += tokens
         rows.append(
             {
@@ -318,17 +338,23 @@ def score_mixed_rows(
                 "target": ex.target,
                 "text": text,
                 "output_tokens": tokens,
+                "cap_hit": cap_hit,
+                "answer_closed": closed,
                 **score,
             }
         )
     metrics = {
         "exact_mean": sum(exact) / max(len(exact), 1),
         "malformed_mean": sum(malformed) / max(len(malformed), 1),
+        "cap_hit_mean": sum(cap_hits) / max(len(cap_hits), 1),
+        "answer_closed_mean": sum(answer_closed) / max(len(answer_closed), 1),
         "output_tokens": output_tokens,
         "by_candidate": {
             candidate: {
                 "exact_mean": sum(values["exact"]) / max(len(values["exact"]), 1),
                 "malformed_mean": sum(values["malformed"]) / max(len(values["malformed"]), 1),
+                "cap_hit_mean": sum(values["cap_hit"]) / max(len(values["cap_hit"]), 1),
+                "answer_closed_mean": sum(values["answer_closed"]) / max(len(values["answer_closed"]), 1),
                 "output_tokens": values["output_tokens"],
             }
             for candidate, values in by_candidate.items()
@@ -341,6 +367,18 @@ def timed_generate(llm, prompts, sampling, *, lora_request=None) -> tuple[list, 
     start = time.time()
     outputs = llm.generate(prompts, sampling, lora_request=lora_request, use_tqdm=False)
     return outputs, time.time() - start
+
+
+def make_sampling_params(SamplingParams, max_tokens: int, stop_at_answer: bool):
+    kwargs = {"max_tokens": max_tokens, "temperature": 0.0}
+    if stop_at_answer:
+        kwargs["stop"] = ["</answer>"]
+        kwargs["include_stop_str_in_output"] = True
+    try:
+        return SamplingParams(**kwargs)
+    except TypeError:
+        kwargs.pop("include_stop_str_in_output", None)
+        return SamplingParams(**kwargs)
 
 
 def run_benchmark(args) -> dict:
@@ -371,7 +409,7 @@ def run_benchmark(args) -> dict:
         return summary
 
     LLM, SamplingParams, LoRARequest = import_vllm_lora_request()
-    sampling = SamplingParams(max_tokens=args.max_new_tokens, temperature=0.0)
+    sampling = make_sampling_params(SamplingParams, args.max_new_tokens, args.stop_at_answer)
     load_start = time.time()
     llm = LLM(
         model=args.model,
@@ -410,7 +448,13 @@ def run_benchmark(args) -> dict:
     adapter_rows = []
     if args.include_base:
         outputs, elapsed_s = timed_generate(llm, prompt_texts, sampling)
-        rows, metrics = score_rows(mode="base", candidate="base", examples=examples, outputs=outputs)
+        rows, metrics = score_rows(
+            mode="base",
+            candidate="base",
+            examples=examples,
+            outputs=outputs,
+            max_new_tokens=args.max_new_tokens,
+        )
         per_prompt_rows.extend(rows)
         adapter_rows.append(
             {
@@ -434,6 +478,7 @@ def run_benchmark(args) -> dict:
                 candidate=spec.candidate,
                 examples=examples,
                 outputs=outputs,
+                max_new_tokens=args.max_new_tokens,
             )
             per_prompt_rows.extend(rows)
             adapter_rows.append(
@@ -463,6 +508,7 @@ def run_benchmark(args) -> dict:
             outputs=outputs,
             specs=specs,
             prompts_per_adapter=len(prompt_texts),
+            max_new_tokens=args.max_new_tokens,
         )
         mixed_rows.extend(rows)
         per_prompt_rows.extend(rows)
@@ -505,6 +551,7 @@ def run_benchmark(args) -> dict:
         "prompts": len(prompt_texts),
         "repeats": args.repeats,
         "max_new_tokens": args.max_new_tokens,
+        "stop_at_answer": args.stop_at_answer,
         "adapter_build_s": adapter_build_s,
         "load_s": load_s,
         "preload": args.preload,
@@ -565,6 +612,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--targets", default=DEFAULT_TARGETS)
     p.add_argument("--family", default="isotropic", choices=["isotropic"])
     p.add_argument("--max-new-tokens", type=int, default=32)
+    p.add_argument("--stop-at-answer", action="store_true")
     p.add_argument("--dtype", default="bfloat16")
     p.add_argument("--adapter-dtype", default="bfloat16", choices=["float16", "bfloat16", "float32"])
     p.add_argument("--gpu-memory-utilization", type=float, default=0.82)

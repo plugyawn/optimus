@@ -264,6 +264,8 @@ def run_search(args):
         "antithetic": args.antithetic,
         "screen_prompts": len(screen),
         "holdout_prompts": len(holdout),
+        "max_new_tokens": args.max_new_tokens,
+        "stop_at_answer": args.stop_at_answer,
         "base_screen_exact": base_screen["exact_mean"],
         "base_holdout_exact": base_holdout["exact_mean"],
         "best_holdout_exact": best_holdout,
@@ -302,6 +304,7 @@ def add_common_args(sp):
     sp.add_argument("--max-new-tokens", type=int, default=32)
     sp.add_argument("--batch-size", type=int, default=16)
     sp.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
+    sp.add_argument("--stop-at-answer", action="store_true")
 
 
 def main():
