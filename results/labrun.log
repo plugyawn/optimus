@@ -588,3 +588,16 @@ search_anzo_p64 search      anzo          64             0.0625               0.
  search_iso_p32 search isotropic          32             0.0625               0.000       0.473247 15.143888                None                None            None
          oracle oracle                     0             0.1250                 NaN            NaN       NaN                None                None            None
  search_iso_p64 search isotropic          64             0.0625               0.000       0.499594 15.987010                None                None            None
+[main c101ef1] Add report
+ 4 files changed, 35 insertions(+)
+ create mode 100644 results/report/candidate_sec.png
+ create mode 100644 results/report/report.md
+ create mode 100644 results/report/summary.csv
+To https://github.com/plugyawn/randopt-lora-lab.git
+ ! [rejected]        main -> main (fetch first)
+error: failed to push some refs to 'https://github.com/plugyawn/randopt-lora-lab.git'
+hint: Updates were rejected because the remote contains work that you do
+hint: not have locally. This is usually caused by another repository pushing
+hint: to the same ref. You may want to first integrate the remote changes
+hint: (e.g., 'git pull ...') before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
