@@ -1,0 +1,79 @@
+{
+  "base_holdout_exact": 0.0625,
+  "base_screen_exact": 0.0625,
+  "candidate_sec": 0.4523577358781101,
+  "family": "anzo",
+  "holdout_prompts": 32,
+  "kind": "search",
+  "pair_sec": 14.475447548099524,
+  "population": 32,
+  "screen_prompts": 32,
+  "top_holdout": [
+    {
+      "candidate": "anzo:seed225255239:s0.02:sign1",
+      "elapsed_s": 2.014120578765869,
+      "exact_mean": 0.125,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.009264707565307617,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed298028866:s0.02:sign1",
+      "elapsed_s": 2.0146875381469727,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.00928354263305664,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 1.9843201637268066,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008985280990600586,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed2121586239:s0.02:sign-1",
+      "elapsed_s": 2.009686231613159,
+      "exact_mean": 0.0625,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.009128093719482422,
+      "output_tokens": 992
+    }
+  ],
+  "top_screen": [
+    {
+      "candidate": "anzo:seed225255239:s0.02:sign1",
+      "elapsed_s": 1.9135255813598633,
+      "exact_mean": 0.125,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.0086517333984375,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed298028866:s0.02:sign1",
+      "elapsed_s": 1.9220399856567383,
+      "exact_mean": 0.125,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008658170700073242,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 1.912275791168213,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.00871896743774414,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed2121586239:s0.02:sign-1",
+      "elapsed_s": 1.9149177074432373,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008665800094604492,
+      "output_tokens": 992
+    }
+  ]
+}
