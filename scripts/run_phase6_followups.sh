@@ -105,6 +105,48 @@ if enough_time 900; then
   push_results "Add 64-prompt mixed LoRA bench"
 fi
 
+if enough_time 1200; then
+  python -m randopt_lora_lab.vllm_lora_search \
+    --out results/vllm_lora_search_iso_s0p01_p512_stop \
+    --model Qwen/Qwen2.5-3B-Instruct \
+    --family isotropic \
+    --population 512 \
+    --sigma 0.01 \
+    --seed 5678 \
+    --prompts 32 \
+    --holdout-prompts 64 \
+    --promote 8 \
+    --rank 8 \
+    --targets q_proj,v_proj \
+    --max-loras 32 \
+    --chunk-adapters 32 \
+    --max-cpu-loras 1024 \
+    --antithetic \
+    --stop-at-answer
+  push_results "Add vLLM mixed LoRA P512 search"
+fi
+
+if enough_time 1200; then
+  python -m randopt_lora_lab.vllm_lora_search \
+    --out results/vllm_lora_search_iso_s0p0075_p512_stop \
+    --model Qwen/Qwen2.5-3B-Instruct \
+    --family isotropic \
+    --population 512 \
+    --sigma 0.0075 \
+    --seed 2468 \
+    --prompts 32 \
+    --holdout-prompts 64 \
+    --promote 8 \
+    --rank 8 \
+    --targets q_proj,v_proj \
+    --max-loras 32 \
+    --chunk-adapters 32 \
+    --max-cpu-loras 1024 \
+    --antithetic \
+    --stop-at-answer
+  push_results "Add vLLM mixed LoRA sigma 0.0075 search"
+fi
+
 if enough_time 2700; then
   python -m randopt_lora_lab.experiments search \
     --out results/search_iso_s0p0075_p512_seed2468 \

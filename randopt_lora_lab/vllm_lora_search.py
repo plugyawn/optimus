@@ -1,0 +1,308 @@
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import time
+from dataclasses import asdict
+from pathlib import Path
+
+import numpy as np
+
+from .countdown import load_examples, prompts as make_prompts
+from .vllm_lora_bench import (
+    AdapterSpec,
+    Candidate,
+    import_vllm_lora_request,
+    make_sampling_params,
+    parse_targets,
+    qwen_lora_shapes,
+    save_seed_adapter,
+    score_mixed_rows,
+    score_rows,
+    write_json,
+    write_jsonl,
+)
+
+
+def candidate_panel(family: str, population: int, sigma: float, seed: int, antithetic: bool) -> list[Candidate]:
+    rng = np.random.default_rng(seed)
+    seeds = [int(x) for x in rng.integers(1, 2**31 - 1, size=population if not antithetic else population // 2)]
+    out = []
+    for candidate_seed in seeds:
+        out.append(Candidate(family, candidate_seed, sigma, 1))
+        if antithetic:
+            out.append(Candidate(family, candidate_seed, sigma, -1))
+    return out[:population]
+
+
+def safe_name(candidate: Candidate) -> str:
+    sign = "pos" if candidate.sign > 0 else "neg"
+    return f"randopt_seed{candidate.seed}_s{candidate.sigma:g}_{sign}"
+
+
+def make_adapter_specs(args, out: Path, targets: list[str], candidates: list[Candidate]) -> list[AdapterSpec]:
+    from transformers import AutoConfig
+
+    config = AutoConfig.from_pretrained(
+        args.model,
+        trust_remote_code=True,
+        local_files_only=args.local_files_only,
+    )
+    model_type = str(getattr(config, "model_type", ""))
+    if not model_type.startswith("qwen2"):
+        raise ValueError(f"{args.model} has model_type={model_type!r}; direct adapter generation is only validated for Qwen2.")
+
+    # Force shape validation before spending time writing many adapter files.
+    qwen_lora_shapes(config, targets)
+    adapter_root = Path(args.adapter_dir) if args.adapter_dir else out / "adapters"
+    adapter_root.mkdir(parents=True, exist_ok=True)
+    specs = []
+    for idx, candidate in enumerate(candidates):
+        name = safe_name(candidate)
+        path = adapter_root / f"{idx:05d}_{name}"
+        save_seed_adapter(
+            path,
+            model=args.model,
+            candidate=candidate,
+            rank=args.rank,
+            targets=targets,
+            config=config,
+            tensor_dtype=args.adapter_dtype,
+        )
+        specs.append(
+            AdapterSpec(
+                index=idx,
+                name=name,
+                lora_int_id=idx + 1,
+                path=str(path.resolve()),
+                candidate=candidate.key,
+                seed=candidate.seed,
+                sigma=candidate.sigma,
+                sign=candidate.sign,
+            )
+        )
+    return specs
+
+
+def reset_outputs(out: Path) -> None:
+    for name in ["adapters.jsonl", "candidate_summary.jsonl", "per_prompt.jsonl", "holdout_per_prompt.jsonl"]:
+        path = out / name
+        if path.exists():
+            path.unlink()
+
+
+def mixed_eval(llm, LoRARequest, sampling, examples, specs: list[AdapterSpec], args, *, mode: str) -> tuple[list[dict], list[dict], dict]:
+    prompt_texts = make_prompts(examples)
+    per_prompt_rows = []
+    candidate_rows = []
+    total_elapsed = 0.0
+    total_tokens = 0
+    chunk_size = max(1, min(args.chunk_adapters, args.max_loras))
+    for chunk_start in range(0, len(specs), chunk_size):
+        chunk = specs[chunk_start : chunk_start + chunk_size]
+        prompts = []
+        requests = []
+        for spec in chunk:
+            req = LoRARequest(spec.name, spec.lora_int_id, spec.path)
+            prompts.extend(prompt_texts)
+            requests.extend([req] * len(prompt_texts))
+        start = time.time()
+        outputs = llm.generate(prompts, sampling, lora_request=requests, use_tqdm=False)
+        elapsed = time.time() - start
+        rows, metrics = score_mixed_rows(
+            examples=examples,
+            outputs=outputs,
+            specs=chunk,
+            prompts_per_adapter=len(prompt_texts),
+            max_new_tokens=args.max_new_tokens,
+        )
+        per_prompt_rows.extend(dict(row, mode=mode) for row in rows)
+        total_elapsed += elapsed
+        total_tokens += int(metrics["output_tokens"])
+        by_candidate = metrics.pop("by_candidate")
+        for spec in chunk:
+            row = dict(by_candidate[spec.candidate])
+            row.update(
+                {
+                    "candidate": spec.candidate,
+                    "adapter_index": spec.index,
+                    "adapter": spec.name,
+                    "mode": mode,
+                    "elapsed_s": elapsed / max(len(chunk), 1),
+                    "prompts": len(prompt_texts),
+                }
+            )
+            candidate_rows.append(row)
+    aggregate = {
+        "elapsed_s": total_elapsed,
+        "output_tokens": total_tokens,
+        "tokens_per_sec": total_tokens / max(total_elapsed, 1e-9),
+        "prompts_per_sec": (len(specs) * len(prompt_texts)) / max(total_elapsed, 1e-9),
+        "candidate_sec": len(specs) / max(total_elapsed, 1e-9),
+    }
+    return per_prompt_rows, candidate_rows, aggregate
+
+
+def base_eval(llm, sampling, examples, args, *, mode: str) -> tuple[list[dict], dict]:
+    prompt_texts = make_prompts(examples)
+    start = time.time()
+    outputs = llm.generate(prompt_texts, sampling, use_tqdm=False)
+    elapsed = time.time() - start
+    rows, metrics = score_rows(
+        mode=mode,
+        candidate="base",
+        examples=examples,
+        outputs=outputs,
+        max_new_tokens=args.max_new_tokens,
+    )
+    metrics["elapsed_s"] = elapsed
+    metrics["tokens_per_sec"] = metrics["output_tokens"] / max(elapsed, 1e-9)
+    metrics["prompts_per_sec"] = len(prompt_texts) / max(elapsed, 1e-9)
+    return rows, metrics
+
+
+def run_search(args) -> dict:
+    targets = parse_targets(args.targets)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    reset_outputs(out)
+    write_json(out / "args.json", vars(args))
+
+    screen = load_examples(args.data, args.prompts, args.seed)
+    holdout = load_examples(args.data, args.holdout_prompts, args.seed + 999)
+    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic)
+
+    adapter_start = time.time()
+    specs = make_adapter_specs(args, out, targets, candidates)
+    adapter_build_s = time.time() - adapter_start
+    write_jsonl(out / "adapters.jsonl", [asdict(spec) for spec in specs])
+
+    LLM, SamplingParams, LoRARequest = import_vllm_lora_request()
+    sampling = make_sampling_params(SamplingParams, args.max_new_tokens, args.stop_at_answer)
+    load_start = time.time()
+    llm = LLM(
+        model=args.model,
+        dtype=args.dtype,
+        trust_remote_code=True,
+        gpu_memory_utilization=args.gpu_memory_utilization,
+        max_model_len=args.max_model_len,
+        enable_lora=True,
+        max_loras=args.max_loras,
+        max_lora_rank=args.rank,
+        max_cpu_loras=max(args.max_cpu_loras, len(specs)),
+    )
+    load_s = time.time() - load_start
+
+    base_screen_rows, base_screen = base_eval(llm, sampling, screen, args, mode="base_screen")
+    base_holdout_rows, base_holdout = base_eval(llm, sampling, holdout, args, mode="base_holdout")
+    write_jsonl(out / "per_prompt.jsonl", base_screen_rows)
+    write_jsonl(out / "holdout_per_prompt.jsonl", base_holdout_rows)
+
+    screen_rows, candidate_rows, screen_aggregate = mixed_eval(
+        llm,
+        LoRARequest,
+        sampling,
+        screen,
+        specs,
+        args,
+        mode="screen",
+    )
+    write_jsonl(out / "per_prompt.jsonl", screen_rows)
+    write_jsonl(out / "candidate_summary.jsonl", candidate_rows)
+
+    top = sorted(candidate_rows, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(candidate_rows))]
+    top_specs = {spec.candidate: spec for spec in specs}
+    holdout_specs = [top_specs[row["candidate"]] for row in top]
+    holdout_rows, holdout_candidate_rows, holdout_aggregate = mixed_eval(
+        llm,
+        LoRARequest,
+        sampling,
+        holdout,
+        holdout_specs,
+        args,
+        mode="holdout",
+    )
+    write_jsonl(out / "holdout_per_prompt.jsonl", holdout_rows)
+
+    by_candidate_holdout = {row["candidate"]: row for row in holdout_candidate_rows}
+    top_holdout = [by_candidate_holdout[row["candidate"]] for row in top if row["candidate"] in by_candidate_holdout]
+    total_eval_s = screen_aggregate["elapsed_s"] + holdout_aggregate["elapsed_s"]
+    adapters_kept = bool(args.keep_adapters or args.adapter_dir)
+    if not adapters_kept:
+        shutil.rmtree(out / "adapters", ignore_errors=True)
+    summary = {
+        "kind": "vllm_lora_search",
+        "model": args.model,
+        "family": args.family,
+        "population": len(specs),
+        "rank": args.rank,
+        "sigma": args.sigma,
+        "targets": targets,
+        "antithetic": args.antithetic,
+        "screen_prompts": len(screen),
+        "holdout_prompts": len(holdout),
+        "promote": args.promote,
+        "max_loras": args.max_loras,
+        "chunk_adapters": args.chunk_adapters,
+        "max_new_tokens": args.max_new_tokens,
+        "stop_at_answer": args.stop_at_answer,
+        "adapter_build_s": adapter_build_s,
+        "adapters_kept": adapters_kept,
+        "load_s": load_s,
+        "base_screen_exact": base_screen["exact_mean"],
+        "base_holdout_exact": base_holdout["exact_mean"],
+        "screen_tokens_per_sec": screen_aggregate["tokens_per_sec"],
+        "screen_prompts_per_sec": screen_aggregate["prompts_per_sec"],
+        "screen_candidate_sec": screen_aggregate["candidate_sec"],
+        "holdout_tokens_per_sec": holdout_aggregate["tokens_per_sec"],
+        "eval_elapsed_s": total_eval_s,
+        "candidate_sec": len(specs) / max(total_eval_s, 1e-9),
+        "best_tokens_per_sec": screen_aggregate["tokens_per_sec"],
+        "best_prompts_per_sec": screen_aggregate["prompts_per_sec"],
+        "top_screen": top,
+        "top_holdout": top_holdout,
+    }
+    write_json(out / "summary.json", summary)
+    print(json.dumps(summary, indent=2, sort_keys=True))
+    return summary
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description="Run mixed-batch vLLM LoRA RandOpt search.")
+    p.add_argument("--out", required=True)
+    p.add_argument("--model", default="Qwen/Qwen2.5-3B-Instruct")
+    p.add_argument("--data", default=None)
+    p.add_argument("--prompts", type=int, default=32)
+    p.add_argument("--holdout-prompts", type=int, default=32)
+    p.add_argument("--seed", type=int, default=1234)
+    p.add_argument("--population", type=int, default=128)
+    p.add_argument("--promote", type=int, default=8)
+    p.add_argument("--rank", type=int, default=8)
+    p.add_argument("--sigma", type=float, default=0.01)
+    p.add_argument("--targets", default="q_proj,v_proj")
+    p.add_argument("--family", default="isotropic", choices=["isotropic"])
+    p.add_argument("--antithetic", action="store_true")
+    p.add_argument("--max-new-tokens", type=int, default=32)
+    p.add_argument("--stop-at-answer", action="store_true")
+    p.add_argument("--dtype", default="bfloat16")
+    p.add_argument("--adapter-dtype", default="bfloat16", choices=["float16", "bfloat16", "float32"])
+    p.add_argument("--gpu-memory-utilization", type=float, default=0.82)
+    p.add_argument("--max-model-len", type=int, default=1024)
+    p.add_argument("--max-loras", type=int, default=32)
+    p.add_argument("--max-cpu-loras", type=int, default=1024)
+    p.add_argument("--chunk-adapters", type=int, default=32)
+    p.add_argument("--adapter-dir", default=None)
+    p.add_argument("--keep-adapters", action="store_true")
+    p.add_argument("--local-files-only", action="store_true")
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    run_search(args)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
