@@ -1,0 +1,123 @@
+{
+  "base_holdout_exact": 0.0625,
+  "base_screen_exact": 0.0625,
+  "base_stage_exact": 0.25,
+  "candidate_sec": 0.8167123248652334,
+  "effective_prompt_evals": 1664,
+  "family": "isotropic",
+  "full_prompt_evals": 4224,
+  "holdout_prompts": 32,
+  "kind": "halving",
+  "population": 128,
+  "prompt_eval_savings": 0.6060606060606061,
+  "prompt_eval_sec": 10.617260223248035,
+  "screen_prompts": 32,
+  "stage_prompts": 8,
+  "survivors": 16,
+  "top_holdout": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign1",
+      "elapsed_s": 1.8589837551116943,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005804777145385742,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 1.8629565238952637,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005922794342041016,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign1",
+      "elapsed_s": 1.866037130355835,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005857229232788086,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign-1",
+      "elapsed_s": 1.8605728149414062,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005820274353027344,
+      "output_tokens": 1024
+    }
+  ],
+  "top_screen": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign1",
+      "elapsed_s": 1.8577497005462646,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005770444869995117,
+      "output_tokens": 1024,
+      "stage_exact_mean": 0.0
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 1.857097864151001,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005819797515869141,
+      "output_tokens": 1024,
+      "stage_exact_mean": 0.0
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign1",
+      "elapsed_s": 1.8587958812713623,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005874156951904297,
+      "output_tokens": 1024,
+      "stage_exact_mean": 0.0
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign-1",
+      "elapsed_s": 1.8581199645996094,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.0060901641845703125,
+      "output_tokens": 1024,
+      "stage_exact_mean": 0.0
+    }
+  ],
+  "top_stage": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign1",
+      "elapsed_s": 0.925347089767456,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.006997108459472656,
+      "output_tokens": 256
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 0.9273090362548828,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.0059163570404052734,
+      "output_tokens": 256
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign1",
+      "elapsed_s": 0.9237842559814453,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005883693695068359,
+      "output_tokens": 256
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign-1",
+      "elapsed_s": 0.9276747703552246,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005819082260131836,
+      "output_tokens": 256
+    }
+  ]
+}

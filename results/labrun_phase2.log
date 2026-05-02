@@ -1698,3 +1698,289 @@ The following generation flags are not valid and may be ignored: ['temperature',
     }
   ]
 }
+[main 8442405] Add isotropic sigma 0.04 search
+ 5 files changed, 2481 insertions(+)
+ create mode 100644 results/sigma_iso_p64_s0p04/candidate_summary.jsonl
+ create mode 100644 results/sigma_iso_p64_s0p04/holdout_per_prompt.jsonl
+ create mode 100644 results/sigma_iso_p64_s0p04/per_prompt.jsonl
+ create mode 100644 results/sigma_iso_p64_s0p04/summary.json
+To https://github.com/plugyawn/randopt-lora-lab.git
+ ! [rejected]        main -> main (fetch first)
+error: failed to push some refs to 'https://github.com/plugyawn/randopt-lora-lab.git'
+hint: Updates were rejected because the remote contains work that you do
+hint: not have locally. This is usually caused by another repository pushing
+hint: to the same ref. You may want to first integrate the remote changes
+hint: (e.g., 'git pull ...') before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+/root/randopt-lora-lab/.venv/lib/python3.10/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.70it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.29it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.17it/s]
+The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+stage 1/128 isotropic:seed2103139804:s0.02:sign1 exact=0.0000
+stage 2/128 isotropic:seed2103139804:s0.02:sign-1 exact=0.0000
+stage 3/128 isotropic:seed2097446776:s0.02:sign1 exact=0.0000
+stage 4/128 isotropic:seed2097446776:s0.02:sign-1 exact=0.0000
+stage 5/128 isotropic:seed2121586239:s0.02:sign1 exact=0.0000
+stage 6/128 isotropic:seed2121586239:s0.02:sign-1 exact=0.0000
+stage 7/128 isotropic:seed816464123:s0.02:sign1 exact=0.0000
+stage 8/128 isotropic:seed816464123:s0.02:sign-1 exact=0.0000
+stage 9/128 isotropic:seed367992410:s0.02:sign1 exact=0.0000
+stage 10/128 isotropic:seed367992410:s0.02:sign-1 exact=0.0000
+stage 11/128 isotropic:seed1982656189:s0.02:sign1 exact=0.0000
+stage 12/128 isotropic:seed1982656189:s0.02:sign-1 exact=0.0000
+stage 13/128 isotropic:seed225255239:s0.02:sign1 exact=0.0000
+stage 14/128 isotropic:seed225255239:s0.02:sign-1 exact=0.0000
+stage 15/128 isotropic:seed561980201:s0.02:sign1 exact=0.0000
+stage 16/128 isotropic:seed561980201:s0.02:sign-1 exact=0.0000
+stage 17/128 isotropic:seed298028866:s0.02:sign1 exact=0.0000
+stage 18/128 isotropic:seed298028866:s0.02:sign-1 exact=0.0000
+stage 19/128 isotropic:seed685255715:s0.02:sign1 exact=0.0000
+stage 20/128 isotropic:seed685255715:s0.02:sign-1 exact=0.0000
+stage 21/128 isotropic:seed1151155068:s0.02:sign1 exact=0.0000
+stage 22/128 isotropic:seed1151155068:s0.02:sign-1 exact=0.0000
+stage 23/128 isotropic:seed253598992:s0.02:sign1 exact=0.0000
+stage 24/128 isotropic:seed253598992:s0.02:sign-1 exact=0.0000
+stage 25/128 isotropic:seed1709091010:s0.02:sign1 exact=0.0000
+stage 26/128 isotropic:seed1709091010:s0.02:sign-1 exact=0.0000
+stage 27/128 isotropic:seed519189161:s0.02:sign1 exact=0.0000
+stage 28/128 isotropic:seed519189161:s0.02:sign-1 exact=0.0000
+stage 29/128 isotropic:seed1688041804:s0.02:sign1 exact=0.0000
+stage 30/128 isotropic:seed1688041804:s0.02:sign-1 exact=0.0000
+stage 31/128 isotropic:seed684046403:s0.02:sign1 exact=0.0000
+stage 32/128 isotropic:seed684046403:s0.02:sign-1 exact=0.0000
+stage 33/128 isotropic:seed1704011245:s0.02:sign1 exact=0.0000
+stage 34/128 isotropic:seed1704011245:s0.02:sign-1 exact=0.0000
+stage 35/128 isotropic:seed2070344413:s0.02:sign1 exact=0.0000
+stage 36/128 isotropic:seed2070344413:s0.02:sign-1 exact=0.0000
+stage 37/128 isotropic:seed2057996156:s0.02:sign1 exact=0.0000
+stage 38/128 isotropic:seed2057996156:s0.02:sign-1 exact=0.0000
+stage 39/128 isotropic:seed566183643:s0.02:sign1 exact=0.0000
+stage 40/128 isotropic:seed566183643:s0.02:sign-1 exact=0.0000
+stage 41/128 isotropic:seed1193176983:s0.02:sign1 exact=0.0000
+stage 42/128 isotropic:seed1193176983:s0.02:sign-1 exact=0.0000
+stage 43/128 isotropic:seed947053435:s0.02:sign1 exact=0.0000
+stage 44/128 isotropic:seed947053435:s0.02:sign-1 exact=0.0000
+stage 45/128 isotropic:seed547003393:s0.02:sign1 exact=0.0000
+stage 46/128 isotropic:seed547003393:s0.02:sign-1 exact=0.0000
+stage 47/128 isotropic:seed1309687590:s0.02:sign1 exact=0.0000
+stage 48/128 isotropic:seed1309687590:s0.02:sign-1 exact=0.0000
+stage 49/128 isotropic:seed1926505261:s0.02:sign1 exact=0.0000
+stage 50/128 isotropic:seed1926505261:s0.02:sign-1 exact=0.0000
+stage 51/128 isotropic:seed1854612611:s0.02:sign1 exact=0.0000
+stage 52/128 isotropic:seed1854612611:s0.02:sign-1 exact=0.0000
+stage 53/128 isotropic:seed1387222073:s0.02:sign1 exact=0.0000
+stage 54/128 isotropic:seed1387222073:s0.02:sign-1 exact=0.0000
+stage 55/128 isotropic:seed1854905472:s0.02:sign1 exact=0.0000
+stage 56/128 isotropic:seed1854905472:s0.02:sign-1 exact=0.0000
+stage 57/128 isotropic:seed1113402598:s0.02:sign1 exact=0.0000
+stage 58/128 isotropic:seed1113402598:s0.02:sign-1 exact=0.0000
+stage 59/128 isotropic:seed1449296584:s0.02:sign1 exact=0.0000
+stage 60/128 isotropic:seed1449296584:s0.02:sign-1 exact=0.0000
+stage 61/128 isotropic:seed2051021141:s0.02:sign1 exact=0.0000
+stage 62/128 isotropic:seed2051021141:s0.02:sign-1 exact=0.0000
+stage 63/128 isotropic:seed1417069371:s0.02:sign1 exact=0.0000
+stage 64/128 isotropic:seed1417069371:s0.02:sign-1 exact=0.0000
+stage 65/128 isotropic:seed101487544:s0.02:sign1 exact=0.0000
+stage 66/128 isotropic:seed101487544:s0.02:sign-1 exact=0.0000
+stage 67/128 isotropic:seed1580027625:s0.02:sign1 exact=0.0000
+stage 68/128 isotropic:seed1580027625:s0.02:sign-1 exact=0.0000
+stage 69/128 isotropic:seed1586287864:s0.02:sign1 exact=0.0000
+stage 70/128 isotropic:seed1586287864:s0.02:sign-1 exact=0.0000
+stage 71/128 isotropic:seed478359838:s0.02:sign1 exact=0.0000
+stage 72/128 isotropic:seed478359838:s0.02:sign-1 exact=0.0000
+stage 73/128 isotropic:seed1862054947:s0.02:sign1 exact=0.0000
+stage 74/128 isotropic:seed1862054947:s0.02:sign-1 exact=0.0000
+stage 75/128 isotropic:seed369509318:s0.02:sign1 exact=0.0000
+stage 76/128 isotropic:seed369509318:s0.02:sign-1 exact=0.0000
+stage 77/128 isotropic:seed1693758289:s0.02:sign1 exact=0.0000
+stage 78/128 isotropic:seed1693758289:s0.02:sign-1 exact=0.0000
+stage 79/128 isotropic:seed1869201919:s0.02:sign1 exact=0.0000
+stage 80/128 isotropic:seed1869201919:s0.02:sign-1 exact=0.0000
+stage 81/128 isotropic:seed1036897055:s0.02:sign1 exact=0.0000
+stage 82/128 isotropic:seed1036897055:s0.02:sign-1 exact=0.0000
+stage 83/128 isotropic:seed129146784:s0.02:sign1 exact=0.0000
+stage 84/128 isotropic:seed129146784:s0.02:sign-1 exact=0.0000
+stage 85/128 isotropic:seed348608486:s0.02:sign1 exact=0.0000
+stage 86/128 isotropic:seed348608486:s0.02:sign-1 exact=0.0000
+stage 87/128 isotropic:seed1468210752:s0.02:sign1 exact=0.0000
+stage 88/128 isotropic:seed1468210752:s0.02:sign-1 exact=0.0000
+stage 89/128 isotropic:seed89257228:s0.02:sign1 exact=0.0000
+stage 90/128 isotropic:seed89257228:s0.02:sign-1 exact=0.0000
+stage 91/128 isotropic:seed1441472669:s0.02:sign1 exact=0.0000
+stage 92/128 isotropic:seed1441472669:s0.02:sign-1 exact=0.0000
+stage 93/128 isotropic:seed300078610:s0.02:sign1 exact=0.0000
+stage 94/128 isotropic:seed300078610:s0.02:sign-1 exact=0.0000
+stage 95/128 isotropic:seed1312151122:s0.02:sign1 exact=0.0000
+stage 96/128 isotropic:seed1312151122:s0.02:sign-1 exact=0.0000
+stage 97/128 isotropic:seed1178406770:s0.02:sign1 exact=0.0000
+stage 98/128 isotropic:seed1178406770:s0.02:sign-1 exact=0.0000
+stage 99/128 isotropic:seed129143896:s0.02:sign1 exact=0.0000
+stage 100/128 isotropic:seed129143896:s0.02:sign-1 exact=0.0000
+stage 101/128 isotropic:seed383297719:s0.02:sign1 exact=0.0000
+stage 102/128 isotropic:seed383297719:s0.02:sign-1 exact=0.0000
+stage 103/128 isotropic:seed2099743525:s0.02:sign1 exact=0.0000
+stage 104/128 isotropic:seed2099743525:s0.02:sign-1 exact=0.0000
+stage 105/128 isotropic:seed866354995:s0.02:sign1 exact=0.0000
+stage 106/128 isotropic:seed866354995:s0.02:sign-1 exact=0.0000
+stage 107/128 isotropic:seed942641440:s0.02:sign1 exact=0.0000
+stage 108/128 isotropic:seed942641440:s0.02:sign-1 exact=0.0000
+stage 109/128 isotropic:seed973428786:s0.02:sign1 exact=0.0000
+stage 110/128 isotropic:seed973428786:s0.02:sign-1 exact=0.0000
+stage 111/128 isotropic:seed1143739099:s0.02:sign1 exact=0.0000
+stage 112/128 isotropic:seed1143739099:s0.02:sign-1 exact=0.0000
+stage 113/128 isotropic:seed414567854:s0.02:sign1 exact=0.0000
+stage 114/128 isotropic:seed414567854:s0.02:sign-1 exact=0.0000
+stage 115/128 isotropic:seed6726536:s0.02:sign1 exact=0.0000
+stage 116/128 isotropic:seed6726536:s0.02:sign-1 exact=0.0000
+stage 117/128 isotropic:seed1386703662:s0.02:sign1 exact=0.0000
+stage 118/128 isotropic:seed1386703662:s0.02:sign-1 exact=0.0000
+stage 119/128 isotropic:seed539592000:s0.02:sign1 exact=0.0000
+stage 120/128 isotropic:seed539592000:s0.02:sign-1 exact=0.0000
+stage 121/128 isotropic:seed1412280717:s0.02:sign1 exact=0.0000
+stage 122/128 isotropic:seed1412280717:s0.02:sign-1 exact=0.0000
+stage 123/128 isotropic:seed1843594175:s0.02:sign1 exact=0.0000
+stage 124/128 isotropic:seed1843594175:s0.02:sign-1 exact=0.0000
+stage 125/128 isotropic:seed925365952:s0.02:sign1 exact=0.0000
+stage 126/128 isotropic:seed925365952:s0.02:sign-1 exact=0.0000
+stage 127/128 isotropic:seed913321254:s0.02:sign1 exact=0.0000
+stage 128/128 isotropic:seed913321254:s0.02:sign-1 exact=0.0000
+full 1/16 isotropic:seed2103139804:s0.02:sign1 exact=0.0000
+full 2/16 isotropic:seed2103139804:s0.02:sign-1 exact=0.0000
+full 3/16 isotropic:seed2097446776:s0.02:sign1 exact=0.0000
+full 4/16 isotropic:seed2097446776:s0.02:sign-1 exact=0.0000
+full 5/16 isotropic:seed2121586239:s0.02:sign1 exact=0.0000
+full 6/16 isotropic:seed2121586239:s0.02:sign-1 exact=0.0000
+full 7/16 isotropic:seed816464123:s0.02:sign1 exact=0.0000
+full 8/16 isotropic:seed816464123:s0.02:sign-1 exact=0.0000
+full 9/16 isotropic:seed367992410:s0.02:sign1 exact=0.0000
+full 10/16 isotropic:seed367992410:s0.02:sign-1 exact=0.0000
+full 11/16 isotropic:seed1982656189:s0.02:sign1 exact=0.0000
+full 12/16 isotropic:seed1982656189:s0.02:sign-1 exact=0.0000
+full 13/16 isotropic:seed225255239:s0.02:sign1 exact=0.0000
+full 14/16 isotropic:seed225255239:s0.02:sign-1 exact=0.0000
+full 15/16 isotropic:seed561980201:s0.02:sign1 exact=0.0000
+full 16/16 isotropic:seed561980201:s0.02:sign-1 exact=0.0000
+{
+  "base_holdout_exact": 0.0625,
+  "base_screen_exact": 0.0625,
+  "base_stage_exact": 0.25,
+  "candidate_sec": 0.8167123248652334,
+  "effective_prompt_evals": 1664,
+  "family": "isotropic",
+  "full_prompt_evals": 4224,
+  "holdout_prompts": 32,
+  "kind": "halving",
+  "population": 128,
+  "prompt_eval_savings": 0.6060606060606061,
+  "prompt_eval_sec": 10.617260223248035,
+  "screen_prompts": 32,
+  "stage_prompts": 8,
+  "survivors": 16,
+  "top_holdout": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign1",
+      "elapsed_s": 1.8589837551116943,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005804777145385742,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 1.8629565238952637,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005922794342041016,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign1",
+      "elapsed_s": 1.866037130355835,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005857229232788086,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign-1",
+      "elapsed_s": 1.8605728149414062,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005820274353027344,
+      "output_tokens": 1024
+    }
+  ],
+  "top_screen": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign1",
+      "elapsed_s": 1.8577497005462646,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005770444869995117,
+      "output_tokens": 1024,
+      "stage_exact_mean": 0.0
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 1.857097864151001,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005819797515869141,
+      "output_tokens": 1024,
+      "stage_exact_mean": 0.0
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign1",
+      "elapsed_s": 1.8587958812713623,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005874156951904297,
+      "output_tokens": 1024,
+      "stage_exact_mean": 0.0
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign-1",
+      "elapsed_s": 1.8581199645996094,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.0060901641845703125,
+      "output_tokens": 1024,
+      "stage_exact_mean": 0.0
+    }
+  ],
+  "top_stage": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign1",
+      "elapsed_s": 0.925347089767456,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.006997108459472656,
+      "output_tokens": 256
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 0.9273090362548828,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.0059163570404052734,
+      "output_tokens": 256
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign1",
+      "elapsed_s": 0.9237842559814453,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005883693695068359,
+      "output_tokens": 256
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign-1",
+      "elapsed_s": 0.9276747703552246,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005819082260131836,
+      "output_tokens": 256
+    }
+  ]
+}
