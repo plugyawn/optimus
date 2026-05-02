@@ -1,0 +1,79 @@
+{
+  "base_holdout_exact": 0.0625,
+  "base_screen_exact": 0.0625,
+  "candidate_sec": 0.49564121373502146,
+  "family": "anzo",
+  "holdout_prompts": 32,
+  "kind": "search",
+  "pair_sec": 15.860518839520687,
+  "population": 64,
+  "screen_prompts": 32,
+  "top_holdout": [
+    {
+      "candidate": "anzo:seed2103139804:s0.04:sign1",
+      "elapsed_s": 1.8894670009613037,
+      "exact_mean": 0.0625,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008748054504394531,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed816464123:s0.04:sign1",
+      "elapsed_s": 1.889847993850708,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008739709854125977,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed1151155068:s0.04:sign-1",
+      "elapsed_s": 1.8912782669067383,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008682012557983398,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed253598992:s0.04:sign1",
+      "elapsed_s": 1.8915762901306152,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008740663528442383,
+      "output_tokens": 993
+    }
+  ],
+  "top_screen": [
+    {
+      "candidate": "anzo:seed2103139804:s0.04:sign1",
+      "elapsed_s": 1.8879384994506836,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.010994434356689453,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed816464123:s0.04:sign1",
+      "elapsed_s": 1.888366460800171,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008731842041015625,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed1151155068:s0.04:sign-1",
+      "elapsed_s": 1.8889939785003662,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008814573287963867,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "anzo:seed253598992:s0.04:sign1",
+      "elapsed_s": 1.8849177360534668,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.008708477020263672,
+      "output_tokens": 993
+    }
+  ]
+}
