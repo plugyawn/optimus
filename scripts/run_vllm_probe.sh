@@ -4,6 +4,8 @@ set -euo pipefail
 export HF_HOME=${HF_HOME:-/root/hf_cache}
 export TRANSFORMERS_CACHE=${TRANSFORMERS_CACHE:-/root/hf_cache}
 export PYTHONUNBUFFERED=1
+export VLLM_USE_DEEP_GEMM=0
+export VLLM_DEEP_GEMM_WARMUP=skip
 
 if [ ! -d /root/vllm_venv ]; then
   python3 -m venv /root/vllm_venv
