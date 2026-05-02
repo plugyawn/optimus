@@ -1,0 +1,1058 @@
+From https://github.com/plugyawn/randopt-lora-lab
+   4191b3e..9aff6e2  main       -> origin/main
+Already up to date.
+/root/randopt-lora-lab/.venv/lib/python3.10/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.70it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.28it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.17it/s]
+The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+sysbench bs=4 prompts=8 mode=base tok/s=112.3 exact=0.0000
+sysbench bs=4 prompts=8 mode=base tok/s=132.5 exact=0.0000
+sysbench bs=4 prompts=8 mode=candidate tok/s=137.2 exact=0.0000
+sysbench bs=4 prompts=8 mode=candidate tok/s=137.4 exact=0.0000
+sysbench bs=4 prompts=16 mode=base tok/s=133.0 exact=0.0000
+sysbench bs=4 prompts=16 mode=base tok/s=133.1 exact=0.0000
+sysbench bs=4 prompts=16 mode=candidate tok/s=137.3 exact=0.0000
+sysbench bs=4 prompts=16 mode=candidate tok/s=137.5 exact=0.0000
+sysbench bs=4 prompts=32 mode=base tok/s=133.2 exact=0.0625
+sysbench bs=4 prompts=32 mode=base tok/s=133.3 exact=0.0625
+sysbench bs=4 prompts=32 mode=candidate tok/s=137.7 exact=0.0000
+sysbench bs=4 prompts=32 mode=candidate tok/s=137.9 exact=0.0000
+sysbench bs=4 prompts=64 mode=base tok/s=133.1 exact=0.0625
+sysbench bs=4 prompts=64 mode=base tok/s=133.0 exact=0.0625
+sysbench bs=4 prompts=64 mode=candidate tok/s=137.3 exact=0.0000
+sysbench bs=4 prompts=64 mode=candidate tok/s=136.1 exact=0.0000
+sysbench bs=8 prompts=8 mode=base tok/s=264.3 exact=0.0000
+sysbench bs=8 prompts=8 mode=base tok/s=264.2 exact=0.0000
+sysbench bs=8 prompts=8 mode=candidate tok/s=274.4 exact=0.0000
+sysbench bs=8 prompts=8 mode=candidate tok/s=274.6 exact=0.0000
+sysbench bs=8 prompts=16 mode=base tok/s=265.0 exact=0.0000
+sysbench bs=8 prompts=16 mode=base tok/s=264.7 exact=0.0000
+sysbench bs=8 prompts=16 mode=candidate tok/s=273.8 exact=0.0000
+sysbench bs=8 prompts=16 mode=candidate tok/s=273.3 exact=0.0000
+sysbench bs=8 prompts=32 mode=base tok/s=264.9 exact=0.0625
+sysbench bs=8 prompts=32 mode=base tok/s=264.9 exact=0.0625
+sysbench bs=8 prompts=32 mode=candidate tok/s=274.0 exact=0.0000
+sysbench bs=8 prompts=32 mode=candidate tok/s=273.8 exact=0.0000
+sysbench bs=8 prompts=64 mode=base tok/s=265.0 exact=0.0625
+sysbench bs=8 prompts=64 mode=base tok/s=264.7 exact=0.0625
+sysbench bs=8 prompts=64 mode=candidate tok/s=273.8 exact=0.0000
+sysbench bs=8 prompts=64 mode=candidate tok/s=273.7 exact=0.0000
+sysbench bs=16 prompts=8 mode=base tok/s=264.8 exact=0.0000
+sysbench bs=16 prompts=8 mode=base tok/s=265.3 exact=0.0000
+sysbench bs=16 prompts=8 mode=candidate tok/s=274.1 exact=0.0000
+sysbench bs=16 prompts=8 mode=candidate tok/s=274.1 exact=0.0000
+sysbench bs=16 prompts=16 mode=base tok/s=525.8 exact=0.0000
+sysbench bs=16 prompts=16 mode=base tok/s=528.5 exact=0.0000
+sysbench bs=16 prompts=16 mode=candidate tok/s=544.1 exact=0.0000
+sysbench bs=16 prompts=16 mode=candidate tok/s=545.3 exact=0.0000
+sysbench bs=16 prompts=32 mode=base tok/s=528.3 exact=0.0625
+sysbench bs=16 prompts=32 mode=base tok/s=528.8 exact=0.0625
+sysbench bs=16 prompts=32 mode=candidate tok/s=544.8 exact=0.0000
+sysbench bs=16 prompts=32 mode=candidate tok/s=545.7 exact=0.0000
+sysbench bs=16 prompts=64 mode=base tok/s=528.1 exact=0.0625
+sysbench bs=16 prompts=64 mode=base tok/s=527.1 exact=0.0625
+sysbench bs=16 prompts=64 mode=candidate tok/s=545.4 exact=0.0000
+sysbench bs=16 prompts=64 mode=candidate tok/s=545.3 exact=0.0000
+sysbench bs=32 prompts=8 mode=base tok/s=265.8 exact=0.0000
+sysbench bs=32 prompts=8 mode=base tok/s=265.1 exact=0.0000
+sysbench bs=32 prompts=8 mode=candidate tok/s=273.6 exact=0.0000
+sysbench bs=32 prompts=8 mode=candidate tok/s=273.5 exact=0.0000
+sysbench bs=32 prompts=16 mode=base tok/s=527.6 exact=0.0000
+sysbench bs=32 prompts=16 mode=base tok/s=526.3 exact=0.0000
+sysbench bs=32 prompts=16 mode=candidate tok/s=544.2 exact=0.0000
+sysbench bs=32 prompts=16 mode=candidate tok/s=543.5 exact=0.0000
+sysbench bs=32 prompts=32 mode=base tok/s=1001.4 exact=0.0625
+sysbench bs=32 prompts=32 mode=base tok/s=1002.2 exact=0.0625
+sysbench bs=32 prompts=32 mode=candidate tok/s=1032.5 exact=0.0000
+sysbench bs=32 prompts=32 mode=candidate tok/s=1032.0 exact=0.0000
+sysbench bs=32 prompts=64 mode=base tok/s=998.8 exact=0.0625
+sysbench bs=32 prompts=64 mode=base tok/s=997.8 exact=0.0625
+sysbench bs=32 prompts=64 mode=candidate tok/s=1032.2 exact=0.0000
+sysbench bs=32 prompts=64 mode=candidate tok/s=1035.0 exact=0.0000
+{
+  "batch_sizes": [
+    4,
+    8,
+    16,
+    32
+  ],
+  "best_batch_size": 32,
+  "best_prompt_count": 64,
+  "best_prompts_per_sec": 32.34265383171872,
+  "best_tokens_per_sec": 1034.964922614999,
+  "family": "isotropic",
+  "kind": "sysbench",
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "prompt_counts": [
+    8,
+    16,
+    32,
+    64
+  ],
+  "rank": 8,
+  "repeats": 2,
+  "rows": [
+    {
+      "batch_size": 4,
+      "candidate": "base",
+      "elapsed_s": 2.2089269161224365,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0026035308837890625,
+      "output_tokens": 248,
+      "prompt_count": 8,
+      "prompts_per_sec": 3.6216680332924946,
+      "rep": 0,
+      "tokens_per_sec": 112.27170903206733
+    },
+    {
+      "batch_size": 4,
+      "candidate": "base",
+      "elapsed_s": 1.871190071105957,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002877473831176758,
+      "output_tokens": 248,
+      "prompt_count": 8,
+      "prompts_per_sec": 4.275354023908241,
+      "rep": 1,
+      "tokens_per_sec": 132.53597474115546
+    },
+    {
+      "batch_size": 4,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 1.866539716720581,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.007254838943481445,
+      "output_tokens": 256,
+      "prompt_count": 8,
+      "prompts_per_sec": 4.286005772250916,
+      "rep": 0,
+      "tokens_per_sec": 137.1521847120293
+    },
+    {
+      "batch_size": 4,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 1.8634052276611328,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006079435348510742,
+      "output_tokens": 256,
+      "prompt_count": 8,
+      "prompts_per_sec": 4.293215389355358,
+      "rep": 1,
+      "tokens_per_sec": 137.38289245937145
+    },
+    {
+      "batch_size": 4,
+      "candidate": "base",
+      "elapsed_s": 3.728240728378296,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028333663940429688,
+      "output_tokens": 496,
+      "prompt_count": 16,
+      "prompts_per_sec": 4.2915683738479125,
+      "rep": 0,
+      "tokens_per_sec": 133.03861958928528
+    },
+    {
+      "batch_size": 4,
+      "candidate": "base",
+      "elapsed_s": 3.727277994155884,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028409957885742188,
+      "output_tokens": 496,
+      "prompt_count": 16,
+      "prompts_per_sec": 4.292676860992634,
+      "rep": 1,
+      "tokens_per_sec": 133.07298269077165
+    },
+    {
+      "batch_size": 4,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 3.7278101444244385,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006023406982421875,
+      "output_tokens": 512,
+      "prompt_count": 16,
+      "prompts_per_sec": 4.292064075186518,
+      "rep": 0,
+      "tokens_per_sec": 137.34605040596858
+    },
+    {
+      "batch_size": 4,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 3.722903251647949,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006028652191162109,
+      "output_tokens": 512,
+      "prompt_count": 16,
+      "prompts_per_sec": 4.297721138178268,
+      "rep": 1,
+      "tokens_per_sec": 137.52707642170458
+    },
+    {
+      "batch_size": 4,
+      "candidate": "base",
+      "elapsed_s": 7.448558330535889,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002849102020263672,
+      "output_tokens": 992,
+      "prompt_count": 32,
+      "prompts_per_sec": 4.296133369703738,
+      "rep": 0,
+      "tokens_per_sec": 133.18013446081588
+    },
+    {
+      "batch_size": 4,
+      "candidate": "base",
+      "elapsed_s": 7.441925048828125,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028226375579833984,
+      "output_tokens": 992,
+      "prompt_count": 32,
+      "prompts_per_sec": 4.299962683047852,
+      "rep": 1,
+      "tokens_per_sec": 133.2988431744834
+    },
+    {
+      "batch_size": 4,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 7.437675714492798,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006016254425048828,
+      "output_tokens": 1024,
+      "prompt_count": 32,
+      "prompts_per_sec": 4.302419361689285,
+      "rep": 0,
+      "tokens_per_sec": 137.67741957405713
+    },
+    {
+      "batch_size": 4,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 7.425612926483154,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.0061168670654296875,
+      "output_tokens": 1024,
+      "prompt_count": 32,
+      "prompts_per_sec": 4.309408572304283,
+      "rep": 1,
+      "tokens_per_sec": 137.90107431373707
+    },
+    {
+      "batch_size": 4,
+      "candidate": "base",
+      "elapsed_s": 14.901985168457031,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028128623962402344,
+      "output_tokens": 1984,
+      "prompt_count": 64,
+      "prompts_per_sec": 4.294729814620171,
+      "rep": 0,
+      "tokens_per_sec": 133.1366242532253
+    },
+    {
+      "batch_size": 4,
+      "candidate": "base",
+      "elapsed_s": 14.922102212905884,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002850055694580078,
+      "output_tokens": 1984,
+      "prompt_count": 64,
+      "prompts_per_sec": 4.288939928627981,
+      "rep": 1,
+      "tokens_per_sec": 132.95713778746742
+    },
+    {
+      "batch_size": 4,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 14.916592121124268,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005953073501586914,
+      "output_tokens": 2048,
+      "prompt_count": 64,
+      "prompts_per_sec": 4.290524235047348,
+      "rep": 0,
+      "tokens_per_sec": 137.29677552151514
+    },
+    {
+      "batch_size": 4,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 15.04320240020752,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005927324295043945,
+      "output_tokens": 2048,
+      "prompt_count": 64,
+      "prompts_per_sec": 4.254413275667761,
+      "rep": 1,
+      "tokens_per_sec": 136.14122482136835
+    },
+    {
+      "batch_size": 8,
+      "candidate": "base",
+      "elapsed_s": 0.9384145736694336,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028128623962402344,
+      "output_tokens": 248,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.525016793716254,
+      "rep": 0,
+      "tokens_per_sec": 264.2755206052039
+    },
+    {
+      "batch_size": 8,
+      "candidate": "base",
+      "elapsed_s": 0.9387614727020264,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028972625732421875,
+      "output_tokens": 248,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.52186655783145,
+      "rep": 1,
+      "tokens_per_sec": 264.17786329277493
+    },
+    {
+      "batch_size": 8,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9330241680145264,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.0059931278228759766,
+      "output_tokens": 256,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.57426878558139,
+      "rep": 0,
+      "tokens_per_sec": 274.3766011386045
+    },
+    {
+      "batch_size": 8,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9321484565734863,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006009340286254883,
+      "output_tokens": 256,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.58232392446097,
+      "rep": 1,
+      "tokens_per_sec": 274.63436558275106
+    },
+    {
+      "batch_size": 8,
+      "candidate": "base",
+      "elapsed_s": 1.8715696334838867,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028231143951416016,
+      "output_tokens": 496,
+      "prompt_count": 16,
+      "prompts_per_sec": 8.54897392741746,
+      "rep": 0,
+      "tokens_per_sec": 265.01819174994125
+    },
+    {
+      "batch_size": 8,
+      "candidate": "base",
+      "elapsed_s": 1.8738014698028564,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028464794158935547,
+      "output_tokens": 496,
+      "prompt_count": 16,
+      "prompts_per_sec": 8.538791466357088,
+      "rep": 1,
+      "tokens_per_sec": 264.70253545706976
+    },
+    {
+      "batch_size": 8,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 1.8699252605438232,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.00603032112121582,
+      "output_tokens": 512,
+      "prompt_count": 16,
+      "prompts_per_sec": 8.556491715260737,
+      "rep": 0,
+      "tokens_per_sec": 273.8077348883436
+    },
+    {
+      "batch_size": 8,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 1.873581886291504,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006067752838134766,
+      "output_tokens": 512,
+      "prompt_count": 16,
+      "prompts_per_sec": 8.539792211414781,
+      "rep": 1,
+      "tokens_per_sec": 273.273350765273
+    },
+    {
+      "batch_size": 8,
+      "candidate": "base",
+      "elapsed_s": 3.744175910949707,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028638839721679688,
+      "output_tokens": 992,
+      "prompt_count": 32,
+      "prompts_per_sec": 8.546606986711591,
+      "rep": 0,
+      "tokens_per_sec": 264.9448165880593
+    },
+    {
+      "batch_size": 8,
+      "candidate": "base",
+      "elapsed_s": 3.744741916656494,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028252601623535156,
+      "output_tokens": 992,
+      "prompt_count": 32,
+      "prompts_per_sec": 8.545315194530499,
+      "rep": 1,
+      "tokens_per_sec": 264.90477103044543
+    },
+    {
+      "batch_size": 8,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 3.737558364868164,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006013154983520508,
+      "output_tokens": 1024,
+      "prompt_count": 32,
+      "prompts_per_sec": 8.561739209423354,
+      "rep": 0,
+      "tokens_per_sec": 273.97565470154734
+    },
+    {
+      "batch_size": 8,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 3.7400858402252197,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006031036376953125,
+      "output_tokens": 1024,
+      "prompt_count": 32,
+      "prompts_per_sec": 8.55595335696173,
+      "rep": 1,
+      "tokens_per_sec": 273.79050742277536
+    },
+    {
+      "batch_size": 8,
+      "candidate": "base",
+      "elapsed_s": 7.485589504241943,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002817869186401367,
+      "output_tokens": 1984,
+      "prompt_count": 64,
+      "prompts_per_sec": 8.549760838973658,
+      "rep": 0,
+      "tokens_per_sec": 265.0425860081834
+    },
+    {
+      "batch_size": 8,
+      "candidate": "base",
+      "elapsed_s": 7.496235132217407,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028035640716552734,
+      "output_tokens": 1984,
+      "prompt_count": 64,
+      "prompts_per_sec": 8.537619067595685,
+      "rep": 1,
+      "tokens_per_sec": 264.6661910954663
+    },
+    {
+      "batch_size": 8,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 7.481011629104614,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005958080291748047,
+      "output_tokens": 2048,
+      "prompt_count": 64,
+      "prompts_per_sec": 8.554992716628087,
+      "rep": 0,
+      "tokens_per_sec": 273.7597669320988
+    },
+    {
+      "batch_size": 8,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 7.483886241912842,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005961179733276367,
+      "output_tokens": 2048,
+      "prompt_count": 64,
+      "prompts_per_sec": 8.551706684365895,
+      "rep": 1,
+      "tokens_per_sec": 273.65461389970864
+    },
+    {
+      "batch_size": 16,
+      "candidate": "base",
+      "elapsed_s": 0.9363870620727539,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028276443481445312,
+      "output_tokens": 248,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.543475581872604,
+      "rep": 0,
+      "tokens_per_sec": 264.84774303805074
+    },
+    {
+      "batch_size": 16,
+      "candidate": "base",
+      "elapsed_s": 0.9349246025085449,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028243064880371094,
+      "output_tokens": 248,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.556839747862858,
+      "rep": 1,
+      "tokens_per_sec": 265.2620321837486
+    },
+    {
+      "batch_size": 16,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9338405132293701,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005994319915771484,
+      "output_tokens": 256,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.566773326565922,
+      "rep": 0,
+      "tokens_per_sec": 274.1367464501095
+    },
+    {
+      "batch_size": 16,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9338216781616211,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006067752838134766,
+      "output_tokens": 256,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.56694611732434,
+      "rep": 1,
+      "tokens_per_sec": 274.1422757543789
+    },
+    {
+      "batch_size": 16,
+      "candidate": "base",
+      "elapsed_s": 0.9432387351989746,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002794504165649414,
+      "output_tokens": 496,
+      "prompt_count": 16,
+      "prompts_per_sec": 16.96283178682736,
+      "rep": 0,
+      "tokens_per_sec": 525.8477853916481
+    },
+    {
+      "batch_size": 16,
+      "candidate": "base",
+      "elapsed_s": 0.9384493827819824,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002790212631225586,
+      "output_tokens": 496,
+      "prompt_count": 16,
+      "prompts_per_sec": 17.049401164897,
+      "rep": 1,
+      "tokens_per_sec": 528.5314361118069
+    },
+    {
+      "batch_size": 16,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.941084623336792,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.00596308708190918,
+      "output_tokens": 512,
+      "prompt_count": 16,
+      "prompts_per_sec": 17.001659152892117,
+      "rep": 0,
+      "tokens_per_sec": 544.0530928925477
+    },
+    {
+      "batch_size": 16,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9389996528625488,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.0059740543365478516,
+      "output_tokens": 512,
+      "prompt_count": 16,
+      "prompts_per_sec": 17.03940992014625,
+      "rep": 1,
+      "tokens_per_sec": 545.26111744468
+    },
+    {
+      "batch_size": 16,
+      "candidate": "base",
+      "elapsed_s": 1.8777666091918945,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028073787689208984,
+      "output_tokens": 992,
+      "prompt_count": 32,
+      "prompts_per_sec": 17.041521477353008,
+      "rep": 0,
+      "tokens_per_sec": 528.2871657979432
+    },
+    {
+      "batch_size": 16,
+      "candidate": "base",
+      "elapsed_s": 1.8757765293121338,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002827167510986328,
+      "output_tokens": 992,
+      "prompt_count": 32,
+      "prompts_per_sec": 17.059601450357587,
+      "rep": 1,
+      "tokens_per_sec": 528.8476449610853
+    },
+    {
+      "batch_size": 16,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 1.879753589630127,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005924224853515625,
+      "output_tokens": 1024,
+      "prompt_count": 32,
+      "prompts_per_sec": 17.02350785578047,
+      "rep": 0,
+      "tokens_per_sec": 544.752251384975
+    },
+    {
+      "batch_size": 16,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 1.8764920234680176,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006042957305908203,
+      "output_tokens": 1024,
+      "prompt_count": 32,
+      "prompts_per_sec": 17.053096735716235,
+      "rep": 1,
+      "tokens_per_sec": 545.6990955429195
+    },
+    {
+      "batch_size": 16,
+      "candidate": "base",
+      "elapsed_s": 3.7566275596618652,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028624534606933594,
+      "output_tokens": 1984,
+      "prompt_count": 64,
+      "prompts_per_sec": 17.036557120333924,
+      "rep": 0,
+      "tokens_per_sec": 528.1332707303516
+    },
+    {
+      "batch_size": 16,
+      "candidate": "base",
+      "elapsed_s": 3.7636358737945557,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.00279998779296875,
+      "output_tokens": 1984,
+      "prompt_count": 64,
+      "prompts_per_sec": 17.00483313107392,
+      "rep": 1,
+      "tokens_per_sec": 527.1498270632915
+    },
+    {
+      "batch_size": 16,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 3.75526762008667,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.0059659481048583984,
+      "output_tokens": 2048,
+      "prompt_count": 64,
+      "prompts_per_sec": 17.042726770701606,
+      "rep": 0,
+      "tokens_per_sec": 545.3672566624514
+    },
+    {
+      "batch_size": 16,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 3.755796194076538,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006004810333251953,
+      "output_tokens": 2048,
+      "prompt_count": 64,
+      "prompts_per_sec": 17.040328253417407,
+      "rep": 1,
+      "tokens_per_sec": 545.290504109357
+    },
+    {
+      "batch_size": 32,
+      "candidate": "base",
+      "elapsed_s": 0.9331071376800537,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028219223022460938,
+      "output_tokens": 248,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.573506382011045,
+      "rep": 0,
+      "tokens_per_sec": 265.7786978423424
+    },
+    {
+      "batch_size": 32,
+      "candidate": "base",
+      "elapsed_s": 0.9354386329650879,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028047561645507812,
+      "output_tokens": 248,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.55213770105064,
+      "rep": 1,
+      "tokens_per_sec": 265.11626873256984
+    },
+    {
+      "batch_size": 32,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9355320930480957,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.0058934688568115234,
+      "output_tokens": 256,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.551283338591698,
+      "rep": 0,
+      "tokens_per_sec": 273.64106683493435
+    },
+    {
+      "batch_size": 32,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9359807968139648,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005934953689575195,
+      "output_tokens": 256,
+      "prompt_count": 8,
+      "prompts_per_sec": 8.547183902951458,
+      "rep": 1,
+      "tokens_per_sec": 273.50988489444666
+    },
+    {
+      "batch_size": 32,
+      "candidate": "base",
+      "elapsed_s": 0.9401850700378418,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002843141555786133,
+      "output_tokens": 496,
+      "prompt_count": 16,
+      "prompts_per_sec": 17.017926055086168,
+      "rep": 0,
+      "tokens_per_sec": 527.5557077076711
+    },
+    {
+      "batch_size": 32,
+      "candidate": "base",
+      "elapsed_s": 0.9423482418060303,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028295516967773438,
+      "output_tokens": 496,
+      "prompt_count": 16,
+      "prompts_per_sec": 16.978861200330424,
+      "rep": 1,
+      "tokens_per_sec": 526.3446972102431
+    },
+    {
+      "batch_size": 32,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9407811164855957,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.006008148193359375,
+      "output_tokens": 512,
+      "prompt_count": 16,
+      "prompts_per_sec": 17.007144084449717,
+      "rep": 0,
+      "tokens_per_sec": 544.2286107023909
+    },
+    {
+      "batch_size": 32,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9419713020324707,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005970954895019531,
+      "output_tokens": 512,
+      "prompt_count": 16,
+      "prompts_per_sec": 16.985655471113773,
+      "rep": 1,
+      "tokens_per_sec": 543.5409750756407
+    },
+    {
+      "batch_size": 32,
+      "candidate": "base",
+      "elapsed_s": 0.9905991554260254,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028066635131835938,
+      "output_tokens": 992,
+      "prompt_count": 32,
+      "prompts_per_sec": 32.30368189263982,
+      "rep": 0,
+      "tokens_per_sec": 1001.4141386718346
+    },
+    {
+      "batch_size": 32,
+      "candidate": "base",
+      "elapsed_s": 0.9898355007171631,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.0028340816497802734,
+      "output_tokens": 992,
+      "prompt_count": 32,
+      "prompts_per_sec": 32.32860407291425,
+      "rep": 1,
+      "tokens_per_sec": 1002.186726260342
+    },
+    {
+      "batch_size": 32,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.991797685623169,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005961418151855469,
+      "output_tokens": 1024,
+      "prompt_count": 32,
+      "prompts_per_sec": 32.26464475957481,
+      "rep": 0,
+      "tokens_per_sec": 1032.4686323063938
+    },
+    {
+      "batch_size": 32,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 0.9922142028808594,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005940437316894531,
+      "output_tokens": 1024,
+      "prompt_count": 32,
+      "prompts_per_sec": 32.25110052556103,
+      "rep": 1,
+      "tokens_per_sec": 1032.035216817953
+    },
+    {
+      "batch_size": 32,
+      "candidate": "base",
+      "elapsed_s": 1.9864819049835205,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002810239791870117,
+      "output_tokens": 1984,
+      "prompt_count": 64,
+      "prompts_per_sec": 32.217761379775034,
+      "rep": 0,
+      "tokens_per_sec": 998.750602773026
+    },
+    {
+      "batch_size": 32,
+      "candidate": "base",
+      "elapsed_s": 1.988353967666626,
+      "exact_mean": 0.0625,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "base",
+      "mutation_s": 0.002855539321899414,
+      "output_tokens": 1984,
+      "prompt_count": 64,
+      "prompts_per_sec": 32.18742791310206,
+      "rep": 1,
+      "tokens_per_sec": 997.8102653061641
+    },
+    {
+      "batch_size": 32,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 1.9841091632843018,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.005969524383544922,
+      "output_tokens": 2048,
+      "prompt_count": 64,
+      "prompts_per_sec": 32.25628971646933,
+      "rep": 0,
+      "tokens_per_sec": 1032.2012709270186
+    },
+    {
+      "batch_size": 32,
+      "candidate": "isotropic:seed1251:s0.02:sign1",
+      "elapsed_s": 1.9788110256195068,
+      "exact_mean": 0.0,
+      "kind": "sysbench_row",
+      "malformed_mean": 0.0,
+      "mode": "candidate",
+      "mutation_s": 0.00595402717590332,
+      "output_tokens": 2048,
+      "prompt_count": 64,
+      "prompts_per_sec": 32.34265383171872,
+      "rep": 1,
+      "tokens_per_sec": 1034.964922614999
+    }
+  ],
+  "targets": "q_proj,v_proj"
+}
