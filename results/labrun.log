@@ -134,3 +134,150 @@ The following generation flags are not valid and may be ignored: ['temperature',
     }
   ]
 }
+[main aca0f22] Add isotropic p32 run
+ 5 files changed, 1371 insertions(+)
+ create mode 100644 results/search_iso_p32/candidate_summary.jsonl
+ create mode 100644 results/search_iso_p32/holdout_per_prompt.jsonl
+ create mode 100644 results/search_iso_p32/summary.json
+To https://github.com/plugyawn/randopt-lora-lab.git
+   21c8184..aca0f22  main -> main
+/root/randopt-lora-lab/.venv/lib/python3.10/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.71it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.30it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.19it/s]
+The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+1/64 isotropic:seed2103139804:s0.02:sign1 exact=0.0000 elapsed=1.88
+2/64 isotropic:seed2103139804:s0.02:sign-1 exact=0.0000 elapsed=1.87
+3/64 isotropic:seed2097446776:s0.02:sign1 exact=0.0000 elapsed=1.88
+4/64 isotropic:seed2097446776:s0.02:sign-1 exact=0.0000 elapsed=1.87
+5/64 isotropic:seed2121586239:s0.02:sign1 exact=0.0000 elapsed=1.87
+6/64 isotropic:seed2121586239:s0.02:sign-1 exact=0.0000 elapsed=1.88
+7/64 isotropic:seed816464123:s0.02:sign1 exact=0.0000 elapsed=1.88
+8/64 isotropic:seed816464123:s0.02:sign-1 exact=0.0000 elapsed=1.87
+9/64 isotropic:seed367992410:s0.02:sign1 exact=0.0000 elapsed=1.88
+10/64 isotropic:seed367992410:s0.02:sign-1 exact=0.0000 elapsed=1.87
+11/64 isotropic:seed1982656189:s0.02:sign1 exact=0.0000 elapsed=1.88
+12/64 isotropic:seed1982656189:s0.02:sign-1 exact=0.0000 elapsed=1.87
+13/64 isotropic:seed225255239:s0.02:sign1 exact=0.0000 elapsed=1.88
+14/64 isotropic:seed225255239:s0.02:sign-1 exact=0.0000 elapsed=1.88
+15/64 isotropic:seed561980201:s0.02:sign1 exact=0.0000 elapsed=1.87
+16/64 isotropic:seed561980201:s0.02:sign-1 exact=0.0000 elapsed=1.87
+17/64 isotropic:seed298028866:s0.02:sign1 exact=0.0000 elapsed=1.87
+18/64 isotropic:seed298028866:s0.02:sign-1 exact=0.0000 elapsed=1.88
+19/64 isotropic:seed685255715:s0.02:sign1 exact=0.0000 elapsed=1.88
+20/64 isotropic:seed685255715:s0.02:sign-1 exact=0.0000 elapsed=1.87
+21/64 isotropic:seed1151155068:s0.02:sign1 exact=0.0000 elapsed=1.87
+22/64 isotropic:seed1151155068:s0.02:sign-1 exact=0.0000 elapsed=1.87
+23/64 isotropic:seed253598992:s0.02:sign1 exact=0.0000 elapsed=1.87
+24/64 isotropic:seed253598992:s0.02:sign-1 exact=0.0000 elapsed=1.87
+25/64 isotropic:seed1709091010:s0.02:sign1 exact=0.0000 elapsed=1.87
+26/64 isotropic:seed1709091010:s0.02:sign-1 exact=0.0000 elapsed=1.87
+27/64 isotropic:seed519189161:s0.02:sign1 exact=0.0000 elapsed=1.87
+28/64 isotropic:seed519189161:s0.02:sign-1 exact=0.0000 elapsed=1.87
+29/64 isotropic:seed1688041804:s0.02:sign1 exact=0.0000 elapsed=1.88
+30/64 isotropic:seed1688041804:s0.02:sign-1 exact=0.0000 elapsed=1.88
+31/64 isotropic:seed684046403:s0.02:sign1 exact=0.0000 elapsed=1.88
+32/64 isotropic:seed684046403:s0.02:sign-1 exact=0.0000 elapsed=1.88
+33/64 isotropic:seed1704011245:s0.02:sign1 exact=0.0000 elapsed=1.88
+34/64 isotropic:seed1704011245:s0.02:sign-1 exact=0.0000 elapsed=1.88
+35/64 isotropic:seed2070344413:s0.02:sign1 exact=0.0000 elapsed=1.87
+36/64 isotropic:seed2070344413:s0.02:sign-1 exact=0.0000 elapsed=1.88
+37/64 isotropic:seed2057996156:s0.02:sign1 exact=0.0000 elapsed=1.88
+38/64 isotropic:seed2057996156:s0.02:sign-1 exact=0.0000 elapsed=1.88
+39/64 isotropic:seed566183643:s0.02:sign1 exact=0.0000 elapsed=1.88
+40/64 isotropic:seed566183643:s0.02:sign-1 exact=0.0000 elapsed=1.87
+41/64 isotropic:seed1193176983:s0.02:sign1 exact=0.0000 elapsed=1.88
+42/64 isotropic:seed1193176983:s0.02:sign-1 exact=0.0000 elapsed=1.88
+43/64 isotropic:seed947053435:s0.02:sign1 exact=0.0000 elapsed=1.88
+44/64 isotropic:seed947053435:s0.02:sign-1 exact=0.0000 elapsed=1.88
+45/64 isotropic:seed547003393:s0.02:sign1 exact=0.0000 elapsed=1.88
+46/64 isotropic:seed547003393:s0.02:sign-1 exact=0.0000 elapsed=1.87
+47/64 isotropic:seed1309687590:s0.02:sign1 exact=0.0000 elapsed=1.87
+48/64 isotropic:seed1309687590:s0.02:sign-1 exact=0.0000 elapsed=1.87
+49/64 isotropic:seed1926505261:s0.02:sign1 exact=0.0000 elapsed=1.88
+50/64 isotropic:seed1926505261:s0.02:sign-1 exact=0.0000 elapsed=1.87
+51/64 isotropic:seed1854612611:s0.02:sign1 exact=0.0000 elapsed=1.87
+52/64 isotropic:seed1854612611:s0.02:sign-1 exact=0.0000 elapsed=1.87
+53/64 isotropic:seed1387222073:s0.02:sign1 exact=0.0000 elapsed=1.87
+54/64 isotropic:seed1387222073:s0.02:sign-1 exact=0.0000 elapsed=1.88
+55/64 isotropic:seed1854905472:s0.02:sign1 exact=0.0000 elapsed=1.88
+56/64 isotropic:seed1854905472:s0.02:sign-1 exact=0.0000 elapsed=1.88
+57/64 isotropic:seed1113402598:s0.02:sign1 exact=0.0000 elapsed=1.88
+58/64 isotropic:seed1113402598:s0.02:sign-1 exact=0.0000 elapsed=1.87
+59/64 isotropic:seed1449296584:s0.02:sign1 exact=0.0000 elapsed=1.88
+60/64 isotropic:seed1449296584:s0.02:sign-1 exact=0.0000 elapsed=1.88
+61/64 isotropic:seed2051021141:s0.02:sign1 exact=0.0000 elapsed=1.88
+62/64 isotropic:seed2051021141:s0.02:sign-1 exact=0.0000 elapsed=1.88
+63/64 isotropic:seed1417069371:s0.02:sign1 exact=0.0000 elapsed=1.87
+64/64 isotropic:seed1417069371:s0.02:sign-1 exact=0.0000 elapsed=1.88
+{
+  "base_holdout_exact": 0.0625,
+  "base_screen_exact": 0.0625,
+  "candidate_sec": 0.4995940757338628,
+  "family": "isotropic",
+  "holdout_prompts": 32,
+  "kind": "search",
+  "pair_sec": 15.987010423483609,
+  "population": 64,
+  "screen_prompts": 32,
+  "top_holdout": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign1",
+      "elapsed_s": 1.8777010440826416,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 1.8721132278442383,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign1",
+      "elapsed_s": 1.873600721359253,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign-1",
+      "elapsed_s": 1.8736474514007568,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 1024
+    }
+  ],
+  "top_screen": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign1",
+      "elapsed_s": 1.875675916671753,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2103139804:s0.02:sign-1",
+      "elapsed_s": 1.8733038902282715,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign1",
+      "elapsed_s": 1.8764066696166992,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 1024
+    },
+    {
+      "candidate": "isotropic:seed2097446776:s0.02:sign-1",
+      "elapsed_s": 1.8731575012207031,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 1024
+    }
+  ]
+}
