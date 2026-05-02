@@ -1,0 +1,79 @@
+{
+  "base_holdout_exact": 0.0625,
+  "base_screen_exact": 0.0625,
+  "candidate_sec": 0.5054203531864688,
+  "family": "isotropic",
+  "holdout_prompts": 32,
+  "kind": "search",
+  "pair_sec": 16.173451301967003,
+  "population": 64,
+  "screen_prompts": 32,
+  "top_holdout": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.005:sign1",
+      "elapsed_s": 1.8557231426239014,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.03125,
+      "mutation_s": 0.005899667739868164,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "isotropic:seed816464123:s0.005:sign-1",
+      "elapsed_s": 1.8555324077606201,
+      "exact_mean": 0.0625,
+      "malformed_mean": 0.03125,
+      "mutation_s": 0.0058765411376953125,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "isotropic:seed519189161:s0.005:sign1",
+      "elapsed_s": 1.8534088134765625,
+      "exact_mean": 0.125,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005820274353027344,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "isotropic:seed566183643:s0.005:sign1",
+      "elapsed_s": 1.8528857231140137,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.0058441162109375,
+      "output_tokens": 992
+    }
+  ],
+  "top_screen": [
+    {
+      "candidate": "isotropic:seed2103139804:s0.005:sign1",
+      "elapsed_s": 1.8530983924865723,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.03125,
+      "mutation_s": 0.007040977478027344,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "isotropic:seed816464123:s0.005:sign-1",
+      "elapsed_s": 1.8487834930419922,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.03125,
+      "mutation_s": 0.005936622619628906,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "isotropic:seed519189161:s0.005:sign1",
+      "elapsed_s": 1.852349042892456,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.005900382995605469,
+      "output_tokens": 992
+    },
+    {
+      "candidate": "isotropic:seed566183643:s0.005:sign1",
+      "elapsed_s": 1.852959394454956,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.0,
+      "mutation_s": 0.0061604976654052734,
+      "output_tokens": 992
+    }
+  ]
+}
