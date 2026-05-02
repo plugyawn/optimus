@@ -278,6 +278,65 @@ def score_rows(
     return rows, metrics
 
 
+def score_mixed_rows(
+    *,
+    examples: list[CountdownExample],
+    outputs,
+    specs: list[AdapterSpec],
+    prompts_per_adapter: int,
+) -> tuple[list[dict], dict]:
+    rows = []
+    exact = []
+    malformed = []
+    output_tokens = 0
+    by_candidate: dict[str, dict] = {}
+    for idx, item in enumerate(outputs):
+        adapter_index = idx // prompts_per_adapter
+        example_index = idx % prompts_per_adapter
+        spec = specs[adapter_index]
+        ex = examples[example_index]
+        text, tokens = extract_output(item)
+        output_tokens += tokens
+        score = score_completion(text, ex)
+        exact.append(float(score["exact"]))
+        malformed.append(float(score["malformed"]))
+        bucket = by_candidate.setdefault(
+            spec.candidate,
+            {"exact": [], "malformed": [], "output_tokens": 0},
+        )
+        bucket["exact"].append(float(score["exact"]))
+        bucket["malformed"].append(float(score["malformed"]))
+        bucket["output_tokens"] += tokens
+        rows.append(
+            {
+                "mode": "mixed",
+                "candidate": spec.candidate,
+                "adapter_index": spec.index,
+                "adapter": spec.name,
+                "example_id": ex.id,
+                "numbers": list(ex.numbers),
+                "target": ex.target,
+                "text": text,
+                "output_tokens": tokens,
+                **score,
+            }
+        )
+    metrics = {
+        "exact_mean": sum(exact) / max(len(exact), 1),
+        "malformed_mean": sum(malformed) / max(len(malformed), 1),
+        "output_tokens": output_tokens,
+        "by_candidate": {
+            candidate: {
+                "exact_mean": sum(values["exact"]) / max(len(values["exact"]), 1),
+                "malformed_mean": sum(values["malformed"]) / max(len(values["malformed"]), 1),
+                "output_tokens": values["output_tokens"],
+            }
+            for candidate, values in by_candidate.items()
+        },
+    }
+    return rows, metrics
+
+
 def timed_generate(llm, prompts, sampling, *, lora_request=None) -> tuple[list, float]:
     start = time.time()
     outputs = llm.generate(prompts, sampling, lora_request=lora_request, use_tqdm=False)
@@ -391,6 +450,37 @@ def run_benchmark(args) -> dict:
                 }
             )
 
+    mixed_rows = []
+    if args.mixed_batch:
+        mixed_prompts = []
+        mixed_requests = []
+        for req in requests:
+            mixed_prompts.extend(prompt_texts)
+            mixed_requests.extend([req] * len(prompt_texts))
+        outputs, elapsed_s = timed_generate(llm, mixed_prompts, sampling, lora_request=mixed_requests)
+        rows, metrics = score_mixed_rows(
+            examples=examples,
+            outputs=outputs,
+            specs=specs,
+            prompts_per_adapter=len(prompt_texts),
+        )
+        mixed_rows.extend(rows)
+        per_prompt_rows.extend(rows)
+        adapter_rows.append(
+            {
+                "mode": "mixed",
+                "adapter_index": None,
+                "adapter": "mixed",
+                "candidate": "mixed",
+                "repeat": 0,
+                "elapsed_s": elapsed_s,
+                "tokens_per_sec": metrics["output_tokens"] / max(elapsed_s, 1e-9),
+                "prompts_per_sec": len(mixed_prompts) / max(elapsed_s, 1e-9),
+                "by_candidate": metrics.pop("by_candidate"),
+                **metrics,
+            }
+        )
+
     if per_prompt_rows:
         write_jsonl(out / "per_prompt.jsonl", per_prompt_rows)
     if adapter_rows:
@@ -400,6 +490,7 @@ def run_benchmark(args) -> dict:
     lora_tokens = sum(float(r["output_tokens"]) for r in lora_rows)
     lora_elapsed = sum(float(r["elapsed_s"]) for r in lora_rows)
     best = max(lora_rows, key=lambda r: r["tokens_per_sec"]) if lora_rows else {}
+    mixed = next((r for r in adapter_rows if r["mode"] == "mixed"), {})
     summary = {
         "kind": "vllm_lora_bench",
         "model": args.model,
@@ -429,6 +520,10 @@ def run_benchmark(args) -> dict:
             (r["tokens_per_sec"] for r in adapter_rows if r["mode"] == "base"),
             None,
         ),
+        "mixed_batch": args.mixed_batch,
+        "mixed_tokens_per_sec": mixed.get("tokens_per_sec"),
+        "mixed_prompts_per_sec": mixed.get("prompts_per_sec"),
+        "mixed_exact_mean": mixed.get("exact_mean"),
     }
     write_json(out / "summary.json", summary)
     return summary
@@ -479,6 +574,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--repeats", type=int, default=1)
     p.add_argument("--adapter-dir", default=None)
     p.add_argument("--preload", action="store_true", help="Warm-load every adapter before timed rows.")
+    p.add_argument("--mixed-batch", action="store_true", help="Evaluate all adapters in one vLLM request batch.")
     p.add_argument("--include-base", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--prepare-only", action="store_true", help="Only write deterministic adapter files.")
     p.add_argument("--local-files-only", action="store_true")
