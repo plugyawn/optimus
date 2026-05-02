@@ -23,6 +23,8 @@ def main():
         summaries.append(row)
     flat = []
     for row in summaries:
+        top_holdout = row.get("top_holdout") or []
+        best_holdout = max((x.get("exact_mean", 0.0) for x in top_holdout), default=None)
         flat.append(
             {
                 "run": row["run"],
@@ -30,8 +32,12 @@ def main():
                 "family": row.get("family", ""),
                 "population": row.get("population", 0),
                 "base_screen_exact": row.get("base_screen_exact", row.get("base_exact")),
+                "best_holdout_exact": best_holdout,
                 "candidate_sec": row.get("candidate_sec"),
                 "pair_sec": row.get("pair_sec"),
+                "prompt_eval_savings": row.get("prompt_eval_savings"),
+                "best_tokens_per_sec": row.get("best_tokens_per_sec"),
+                "best_batch_size": row.get("best_batch_size"),
             }
         )
     df = pd.DataFrame(flat)
@@ -41,6 +47,12 @@ def main():
         ax.set_ylabel("candidates/sec")
         plt.tight_layout()
         plt.savefig(out / "candidate_sec.png", dpi=160)
+        plt.close()
+    if "best_tokens_per_sec" in df and df["best_tokens_per_sec"].notna().any():
+        ax = df.dropna(subset=["best_tokens_per_sec"]).plot.bar(x="run", y="best_tokens_per_sec", legend=False)
+        ax.set_ylabel("tokens/sec")
+        plt.tight_layout()
+        plt.savefig(out / "tokens_per_sec.png", dpi=160)
         plt.close()
     (out / "report.md").write_text("# RandOpt LoRA Lab Report\n\n" + df.to_markdown(index=False) + "\n")
     print(df.to_string(index=False))
