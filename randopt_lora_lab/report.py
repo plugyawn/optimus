@@ -37,6 +37,8 @@ def main():
     for row in summaries:
         top_holdout = row.get("top_holdout") or []
         best_holdout = max((x.get("exact_mean", 0.0) for x in top_holdout), default=None)
+        tokens_per_sec = row.get("best_tokens_per_sec", row.get("tokens_per_sec"))
+        prompts_per_sec = row.get("best_prompts_per_sec", row.get("prompts_per_sec"))
         flat.append(
             {
                 "run": row["run"],
@@ -48,7 +50,8 @@ def main():
                 "candidate_sec": row.get("candidate_sec"),
                 "pair_sec": row.get("pair_sec"),
                 "prompt_eval_savings": row.get("prompt_eval_savings"),
-                "best_tokens_per_sec": row.get("best_tokens_per_sec"),
+                "best_tokens_per_sec": tokens_per_sec,
+                "best_prompts_per_sec": prompts_per_sec,
                 "best_batch_size": row.get("best_batch_size"),
             }
         )
@@ -108,7 +111,24 @@ def main():
         plt.tight_layout()
         plt.savefig(out / "score_histograms.png", dpi=160)
         plt.close()
-    (out / "report.md").write_text("# RandOpt LoRA Lab Report\n\n" + df.to_markdown(index=False) + "\n")
+    notes = []
+    if "candidate_sec" in df and df["candidate_sec"].notna().any():
+        best_candidate = df.dropna(subset=["candidate_sec"]).sort_values("candidate_sec", ascending=False).iloc[0]
+        notes.append(
+            f"- Fastest candidate-block run: `{best_candidate['run']}` at "
+            f"{best_candidate['candidate_sec']:.3f} candidates/sec."
+        )
+    if "best_tokens_per_sec" in df and df["best_tokens_per_sec"].notna().any():
+        best_tokens = df.dropna(subset=["best_tokens_per_sec"]).sort_values("best_tokens_per_sec", ascending=False).iloc[0]
+        notes.append(
+            f"- Fastest generation backend row: `{best_tokens['run']}` at "
+            f"{best_tokens['best_tokens_per_sec']:.1f} tokens/sec."
+        )
+    body = "# RandOpt LoRA Lab Report\n\n"
+    if notes:
+        body += "## Auto Notes\n\n" + "\n".join(notes) + "\n\n"
+    body += df.to_markdown(index=False) + "\n"
+    (out / "report.md").write_text(body)
     print(df.to_string(index=False))
 
 

@@ -51,6 +51,34 @@ def fill_lora_gaussian(model, candidate: Candidate, rank: int, family_state: dic
                 rows = min(a_noise.shape[0], basis.shape[0])
                 cols = min(a_noise.shape[1], basis.shape[1])
                 a_noise[:rows, :cols] = basis[:rows, :cols]
+            elif name in family_state and isinstance(family_state[name], dict):
+                spec = family_state[name]
+                mode = spec.get("mode", "elite_basis")
+                if "col_scale" in spec:
+                    col_scale = spec["col_scale"].to(a_noise.device, dtype=torch.float32)
+                    a_noise.mul_(col_scale[: a_noise.shape[1]].clamp(0.05, 20.0).view(1, -1))
+                if "basis" in spec:
+                    basis = spec["basis"].to(a_noise.device, dtype=torch.float32)
+                    if basis.ndim == 2 and basis.numel() > 0:
+                        cols = min(a_noise.shape[1], basis.shape[1])
+                        basis = basis[:, :cols]
+                        if mode == "activation_overwrite":
+                            rows = min(a_noise.shape[0], basis.shape[0])
+                            a_noise[:rows, :cols] = basis[:rows, :cols]
+                        else:
+                            gen_basis = torch.Generator(device=a.device)
+                            gen_basis.manual_seed((candidate.seed + stable_int(name + ":adaptive_basis")) % (2**63 - 1))
+                            coeff = torch.randn(
+                                (a_noise.shape[0], basis.shape[0]),
+                                generator=gen_basis,
+                                device=a.device,
+                                dtype=torch.float32,
+                            )
+                            basis_noise = (coeff @ basis) / math.sqrt(max(1, basis.shape[0]))
+                            basis_noise = basis_noise / basis_noise.std(unbiased=False).clamp_min(1e-6)
+                            residual_scale = float(spec.get("residual_scale", 0.5))
+                            basis_scale = float(spec.get("basis_scale", 1.0))
+                            a_noise[:, :cols] = residual_scale * a_noise[:, :cols] + basis_scale * basis_noise
             a.copy_((candidate.sign * candidate.sigma * a_noise).to(a.dtype))
             b.copy_((b_noise / math.sqrt(rank)).to(b.dtype))
 

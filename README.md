@@ -18,6 +18,12 @@ python -m randopt_lora_lab.experiments search --out results/search_anzo --family
 python -m randopt_lora_lab.report --root results --out results/report
 ```
 
+vLLM LoRA serving probe:
+
+```bash
+python -m randopt_lora_lab.vllm_lora_bench --out results/vllm_lora_bench --adapters 8 --prompts 32 --preload
+```
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 
 ## Evidence Rules
