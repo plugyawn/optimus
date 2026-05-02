@@ -25,6 +25,11 @@ def max_present(rows: list[dict], key: str):
     return max(values) if values else None
 
 
+def scalar(row: dict, key: str, default=None):
+    value = row.get(key, default)
+    return default if value is None else value
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--root", required=True)
@@ -69,9 +74,14 @@ def main():
                 "stop_at_answer": row.get("stop_at_answer"),
                 "max_new_tokens": row.get("max_new_tokens"),
                 "base_screen_exact": row.get("base_screen_exact", row.get("base_exact")),
+                "base_holdout_exact": row.get("base_holdout_exact"),
                 "best_holdout_exact": best_holdout,
+                "holdout_lift": None
+                if best_holdout is None or row.get("base_holdout_exact") is None
+                else best_holdout - row.get("base_holdout_exact"),
                 "best_cap_hit_mean": max_present(top_holdout, "cap_hit_mean"),
                 "best_answer_closed_mean": max_present(top_holdout, "answer_closed_mean"),
+                "best_malformed_mean": max_present(top_holdout, "malformed_mean"),
                 "candidate_sec": row.get("candidate_sec"),
                 "pair_sec": row.get("pair_sec"),
                 "prompt_eval_savings": row.get("prompt_eval_savings"),
@@ -83,6 +93,12 @@ def main():
         )
     df = pd.DataFrame(flat)
     df.to_csv(out / "summary.csv", index=False)
+    quality = df[df["best_holdout_exact"].notna()].copy()
+    systems = df[df["best_tokens_per_sec"].notna()].copy()
+    if not quality.empty:
+        quality.sort_values("best_holdout_exact", ascending=False).to_csv(out / "quality_summary.csv", index=False)
+    if not systems.empty:
+        systems.sort_values("best_tokens_per_sec", ascending=False).to_csv(out / "systems_summary.csv", index=False)
     if "candidate_sec" in df and df["candidate_sec"].notna().any():
         ax = df.dropna(subset=["candidate_sec"]).plot.bar(x="run", y="candidate_sec", legend=False)
         ax.set_ylabel("candidates/sec")
@@ -94,6 +110,27 @@ def main():
         ax.set_ylabel("tokens/sec")
         plt.tight_layout()
         plt.savefig(out / "tokens_per_sec.png", dpi=160)
+        plt.close()
+    if not quality.empty:
+        plot_df = quality.sort_values("best_holdout_exact", ascending=False)
+        ax = plot_df.plot.bar(x="run", y="best_holdout_exact", legend=False, figsize=(10, 4))
+        ax.set_ylabel("best holdout exact")
+        plt.tight_layout()
+        plt.savefig(out / "quality_holdout.png", dpi=160)
+        plt.close()
+        if plot_df["holdout_lift"].notna().any():
+            ax = plot_df.dropna(subset=["holdout_lift"]).plot.bar(x="run", y="holdout_lift", legend=False, figsize=(10, 4))
+            ax.axhline(0.0, color="black", linewidth=0.8)
+            ax.set_ylabel("holdout lift vs base")
+            plt.tight_layout()
+            plt.savefig(out / "quality_lift.png", dpi=160)
+            plt.close()
+    if "best_cap_hit_mean" in df and df["best_cap_hit_mean"].notna().any():
+        audit = df.dropna(subset=["best_cap_hit_mean"])
+        ax = audit.plot.bar(x="run", y=["best_cap_hit_mean", "best_answer_closed_mean"], figsize=(10, 4))
+        ax.set_ylabel("fraction")
+        plt.tight_layout()
+        plt.savefig(out / "cap_answer_audit.png", dpi=160)
         plt.close()
     candidate_frames = []
     for run_dir in sorted(root.iterdir()):
@@ -150,9 +187,43 @@ def main():
             f"- Fastest generation backend row: `{best_tokens['run']}` at "
             f"{best_tokens['best_tokens_per_sec']:.1f} tokens/sec."
         )
+    if not quality.empty:
+        best_quality = quality.sort_values("best_holdout_exact", ascending=False).iloc[0]
+        lift = best_quality["holdout_lift"]
+        lift_text = "" if pd.isna(lift) else f" ({lift:+.4f} lift vs base)"
+        notes.append(
+            f"- Best holdout run: `{best_quality['run']}` at "
+            f"{best_quality['best_holdout_exact']:.4f}{lift_text}."
+        )
+    if "prompt_eval_savings" in df and df["prompt_eval_savings"].notna().any():
+        best_savings = df.dropna(subset=["prompt_eval_savings"]).sort_values("prompt_eval_savings", ascending=False).iloc[0]
+        notes.append(
+            f"- Best staged-screen saving: `{best_savings['run']}` saved "
+            f"{100.0 * best_savings['prompt_eval_savings']:.1f}% of prompt evals."
+        )
+    mixed_rows = df[df["throughput_mode"] == "mixed_lora"]
+    seq_rows = df[df["throughput_mode"] == "sequential_lora"]
+    if not mixed_rows.empty and not seq_rows.empty:
+        mixed = mixed_rows.sort_values("best_tokens_per_sec", ascending=False).iloc[0]
+        seq = seq_rows.sort_values("best_tokens_per_sec", ascending=False).iloc[0]
+        notes.append(
+            f"- Mixed LoRA speedup vs best sequential LoRA row: "
+            f"{mixed['best_tokens_per_sec'] / max(seq['best_tokens_per_sec'], 1e-9):.2f}x."
+        )
     body = "# RandOpt LoRA Lab Report\n\n"
     if notes:
         body += "## Auto Notes\n\n" + "\n".join(notes) + "\n\n"
+    if not systems.empty:
+        body += "## Systems Top Rows\n\n"
+        body += systems.sort_values("best_tokens_per_sec", ascending=False)[
+            ["run", "kind", "throughput_mode", "best_tokens_per_sec", "best_prompts_per_sec"]
+        ].head(8).to_markdown(index=False) + "\n\n"
+    if not quality.empty:
+        body += "## Research Top Rows\n\n"
+        body += quality.sort_values("best_holdout_exact", ascending=False)[
+            ["run", "kind", "family", "population", "base_holdout_exact", "best_holdout_exact", "holdout_lift", "prompt_eval_savings"]
+        ].head(12).to_markdown(index=False) + "\n\n"
+    body += "## Full Summary\n\n"
     body += df.to_markdown(index=False) + "\n"
     (out / "report.md").write_text(body)
     print(df.to_string(index=False))
