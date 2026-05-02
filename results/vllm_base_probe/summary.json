@@ -1,0 +1,13 @@
+{
+  "elapsed_s": 0.4734184741973877,
+  "exact_mean": 0.0625,
+  "kind": "vllm_base_probe",
+  "load_s": 33.75620102882385,
+  "malformed_mean": 0.0,
+  "max_new_tokens": 32,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "output_tokens": 1980,
+  "prompts": 128,
+  "prompts_per_sec": 270.37390168815324,
+  "tokens_per_sec": 4182.34629173862
+}
