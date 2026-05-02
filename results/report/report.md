@@ -1,17 +1,31 @@
 # RandOpt LoRA Lab Report
 
-| run                  | kind            | family    |   population |   base_screen_exact |   best_holdout_exact |   candidate_sec |   pair_sec |   prompt_eval_savings |   best_tokens_per_sec |   best_batch_size |
-|:---------------------|:----------------|:----------|-------------:|--------------------:|---------------------:|----------------:|-----------:|----------------------:|----------------------:|------------------:|
-| search_anzo_p32      | search          | anzo      |           32 |              0.0625 |              0.125   |        0.452358 |    14.4754 |            nan        |                nan    |               nan |
-| vllm_base_probe      | vllm_base_probe |           |            0 |            nan      |            nan       |      nan        |   nan      |            nan        |                nan    |               nan |
-| sigma_iso_p64_s0p01  | search          | isotropic |           64 |              0.0625 |              0.15625 |        0.49918  |    15.9738 |            nan        |                nan    |               nan |
-| search_anzo_p64      | search          | anzo      |           64 |              0.0625 |              0.125   |        0.498147 |    15.9407 |            nan        |                nan    |               nan |
-| search_iso_p32       | search          | isotropic |           32 |              0.0625 |              0       |        0.473247 |    15.1439 |            nan        |                nan    |               nan |
-| sigma_iso_p64_s0p04  | search          | isotropic |           64 |              0.0625 |              0       |        0.499252 |    15.9761 |            nan        |                nan    |               nan |
-| halving_iso_p128     | halving         | isotropic |          128 |              0.0625 |              0       |        0.816712 |   nan      |              0.606061 |                nan    |               nan |
-| sigma_iso_p64_s0p005 | search          | isotropic |           64 |              0.0625 |              0.125   |        0.50542  |    16.1735 |            nan        |                nan    |               nan |
-| halving_anzo_p128    | halving         | anzo      |          128 |              0.0625 |              0.125   |        0.816943 |   nan      |              0.606061 |                nan    |               nan |
-| sysbench_tf3b        | sysbench        | isotropic |            0 |            nan      |            nan       |      nan        |   nan      |            nan        |               1034.96 |                32 |
-| oracle               | oracle          |           |            0 |              0.125  |            nan       |      nan        |   nan      |            nan        |                nan    |               nan |
-| sigma_iso_p64_s0p02  | search          | isotropic |           64 |              0.0625 |              0       |        0.502273 |    16.0727 |            nan        |                nan    |               nan |
-| search_iso_p64       | search          | isotropic |           64 |              0.0625 |              0       |        0.499594 |    15.987  |            nan        |                nan    |               nan |
+## Auto Notes
+
+- Fastest candidate-block run: `halving_iso_s0p01_p256` at 0.821 candidates/sec.
+- Fastest generation backend row: `vllm_base_probe` at 4182.3 tokens/sec.
+
+| run                          | kind            | family    |   population |   base_screen_exact |   best_holdout_exact |   candidate_sec |   pair_sec |   prompt_eval_savings |   best_tokens_per_sec |   best_prompts_per_sec |   best_batch_size |
+|:-----------------------------|:----------------|:----------|-------------:|--------------------:|---------------------:|----------------:|-----------:|----------------------:|----------------------:|-----------------------:|------------------:|
+| search_anzo_p32              | search          | anzo      |           32 |              0.0625 |              0.125   |        0.452358 |    14.4754 |            nan        |                nan    |               nan      |               nan |
+| vllm_base_probe              | vllm_base_probe |           |            0 |            nan      |            nan       |      nan        |   nan      |            nan        |               4182.35 |               270.374  |               nan |
+| sigma_iso_p64_s0p01          | search          | isotropic |           64 |              0.0625 |              0.15625 |        0.49918  |    15.9738 |            nan        |                nan    |               nan      |               nan |
+| phase4_covlite_sigma001_p128 | adaptive_search |           |            0 |              0.0625 |              0.09375 |        0.517772 |   nan      |            nan        |                nan    |               nan      |               nan |
+| anzo_sigma_p64_s0p02         | search          | anzo      |           64 |              0.0625 |              0.125   |        0.495051 |    15.8416 |            nan        |                nan    |               nan      |               nan |
+| vllm_lora_bench_a4_p64       | vllm_lora_bench | isotropic |            0 |            nan      |            nan       |      nan        |   nan      |            nan        |                nan    |               nan      |               nan |
+| anzo_sigma_p64_s0p01         | search          | anzo      |           64 |              0.0625 |              0.125   |        0.498963 |    15.9668 |            nan        |                nan    |               nan      |               nan |
+| search_anzo_p64              | search          | anzo      |           64 |              0.0625 |              0.125   |        0.498147 |    15.9407 |            nan        |                nan    |               nan      |               nan |
+| search_iso_p32               | search          | isotropic |           32 |              0.0625 |              0       |        0.473247 |    15.1439 |            nan        |                nan    |               nan      |               nan |
+| sigma_iso_p64_s0p04          | search          | isotropic |           64 |              0.0625 |              0       |        0.499252 |    15.9761 |            nan        |                nan    |               nan      |               nan |
+| vllm_lora_bench_a16_p32      | vllm_lora_bench | isotropic |            0 |            nan      |            nan       |      nan        |   nan      |            nan        |                nan    |               nan      |               nan |
+| halving_iso_p128             | halving         | isotropic |          128 |              0.0625 |              0       |        0.816712 |   nan      |              0.606061 |                nan    |               nan      |               nan |
+| anzo_sigma_p64_s0p005        | search          | anzo      |           64 |              0.0625 |              0.09375 |        0.497809 |    15.9299 |            nan        |                nan    |               nan      |               nan |
+| anzo_sigma_p64_s0p04         | search          | anzo      |           64 |              0.0625 |              0.09375 |        0.495641 |    15.8605 |            nan        |                nan    |               nan      |               nan |
+| halving_iso_s0p01_p256       | halving         | isotropic |          256 |              0.0625 |              0.15625 |        0.821026 |   nan      |              0.615385 |                nan    |               nan      |               nan |
+| vllm_lora_bench              | vllm_lora_bench | isotropic |            0 |            nan      |            nan       |      nan        |   nan      |            nan        |                nan    |               nan      |               nan |
+| sigma_iso_p64_s0p005         | search          | isotropic |           64 |              0.0625 |              0.125   |        0.50542  |    16.1735 |            nan        |                nan    |               nan      |               nan |
+| halving_anzo_p128            | halving         | anzo      |          128 |              0.0625 |              0.125   |        0.816943 |   nan      |              0.606061 |                nan    |               nan      |               nan |
+| sysbench_tf3b                | sysbench        | isotropic |            0 |            nan      |            nan       |      nan        |   nan      |            nan        |               1034.96 |                32.3427 |                32 |
+| oracle                       | oracle          |           |            0 |              0.125  |            nan       |      nan        |   nan      |            nan        |                nan    |               nan      |               nan |
+| sigma_iso_p64_s0p02          | search          | isotropic |           64 |              0.0625 |              0       |        0.502273 |    16.0727 |            nan        |                nan    |               nan      |               nan |
+| search_iso_p64               | search          | isotropic |           64 |              0.0625 |              0       |        0.499594 |    15.987  |            nan        |                nan    |               nan      |               nan |
