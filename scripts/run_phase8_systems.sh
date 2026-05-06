@@ -10,6 +10,8 @@ RANK=${RANK:-8}
 SIGMA=${SIGMA:-0.0075}
 SEED=${SEED:-2468}
 OUT_ROOT=${OUT_ROOT:-results/phase8_systems}
+BENCH_EXTRA_ARGS=${BENCH_EXTRA_ARGS:-}
+SEARCH_EXTRA_ARGS=${SEARCH_EXTRA_ARGS:-}
 
 export PYTHONUNBUFFERED=1
 export XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp/randopt-xdg-config}
@@ -40,7 +42,8 @@ for adapters in 8 16 32; do
     --preload \
     --mixed-batch \
     --skip-sequential \
-    --no-include-base
+    --no-include-base \
+    $BENCH_EXTRA_ARGS
 done
 
 for chunk in 8 16 32; do
@@ -61,7 +64,8 @@ for chunk in 8 16 32; do
     --max-cpu-loras 2048 \
     --max-new-tokens "$MAX_NEW_TOKENS" \
     --stop-at-answer \
-    --antithetic
+    --antithetic \
+    $SEARCH_EXTRA_ARGS
 done
 
 python -m randopt_lora_lab.compare_backends \

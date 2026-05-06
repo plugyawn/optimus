@@ -405,6 +405,8 @@ def run_benchmark(args) -> dict:
         max_loras=args.max_loras,
         max_lora_rank=args.rank,
         max_cpu_loras=max(args.max_cpu_loras, len(specs)),
+        enforce_eager=args.enforce_eager,
+        **({"max_num_batched_tokens": args.max_num_batched_tokens} if args.max_num_batched_tokens else {}),
     )
     load_s = time.time() - load_start
 
@@ -537,6 +539,8 @@ def run_benchmark(args) -> dict:
         "repeats": args.repeats,
         "max_new_tokens": args.max_new_tokens,
         "stop_at_answer": args.stop_at_answer,
+        "enforce_eager": args.enforce_eager,
+        "max_num_batched_tokens": args.max_num_batched_tokens,
         "adapter_build_s": adapter_build_s,
         "load_s": load_s,
         "preload": args.preload,
@@ -605,6 +609,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--adapter-dtype", default="bfloat16", choices=["float16", "bfloat16", "float32"])
     p.add_argument("--gpu-memory-utilization", type=float, default=0.82)
     p.add_argument("--max-model-len", type=int, default=1024)
+    p.add_argument("--max-num-batched-tokens", type=int, default=0)
+    p.add_argument("--enforce-eager", action="store_true")
     p.add_argument("--max-loras", type=int, default=8)
     p.add_argument("--max-cpu-loras", type=int, default=64)
     p.add_argument("--repeats", type=int, default=1)
