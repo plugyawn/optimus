@@ -219,6 +219,10 @@ def main():
                 "best_prompts_per_sec": prompts_per_sec,
                 "throughput_mode": throughput_mode,
                 "best_batch_size": row.get("best_batch_size"),
+                "a_frob_mean": row.get("a_frob_mean"),
+                "b_frob_mean": row.get("b_frob_mean"),
+                "ba_frob_mean": row.get("ba_frob_mean"),
+                "ba_frob_upper_mean": row.get("ba_frob_upper_mean"),
             }
         flat_row.update(paired)
         flat.append(flat_row)
