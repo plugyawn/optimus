@@ -213,6 +213,12 @@ def main():
                 "best_answer_closed_mean": max_present(top_holdout, "answer_closed_mean"),
                 "best_malformed_mean": max_present(top_holdout, "malformed_mean"),
                 "candidate_sec": row.get("candidate_sec"),
+                "screen_candidate_sec": row.get("screen_candidate_sec"),
+                "stage_candidate_sec": row.get("stage_candidate_sec"),
+                "prompt_eval_sec": row.get("prompt_eval_sec"),
+                "eval_elapsed_s": row.get("eval_elapsed_s"),
+                "adapter_build_s": row.get("adapter_build_s"),
+                "load_s": row.get("load_s"),
                 "pair_sec": row.get("pair_sec"),
                 "prompt_eval_savings": row.get("prompt_eval_savings"),
                 "best_tokens_per_sec": tokens_per_sec,
@@ -229,7 +235,12 @@ def main():
     df = pd.DataFrame(flat)
     df.to_csv(out / "summary.csv", index=False)
     quality = df[df["best_holdout_exact"].notna()].copy()
-    systems = df[df["best_tokens_per_sec"].notna()].copy()
+    systems = df[
+        df["best_tokens_per_sec"].notna()
+        | df["candidate_sec"].notna()
+        | df["screen_candidate_sec"].notna()
+        | df["prompt_eval_sec"].notna()
+    ].copy()
     if not quality.empty:
         quality.sort_values("best_holdout_exact", ascending=False).to_csv(out / "quality_summary.csv", index=False)
         invalid = quality[
@@ -245,7 +256,11 @@ def main():
         if not invalid.empty:
             invalid.to_csv(out / "quality_invalid_eval_rows.csv", index=False)
     if not systems.empty:
-        systems.sort_values("best_tokens_per_sec", ascending=False).to_csv(out / "systems_summary.csv", index=False)
+        systems.sort_values(
+            ["candidate_sec", "prompt_eval_sec", "best_tokens_per_sec"],
+            ascending=False,
+            na_position="last",
+        ).to_csv(out / "systems_summary.csv", index=False)
     if "candidate_sec" in df and df["candidate_sec"].notna().any():
         ax = df.dropna(subset=["candidate_sec"]).plot.bar(x="run", y="candidate_sec", legend=False)
         ax.set_ylabel("candidates/sec")
@@ -365,8 +380,23 @@ def main():
         body += "## Auto Notes\n\n" + "\n".join(notes) + "\n\n"
     if not systems.empty:
         body += "## Systems Top Rows\n\n"
-        body += systems.sort_values("best_tokens_per_sec", ascending=False)[
-            ["run", "kind", "throughput_mode", "best_tokens_per_sec", "best_prompts_per_sec"]
+        body += systems.sort_values(
+            ["candidate_sec", "prompt_eval_sec", "best_tokens_per_sec"],
+            ascending=False,
+            na_position="last",
+        )[
+            [
+                "run",
+                "kind",
+                "throughput_mode",
+                "candidate_sec",
+                "screen_candidate_sec",
+                "prompt_eval_sec",
+                "prompt_eval_savings",
+                "best_tokens_per_sec",
+                "best_prompts_per_sec",
+                "load_s",
+            ]
         ].head(8).to_markdown(index=False) + "\n\n"
     if not quality.empty:
         body += "## Research Top Rows\n\n"
