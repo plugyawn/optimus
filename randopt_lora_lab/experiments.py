@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 from .backends import TransformersLoraBackend
-from .countdown import load_examples, prompts as make_prompts, score_completion
+from .countdown import load_examples, prompts as make_prompts, score_completion, unique_example_count
 from .lora_space import Candidate
 
 
@@ -86,7 +86,7 @@ def run_oracle(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     backend = make_backend(args)
-    examples = load_examples(args.data, args.prompts, args.seed)
+    examples = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     sig0 = backend.logits_signature(make_prompts(examples[:4]))
     base = evaluate_candidate(backend, None, examples)
     zero = evaluate_candidate(backend, Candidate("isotropic", 0, 0.0), examples)
@@ -148,18 +148,61 @@ def anzo_anchor_prompts() -> list[str]:
     ]
 
 
+def anzo_random_target_prompts(seed: int, n: int) -> list[str]:
+    rng = np.random.default_rng(seed)
+    topics = [
+        "weather",
+        "databases",
+        "calendar planning",
+        "biology",
+        "debugging",
+        "sorting algorithms",
+        "email",
+        "unit tests",
+        "maps",
+        "music",
+        "nutrition",
+        "finance",
+    ]
+    prompts = []
+    for idx in rng.integers(0, len(topics), size=n):
+        prompts.append(f"Give a concise factual sentence about {topics[int(idx)]}.")
+    return prompts
+
+
 def maybe_build_family_state(args, backend, screen):
-    if args.family != "anzo":
+    if args.family == "isotropic":
         return None
-    return backend.build_anzo_state(make_prompts(screen[: min(16, len(screen))]), anzo_anchor_prompts())
+    if args.family == "random_ortho":
+        return backend.build_random_orthonormal_state(args.seed)
+    if args.family == "target_svd":
+        return backend.build_anzo_state(
+            make_prompts(screen[: min(16, len(screen))]),
+            anzo_anchor_prompts(),
+            subtract_anchor=False,
+        )
+    if args.family == "anzo_random_target":
+        return backend.build_anzo_state(
+            anzo_random_target_prompts(args.seed + 17, min(16, len(screen))),
+            anzo_anchor_prompts(),
+        )
+    if args.family == "anzo":
+        return backend.build_anzo_state(make_prompts(screen[: min(16, len(screen))]), anzo_anchor_prompts())
+    raise ValueError(f"unsupported family: {args.family}")
 
 
 def run_search(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     backend = make_backend(args)
-    screen = load_examples(args.data, args.prompts, args.seed)
-    holdout = load_examples(args.data, args.holdout_prompts, args.seed + 999)
+    screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
+    holdout = load_examples(
+        args.data,
+        args.holdout_prompts,
+        args.seed + 999,
+        allow_repeat=args.allow_repeat_data,
+        exclude_ids={ex.id for ex in screen},
+    )
     base_screen = evaluate_candidate(backend, None, screen)
     base_holdout = evaluate_candidate(backend, None, holdout)
     family_state = maybe_build_family_state(args, backend, screen)
@@ -184,6 +227,9 @@ def run_search(args):
         "population": len(candidates),
         "screen_prompts": len(screen),
         "holdout_prompts": len(holdout),
+        "screen_unique_prompts": unique_example_count(screen),
+        "holdout_unique_prompts": unique_example_count(holdout),
+        "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "base_screen_exact": base_screen["exact_mean"],
         "base_holdout_exact": base_holdout["exact_mean"],
         "candidate_sec": len(candidates) / total_s,
@@ -202,8 +248,14 @@ def run_halving(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     backend = make_backend(args)
-    screen = load_examples(args.data, args.prompts, args.seed)
-    holdout = load_examples(args.data, args.holdout_prompts, args.seed + 999)
+    screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
+    holdout = load_examples(
+        args.data,
+        args.holdout_prompts,
+        args.seed + 999,
+        allow_repeat=args.allow_repeat_data,
+        exclude_ids={ex.id for ex in screen},
+    )
     stage = screen[: min(args.stage_prompts, len(screen))]
     base_stage = evaluate_candidate(backend, None, stage)
     base_screen = evaluate_candidate(backend, None, screen)
@@ -245,6 +297,10 @@ def run_halving(args):
         "stage_prompts": len(stage),
         "screen_prompts": len(screen),
         "holdout_prompts": len(holdout),
+        "stage_unique_prompts": unique_example_count(stage),
+        "screen_unique_prompts": unique_example_count(screen),
+        "holdout_unique_prompts": unique_example_count(holdout),
+        "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "survivors": len(survivors),
         "base_stage_exact": base_stage["exact_mean"],
         "base_screen_exact": base_screen["exact_mean"],
@@ -274,7 +330,12 @@ def run_sysbench(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     backend = make_backend(args)
-    examples = load_examples(args.data, max(parse_int_list(args.prompt_counts)), args.seed)
+    examples = load_examples(
+        args.data,
+        max(parse_int_list(args.prompt_counts)),
+        args.seed,
+        allow_repeat=args.allow_repeat_data,
+    )
     candidate = Candidate(args.family, args.seed + 17, args.sigma)
     rows = []
     for batch_size in parse_int_list(args.batch_sizes):
@@ -343,7 +404,11 @@ def main():
         sp.add_argument("--batch-size", type=int, default=16)
         sp.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
         sp.add_argument("--stop-at-answer", action="store_true")
-        sp.add_argument("--family", default="isotropic", choices=["isotropic", "anzo"])
+        sp.add_argument(
+            "--family",
+            default="isotropic",
+            choices=["isotropic", "anzo", "target_svd", "random_ortho", "anzo_random_target"],
+        )
         sp.add_argument("--population", type=int, default=32)
         sp.add_argument("--promote", type=int, default=4)
         sp.add_argument("--stage-prompts", type=int, default=8)
@@ -352,6 +417,7 @@ def main():
         sp.add_argument("--prompt-counts", default="8,16,32")
         sp.add_argument("--repeats", type=int, default=2)
         sp.add_argument("--antithetic", action="store_true")
+        sp.add_argument("--allow-repeat-data", action="store_true")
     args = p.parse_args()
     if args.cmd == "oracle":
         run_oracle(args)

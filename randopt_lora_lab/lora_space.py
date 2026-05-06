@@ -24,6 +24,71 @@ def stable_int(text: str) -> int:
     return int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], 16)
 
 
+def canonical_module_name(name: str) -> str:
+    """Return the bare transformer module path shared by PEFT and vLLM adapters."""
+
+    marker = "model.layers."
+    idx = name.find(marker)
+    return name[idx:] if idx >= 0 else name
+
+
+def lora_noise_tensors(
+    module_name: str,
+    a_shape: torch.Size | tuple[int, ...],
+    b_shape: torch.Size | tuple[int, ...],
+    candidate: Candidate,
+    rank: int,
+    *,
+    family_state: dict | None = None,
+    state_key: str | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Materialize canonical CPU LoRA tensors for one candidate/module.
+
+    Both PEFT in-process mutation and vLLM safetensor generation must call this
+    path. Candidate identity otherwise drifts because CPU/CUDA RNGs and PEFT/vLLM
+    module names are not equivalent.
+    """
+
+    family_state = family_state or {}
+    canonical_name = canonical_module_name(module_name)
+    gen = torch.Generator(device="cpu")
+    gen.manual_seed((candidate.seed + stable_int(canonical_name)) % (2**63 - 1))
+    a_noise = torch.randn(tuple(a_shape), generator=gen, dtype=torch.float32)
+    b_noise = torch.randn(tuple(b_shape), generator=gen, dtype=torch.float32)
+    lookup_key = state_key or module_name
+    if candidate.family in {"anzo", "target_svd", "random_ortho", "anzo_random_target"} and lookup_key in family_state:
+        basis = family_state[lookup_key].cpu().float()
+        rows = min(a_noise.shape[0], basis.shape[0])
+        cols = min(a_noise.shape[1], basis.shape[1])
+        a_noise[:rows, :cols] = basis[:rows, :cols]
+    elif lookup_key in family_state and isinstance(family_state[lookup_key], dict):
+        spec = family_state[lookup_key]
+        mode = spec.get("mode", "elite_basis")
+        if "col_scale" in spec:
+            col_scale = spec["col_scale"].cpu().float()
+            a_noise.mul_(col_scale[: a_noise.shape[1]].clamp(0.05, 20.0).view(1, -1))
+        if "basis" in spec:
+            basis = spec["basis"].cpu().float()
+            if basis.ndim == 2 and basis.numel() > 0:
+                cols = min(a_noise.shape[1], basis.shape[1])
+                basis = basis[:, :cols]
+                if mode == "activation_overwrite":
+                    rows = min(a_noise.shape[0], basis.shape[0])
+                    a_noise[:rows, :cols] = basis[:rows, :cols]
+                else:
+                    gen_basis = torch.Generator(device="cpu")
+                    gen_basis.manual_seed((candidate.seed + stable_int(canonical_name + ":adaptive_basis")) % (2**63 - 1))
+                    coeff = torch.randn((a_noise.shape[0], basis.shape[0]), generator=gen_basis, dtype=torch.float32)
+                    basis_noise = (coeff @ basis) / math.sqrt(max(1, basis.shape[0]))
+                    basis_noise = basis_noise / basis_noise.std(unbiased=False).clamp_min(1e-6)
+                    residual_scale = float(spec.get("residual_scale", 0.5))
+                    basis_scale = float(spec.get("basis_scale", 1.0))
+                    a_noise[:, :cols] = residual_scale * a_noise[:, :cols] + basis_scale * basis_noise
+    a = candidate.sign * candidate.sigma * a_noise
+    b = b_noise / math.sqrt(rank)
+    return a.contiguous(), b.contiguous()
+
+
 def lora_module_names(model, suffixes: tuple[str, ...]) -> list[str]:
     names = []
     for name, module in model.named_modules():
@@ -41,46 +106,18 @@ def fill_lora_gaussian(model, candidate: Candidate, rank: int, family_state: dic
         adapter = next(iter(module.lora_A.keys()))
         a = module.lora_A[adapter].weight
         b = module.lora_B[adapter].weight
-        gen = torch.Generator(device=a.device)
-        gen.manual_seed((candidate.seed + stable_int(name)) % (2**63 - 1))
+        a_value, b_value = lora_noise_tensors(
+            name,
+            a.shape,
+            b.shape,
+            candidate,
+            rank,
+            family_state=family_state,
+            state_key=name,
+        )
         with torch.no_grad():
-            a_noise = torch.randn(a.shape, generator=gen, device=a.device, dtype=torch.float32)
-            b_noise = torch.randn(b.shape, generator=gen, device=b.device, dtype=torch.float32)
-            if candidate.family == "anzo" and name in family_state:
-                basis = family_state[name].to(a_noise.device, dtype=torch.float32)
-                rows = min(a_noise.shape[0], basis.shape[0])
-                cols = min(a_noise.shape[1], basis.shape[1])
-                a_noise[:rows, :cols] = basis[:rows, :cols]
-            elif name in family_state and isinstance(family_state[name], dict):
-                spec = family_state[name]
-                mode = spec.get("mode", "elite_basis")
-                if "col_scale" in spec:
-                    col_scale = spec["col_scale"].to(a_noise.device, dtype=torch.float32)
-                    a_noise.mul_(col_scale[: a_noise.shape[1]].clamp(0.05, 20.0).view(1, -1))
-                if "basis" in spec:
-                    basis = spec["basis"].to(a_noise.device, dtype=torch.float32)
-                    if basis.ndim == 2 and basis.numel() > 0:
-                        cols = min(a_noise.shape[1], basis.shape[1])
-                        basis = basis[:, :cols]
-                        if mode == "activation_overwrite":
-                            rows = min(a_noise.shape[0], basis.shape[0])
-                            a_noise[:rows, :cols] = basis[:rows, :cols]
-                        else:
-                            gen_basis = torch.Generator(device=a.device)
-                            gen_basis.manual_seed((candidate.seed + stable_int(name + ":adaptive_basis")) % (2**63 - 1))
-                            coeff = torch.randn(
-                                (a_noise.shape[0], basis.shape[0]),
-                                generator=gen_basis,
-                                device=a.device,
-                                dtype=torch.float32,
-                            )
-                            basis_noise = (coeff @ basis) / math.sqrt(max(1, basis.shape[0]))
-                            basis_noise = basis_noise / basis_noise.std(unbiased=False).clamp_min(1e-6)
-                            residual_scale = float(spec.get("residual_scale", 0.5))
-                            basis_scale = float(spec.get("basis_scale", 1.0))
-                            a_noise[:, :cols] = residual_scale * a_noise[:, :cols] + basis_scale * basis_noise
-            a.copy_((candidate.sign * candidate.sigma * a_noise).to(a.dtype))
-            b.copy_((b_noise / math.sqrt(rank)).to(b.dtype))
+            a.copy_(a_value.to(device=a.device, dtype=a.dtype))
+            b.copy_(b_value.to(device=b.device, dtype=b.dtype))
 
 
 def zero_lora(model) -> None:
@@ -93,7 +130,15 @@ def zero_lora(model) -> None:
                     layer.weight.zero_()
 
 
-def build_anzo_state(model, tokenizer, target_prompts: list[str], anchor_prompts: list[str], rank: int) -> dict:
+def build_anzo_state(
+    model,
+    tokenizer,
+    target_prompts: list[str],
+    anchor_prompts: list[str],
+    rank: int,
+    *,
+    subtract_anchor: bool = True,
+) -> dict:
     """Build a cheap target-active/anchor-quiet input basis for LoRA A matrices.
 
     For each LoRA target module, collect input activations on target and anchor
@@ -147,7 +192,7 @@ def build_anzo_state(model, tokenizer, target_prompts: list[str], anchor_prompts
         anchor = anchor - anchor.mean(dim=0, keepdim=True)
         # Anchor subspace from a small SVD. Keep it modest so target signal can survive.
         q = min(rank * 4, anchor.shape[0], anchor.shape[1])
-        if q > 0:
+        if subtract_anchor and q > 0:
             _, _, vh_a = torch.linalg.svd(anchor, full_matrices=False)
             anchor_basis = vh_a[:q].T
             target = target - (target @ anchor_basis) @ anchor_basis.T
@@ -156,4 +201,19 @@ def build_anzo_state(model, tokenizer, target_prompts: list[str], anchor_prompts
         if basis.shape[0] < rank:
             basis = F.pad(basis, (0, 0, 0, rank - basis.shape[0]))
         state[name] = basis.contiguous()
+    return state
+
+
+def build_random_orthonormal_state(model, rank: int, seed: int) -> dict:
+    state = {}
+    for name, module in model.named_modules():
+        if not hasattr(module, "lora_A") or not module.lora_A:
+            continue
+        adapter = next(iter(module.lora_A.keys()))
+        weight = module.lora_A[adapter].weight
+        gen = torch.Generator(device="cpu")
+        gen.manual_seed((seed + stable_int(canonical_module_name(name) + ":random_ortho")) % (2**63 - 1))
+        mat = torch.randn((int(weight.shape[1]), rank), generator=gen, dtype=torch.float32)
+        q, _ = torch.linalg.qr(mat, mode="reduced")
+        state[name] = q.T.contiguous()
     return state

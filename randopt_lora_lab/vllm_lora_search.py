@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .countdown import load_examples, prompts as make_prompts
+from .countdown import load_examples, prompts as make_prompts, unique_example_count
 from .vllm_lora_bench import (
     AdapterSpec,
     Candidate,
@@ -174,8 +174,14 @@ def run_search(args) -> dict:
     reset_outputs(out)
     write_json(out / "args.json", vars(args))
 
-    screen = load_examples(args.data, args.prompts, args.seed)
-    holdout = load_examples(args.data, args.holdout_prompts, args.seed + 999)
+    screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
+    holdout = load_examples(
+        args.data,
+        args.holdout_prompts,
+        args.seed + 999,
+        allow_repeat=args.allow_repeat_data,
+        exclude_ids={ex.id for ex in screen},
+    )
     candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic)
 
     adapter_start = time.time()
@@ -247,6 +253,9 @@ def run_search(args) -> dict:
         "antithetic": args.antithetic,
         "screen_prompts": len(screen),
         "holdout_prompts": len(holdout),
+        "screen_unique_prompts": unique_example_count(screen),
+        "holdout_unique_prompts": unique_example_count(holdout),
+        "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "promote": args.promote,
         "max_loras": args.max_loras,
         "chunk_adapters": args.chunk_adapters,
@@ -327,6 +336,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--adapter-dir", default=None)
     p.add_argument("--keep-adapters", action="store_true")
     p.add_argument("--local-files-only", action="store_true")
+    p.add_argument("--allow-repeat-data", action="store_true")
     return p
 
 

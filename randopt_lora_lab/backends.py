@@ -7,7 +7,7 @@ import torch
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList
 
-from .lora_space import Candidate, build_anzo_state, fill_lora_gaussian, lora_module_names, zero_lora
+from .lora_space import Candidate, build_anzo_state, build_random_orthonormal_state, fill_lora_gaussian, lora_module_names, zero_lora
 
 
 @dataclass
@@ -121,5 +121,15 @@ class TransformersLoraBackend:
         out = self.model(**inputs)
         return out.logits[:, -1, :].float().detach().cpu()
 
-    def build_anzo_state(self, target_prompts: list[str], anchor_prompts: list[str]):
-        return build_anzo_state(self.model, self.tokenizer, target_prompts, anchor_prompts, self.rank)
+    def build_anzo_state(self, target_prompts: list[str], anchor_prompts: list[str], *, subtract_anchor: bool = True):
+        return build_anzo_state(
+            self.model,
+            self.tokenizer,
+            target_prompts,
+            anchor_prompts,
+            self.rank,
+            subtract_anchor=subtract_anchor,
+        )
+
+    def build_random_orthonormal_state(self, seed: int):
+        return build_random_orthonormal_state(self.model, self.rank, seed)

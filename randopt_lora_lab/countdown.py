@@ -59,7 +59,30 @@ def built_in_examples() -> list[CountdownExample]:
     return [CountdownExample(i, tuple(nums), target) for i, (nums, target) in enumerate(raw)]
 
 
-def load_examples(path: str | None, n: int, seed: int) -> list[CountdownExample]:
+def assert_unique_example_ids(examples: Iterable[CountdownExample], *, label: str = "examples") -> None:
+    seen: set[int] = set()
+    duplicates: list[int] = []
+    for ex in examples:
+        if ex.id in seen:
+            duplicates.append(ex.id)
+        seen.add(ex.id)
+    if duplicates:
+        sample = ", ".join(str(x) for x in duplicates[:8])
+        raise ValueError(f"{label} contains duplicate example ids: {sample}")
+
+
+def unique_example_count(examples: Iterable[CountdownExample]) -> int:
+    return len({ex.id for ex in examples})
+
+
+def load_examples(
+    path: str | None,
+    n: int,
+    seed: int,
+    *,
+    allow_repeat: bool = False,
+    exclude_ids: set[int] | None = None,
+) -> list[CountdownExample]:
     if path and Path(path).exists():
         data = json.loads(Path(path).read_text())
         examples = []
@@ -68,10 +91,19 @@ def load_examples(path: str | None, n: int, seed: int) -> list[CountdownExample]
             examples.append(CountdownExample(int(row.get("id", i)), nums, int(row["target"])))
     else:
         examples = built_in_examples()
+    assert_unique_example_ids(examples, label=path or "built-in Countdown examples")
+    if exclude_ids:
+        examples = [ex for ex in examples if ex.id not in exclude_ids]
     rng = random.Random(seed)
     examples = examples[:]
-    while len(examples) < n:
-        examples.extend(examples)
+    if len(examples) < n:
+        if not allow_repeat:
+            raise ValueError(
+                f"Requested {n} examples, but only {len(examples)} unique examples are available. "
+                "Pass --allow-repeat-data only for smoke tests."
+            )
+        while len(examples) < n:
+            examples.extend(examples)
     rng.shuffle(examples)
     return examples[:n]
 
@@ -88,6 +120,10 @@ def prompt(example: CountdownExample) -> str:
 def extract_answer(text: str) -> str:
     matches = ANSWER_RE.findall(text)
     return matches[-1].strip() if matches else ""
+
+
+def answer_spans(text: str) -> list[re.Match[str]]:
+    return list(ANSWER_RE.finditer(text))
 
 
 ALLOWED = {
@@ -115,12 +151,21 @@ def safe_eval_expr(expr: str) -> float:
     return float(rec(ast.parse(expr, mode="eval")))
 
 
-def score_completion(text: str, example: CountdownExample) -> dict:
-    answer = extract_answer(text)
+def score_completion(text: str, example: CountdownExample, *, strict: bool = True) -> dict:
+    spans = answer_spans(text)
+    answer = spans[-1].group(1).strip() if spans else ""
     has_answer = bool(answer)
-    malformed = False
+    answer_count = len(spans)
+    missing_answer = answer_count == 0
+    multiple_answers = answer_count > 1
+    trailing_text = False
+    if spans:
+        before = text[: spans[0].start()].strip()
+        after = text[spans[-1].end() :].strip()
+        trailing_text = bool(before or after)
+    malformed = bool(strict and (missing_answer or multiple_answers or trailing_text))
     exact = 0.0
-    if answer:
+    if answer and not malformed:
         if "=" in answer or not re.match(r"^[0-9+\-*/(). ]+$", answer):
             malformed = True
         else:
@@ -134,6 +179,10 @@ def score_completion(text: str, example: CountdownExample) -> dict:
         "exact": exact,
         "has_answer": has_answer,
         "malformed": malformed,
+        "answer_count": answer_count,
+        "missing_answer": missing_answer,
+        "multiple_answers": multiple_answers,
+        "trailing_text": trailing_text,
         "answer": answer,
     }
 

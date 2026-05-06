@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import math
 import os
 import platform
 import random
@@ -16,6 +14,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .countdown import CountdownExample, load_examples, prompts as make_prompts, score_completion
+from .lora_space import Candidate, lora_noise_tensors
 
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-3B-Instruct"
@@ -32,18 +31,6 @@ SUPPORTED_QWEN_TARGETS = {
 
 
 @dataclass(frozen=True)
-class Candidate:
-    family: str
-    seed: int
-    sigma: float
-    sign: int = 1
-
-    @property
-    def key(self) -> str:
-        return f"{self.family}:seed{self.seed}:s{self.sigma:g}:sign{self.sign}"
-
-
-@dataclass(frozen=True)
 class AdapterSpec:
     index: int
     name: str
@@ -53,10 +40,6 @@ class AdapterSpec:
     seed: int
     sigma: float
     sign: int
-
-
-def stable_int(text: str) -> int:
-    return int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], 16)
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -161,12 +144,13 @@ def save_seed_adapter(
     }[tensor_dtype]
     tensors = {}
     for module, in_features, out_features in qwen_lora_shapes(config, targets):
-        gen = torch.Generator(device="cpu")
-        gen.manual_seed((candidate.seed + stable_int(module)) % (2**63 - 1))
-        a_noise = torch.randn((rank, in_features), generator=gen, dtype=torch.float32)
-        b_noise = torch.randn((out_features, rank), generator=gen, dtype=torch.float32)
-        a = candidate.sign * candidate.sigma * a_noise
-        b = b_noise / math.sqrt(rank)
+        a, b = lora_noise_tensors(
+            module,
+            (rank, in_features),
+            (out_features, rank),
+            candidate,
+            rank,
+        )
         prefix = f"base_model.model.{module}"
         tensors[f"{prefix}.lora_A.weight"] = a.to(dtype).contiguous()
         tensors[f"{prefix}.lora_B.weight"] = b.to(dtype).contiguous()
@@ -388,7 +372,7 @@ def run_benchmark(args) -> dict:
     reset_jsonl_outputs(out)
     write_json(out / "args.json", vars(args))
 
-    examples = load_examples(args.data, args.prompts, args.seed)
+    examples = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     prompt_texts = make_prompts(examples)
 
     adapter_start = time.time()
@@ -626,6 +610,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--include-base", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--prepare-only", action="store_true", help="Only write deterministic adapter files.")
     p.add_argument("--local-files-only", action="store_true")
+    p.add_argument("--allow-repeat-data", action="store_true")
     return p
 
 

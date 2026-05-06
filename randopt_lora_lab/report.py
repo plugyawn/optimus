@@ -30,6 +30,16 @@ def scalar(row: dict, key: str, default=None):
     return default if value is None else value
 
 
+def wilson_interval(rate: float | None, n: int | None, z: float = 1.96) -> tuple[float | None, float | None]:
+    if rate is None or not n:
+        return None, None
+    successes = max(0.0, min(float(n), float(rate) * n))
+    denom = 1.0 + z * z / n
+    center = (successes / n + z * z / (2 * n)) / denom
+    margin = z * ((successes / n * (1.0 - successes / n) + z * z / (4 * n)) / n) ** 0.5 / denom
+    return max(0.0, center - margin), min(1.0, center + margin)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--root", required=True)
@@ -47,6 +57,10 @@ def main():
     for row in summaries:
         top_holdout = row.get("top_holdout") or []
         best_holdout = max((x.get("exact_mean", 0.0) for x in top_holdout), default=None)
+        holdout_n = row.get("holdout_unique_prompts") or row.get("holdout_prompts")
+        best_ci_low, best_ci_high = wilson_interval(best_holdout, holdout_n)
+        base_holdout = row.get("base_holdout_exact")
+        base_ci_low, base_ci_high = wilson_interval(base_holdout, holdout_n)
         tokens_per_sec = (
             row.get("mixed_tokens_per_sec")
             or row.get("lora_tokens_per_sec")
@@ -71,14 +85,23 @@ def main():
                 "kind": row.get("kind"),
                 "family": row.get("family", ""),
                 "population": row.get("population", 0),
+                "screen_prompts": row.get("screen_prompts"),
+                "holdout_prompts": row.get("holdout_prompts"),
                 "stop_at_answer": row.get("stop_at_answer"),
                 "max_new_tokens": row.get("max_new_tokens"),
                 "base_screen_exact": row.get("base_screen_exact", row.get("base_exact")),
                 "base_holdout_exact": row.get("base_holdout_exact"),
                 "best_holdout_exact": best_holdout,
+                "base_holdout_ci_low": base_ci_low,
+                "base_holdout_ci_high": base_ci_high,
+                "best_holdout_ci_low": best_ci_low,
+                "best_holdout_ci_high": best_ci_high,
                 "holdout_lift": None
                 if best_holdout is None or row.get("base_holdout_exact") is None
                 else best_holdout - row.get("base_holdout_exact"),
+                "screen_unique_prompts": row.get("screen_unique_prompts"),
+                "holdout_unique_prompts": row.get("holdout_unique_prompts"),
+                "screen_holdout_overlap": row.get("screen_holdout_overlap"),
                 "best_cap_hit_mean": max_present(top_holdout, "cap_hit_mean"),
                 "best_answer_closed_mean": max_present(top_holdout, "answer_closed_mean"),
                 "best_malformed_mean": max_present(top_holdout, "malformed_mean"),
@@ -97,6 +120,12 @@ def main():
     systems = df[df["best_tokens_per_sec"].notna()].copy()
     if not quality.empty:
         quality.sort_values("best_holdout_exact", ascending=False).to_csv(out / "quality_summary.csv", index=False)
+        invalid = quality[
+            (quality["screen_holdout_overlap"].fillna(0) > 0)
+            | (quality["holdout_unique_prompts"].fillna(quality["holdout_prompts"]) < quality["holdout_prompts"])
+        ]
+        if not invalid.empty:
+            invalid.to_csv(out / "quality_invalid_eval_rows.csv", index=False)
     if not systems.empty:
         systems.sort_values("best_tokens_per_sec", ascending=False).to_csv(out / "systems_summary.csv", index=False)
     if "candidate_sec" in df and df["candidate_sec"].notna().any():
@@ -221,7 +250,19 @@ def main():
     if not quality.empty:
         body += "## Research Top Rows\n\n"
         body += quality.sort_values("best_holdout_exact", ascending=False)[
-            ["run", "kind", "family", "population", "base_holdout_exact", "best_holdout_exact", "holdout_lift", "prompt_eval_savings"]
+            [
+                "run",
+                "kind",
+                "family",
+                "population",
+                "base_holdout_exact",
+                "best_holdout_exact",
+                "holdout_lift",
+                "best_holdout_ci_low",
+                "best_holdout_ci_high",
+                "screen_holdout_overlap",
+                "prompt_eval_savings",
+            ]
         ].head(12).to_markdown(index=False) + "\n\n"
     body += "## Full Summary\n\n"
     body += df.to_markdown(index=False) + "\n"

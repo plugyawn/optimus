@@ -9,7 +9,7 @@ from pathlib import Path
 
 import torch
 
-from .countdown import load_examples, prompts as make_prompts
+from .countdown import load_examples, prompts as make_prompts, unique_example_count
 from .experiments import (
     anzo_anchor_prompts,
     candidate_panel,
@@ -18,7 +18,7 @@ from .experiments import (
     parse_candidate_key,
     write_jsonl,
 )
-from .lora_space import Candidate, stable_int
+from .lora_space import Candidate, lora_noise_tensors
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -92,10 +92,9 @@ def lora_a_modules(model):
 
 
 def candidate_a_noise(name: str, weight: torch.Tensor, candidate: Candidate) -> torch.Tensor:
-    gen = torch.Generator(device=weight.device)
-    gen.manual_seed((candidate.seed + stable_int(name)) % (2**63 - 1))
-    noise = torch.randn(tuple(weight.shape), generator=gen, device=weight.device, dtype=torch.float32)
-    return (candidate.sign * noise).detach().cpu()
+    unit_candidate = Candidate(candidate.family, candidate.seed, 1.0, candidate.sign)
+    noise, _ = lora_noise_tensors(name, tuple(weight.shape), (1, 1), unit_candidate, rank=max(1, weight.shape[0]))
+    return noise.detach().cpu()
 
 
 def top_basis(rows: list[torch.Tensor], basis_rank: int) -> torch.Tensor | None:
@@ -201,8 +200,14 @@ def run_search(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     backend = make_backend(args)
-    screen = load_examples(args.data, args.prompts, args.seed)
-    holdout = load_examples(args.data, args.holdout_prompts, args.seed + 999)
+    screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
+    holdout = load_examples(
+        args.data,
+        args.holdout_prompts,
+        args.seed + 999,
+        allow_repeat=args.allow_repeat_data,
+        exclude_ids={ex.id for ex in screen},
+    )
     prior_rows = candidate_score_rows(expand_prior_paths(args.prior_results), args.basis_elites, args.min_prior_score)
 
     base_screen = evaluate_candidate(backend, None, screen)
@@ -264,6 +269,9 @@ def run_search(args):
         "antithetic": args.antithetic,
         "screen_prompts": len(screen),
         "holdout_prompts": len(holdout),
+        "screen_unique_prompts": unique_example_count(screen),
+        "holdout_unique_prompts": unique_example_count(holdout),
+        "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "max_new_tokens": args.max_new_tokens,
         "stop_at_answer": args.stop_at_answer,
         "base_screen_exact": base_screen["exact_mean"],
@@ -305,6 +313,7 @@ def add_common_args(sp):
     sp.add_argument("--batch-size", type=int, default=16)
     sp.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
     sp.add_argument("--stop-at-answer", action="store_true")
+    sp.add_argument("--allow-repeat-data", action="store_true")
 
 
 def main():
