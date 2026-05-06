@@ -68,6 +68,31 @@ for chunk in 8 16 32; do
     $SEARCH_EXTRA_ARGS
 done
 
+for spec in "8 64" "16 128"; do
+  read -r stage survivors <<<"$spec"
+  python -m randopt_lora_lab.vllm_lora_halving \
+    --out "$OUT_ROOT/halving_stage${stage}_surv${survivors}_p${POPULATION}" \
+    --model "$MODEL" \
+    --data "$DATA" \
+    --prompts "$PROMPTS" \
+    --stage-prompts "$stage" \
+    --holdout-prompts 8 \
+    --population "$POPULATION" \
+    --survivors "$survivors" \
+    --promote 0 \
+    --rank "$RANK" \
+    --sigma "$SIGMA" \
+    --seed "$SEED" \
+    --targets q_proj,v_proj \
+    --max-loras 16 \
+    --chunk-adapters 16 \
+    --max-cpu-loras 2048 \
+    --max-new-tokens "$MAX_NEW_TOKENS" \
+    --stop-at-answer \
+    --antithetic \
+    $SEARCH_EXTRA_ARGS
+done
+
 python -m randopt_lora_lab.compare_backends \
   --trusted "$OUT_ROOT/search_chunk16_p${POPULATION}" \
   --candidate "$OUT_ROOT/search_chunk32_p${POPULATION}" \
