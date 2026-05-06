@@ -454,30 +454,31 @@ def run_benchmark(args) -> dict:
             }
         )
 
-    for repeat in range(args.repeats):
-        for spec, req in zip(specs, requests):
-            outputs, elapsed_s = timed_generate(llm, prompt_texts, sampling, lora_request=req)
-            rows, metrics = score_rows(
-                mode="sequential",
-                candidate=spec.candidate,
-                examples=examples,
-                outputs=outputs,
-                max_new_tokens=args.max_new_tokens,
-            )
-            per_prompt_rows.extend(rows)
-            adapter_rows.append(
-                {
-                    "mode": "sequential",
-                    "adapter_index": spec.index,
-                    "adapter": spec.name,
-                    "candidate": spec.candidate,
-                    "repeat": repeat,
-                    "elapsed_s": elapsed_s,
-                    "tokens_per_sec": metrics["output_tokens"] / max(elapsed_s, 1e-9),
-                    "prompts_per_sec": len(prompt_texts) / max(elapsed_s, 1e-9),
-                    **metrics,
-                }
-            )
+    if not args.skip_sequential:
+        for repeat in range(args.repeats):
+            for spec, req in zip(specs, requests):
+                outputs, elapsed_s = timed_generate(llm, prompt_texts, sampling, lora_request=req)
+                rows, metrics = score_rows(
+                    mode="sequential",
+                    candidate=spec.candidate,
+                    examples=examples,
+                    outputs=outputs,
+                    max_new_tokens=args.max_new_tokens,
+                )
+                per_prompt_rows.extend(rows)
+                adapter_rows.append(
+                    {
+                        "mode": "sequential",
+                        "adapter_index": spec.index,
+                        "adapter": spec.name,
+                        "candidate": spec.candidate,
+                        "repeat": repeat,
+                        "elapsed_s": elapsed_s,
+                        "tokens_per_sec": metrics["output_tokens"] / max(elapsed_s, 1e-9),
+                        "prompts_per_sec": len(prompt_texts) / max(elapsed_s, 1e-9),
+                        **metrics,
+                    }
+                )
 
     mixed_rows = []
     if args.mixed_batch:
@@ -540,10 +541,13 @@ def run_benchmark(args) -> dict:
         "load_s": load_s,
         "preload": args.preload,
         "preload_s": sum(float(r["elapsed_s"]) for r in preload_rows),
+        "skip_sequential": args.skip_sequential,
         "lora_elapsed_s": lora_elapsed,
         "lora_output_tokens": lora_tokens,
-        "lora_tokens_per_sec": lora_tokens / max(lora_elapsed, 1e-9),
-        "lora_prompts_per_sec": (len(prompt_texts) * len(specs) * args.repeats) / max(lora_elapsed, 1e-9),
+        "lora_tokens_per_sec": None if not lora_rows else lora_tokens / max(lora_elapsed, 1e-9),
+        "lora_prompts_per_sec": None
+        if not lora_rows
+        else (len(prompt_texts) * len(specs) * args.repeats) / max(lora_elapsed, 1e-9),
         "best_adapter_tokens_per_sec": best.get("tokens_per_sec"),
         "best_adapter_prompts_per_sec": best.get("prompts_per_sec"),
         "adapter_rows": len(lora_rows),
@@ -607,6 +611,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--adapter-dir", default=None)
     p.add_argument("--preload", action="store_true", help="Warm-load every adapter before timed rows.")
     p.add_argument("--mixed-batch", action="store_true", help="Evaluate all adapters in one vLLM request batch.")
+    p.add_argument("--skip-sequential", action="store_true", help="Skip slow one-adapter-at-a-time rows.")
     p.add_argument("--include-base", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--prepare-only", action="store_true", help="Only write deterministic adapter files.")
     p.add_argument("--local-files-only", action="store_true")
