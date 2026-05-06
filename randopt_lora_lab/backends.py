@@ -62,6 +62,7 @@ class TransformersLoraBackend:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.padding_side = "left"
         self.answer_stop_ids = self.tokenizer("</answer>", add_special_tokens=False)["input_ids"]
+        self.answer_stop_text = "</answer>"
         base = AutoModelForCausalLM.from_pretrained(
             model_name,
             torch_dtype=torch_dtype,
@@ -112,7 +113,10 @@ class TransformersLoraBackend:
             counts = (new_ids != self.tokenizer.pad_token_id).sum(dim=1).tolist()
             token_counts.extend(int(x) for x in counts)
             output_tokens += int(sum(counts))
-            texts.extend(self.tokenizer.batch_decode(new_ids, skip_special_tokens=True))
+            decoded = self.tokenizer.batch_decode(new_ids, skip_special_tokens=True)
+            if self.stop_at_answer:
+                decoded = [self._truncate_at_answer_stop(text) for text in decoded]
+            texts.extend(decoded)
         return GenerationResult(texts, output_tokens, token_counts, time.time() - start)
 
     @torch.no_grad()
@@ -133,3 +137,9 @@ class TransformersLoraBackend:
 
     def build_random_orthonormal_state(self, seed: int):
         return build_random_orthonormal_state(self.model, self.rank, seed)
+
+    def _truncate_at_answer_stop(self, text: str) -> str:
+        idx = text.find(self.answer_stop_text)
+        if idx < 0:
+            return text
+        return text[: idx + len(self.answer_stop_text)]

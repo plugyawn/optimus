@@ -1,6 +1,7 @@
 import unittest
 
 from randopt_lora_lab.countdown import CountdownExample, load_examples, score_completion
+from randopt_lora_lab.backends import TransformersLoraBackend
 
 
 class CountdownDataTests(unittest.TestCase):
@@ -46,6 +47,14 @@ class CountdownParserTests(unittest.TestCase):
         self.assertEqual(score["exact"], 0.0)
         self.assertTrue(score["malformed"])
         self.assertTrue(score["multiple_answers"])
+
+
+class BackendTextNormalizationTests(unittest.TestCase):
+    def test_truncate_at_answer_stop(self):
+        backend = object.__new__(TransformersLoraBackend)
+        backend.answer_stop_text = "</answer>"
+        text = backend._truncate_at_answer_stop(" <answer>8*(7-3)-8</answer>Human:")
+        self.assertEqual(text, " <answer>8*(7-3)-8</answer>")
 
 
 if __name__ == "__main__":
