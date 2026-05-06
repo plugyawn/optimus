@@ -12,6 +12,8 @@ SEED=${SEED:-2468}
 OUT_ROOT=${OUT_ROOT:-results/phase8_systems}
 
 export PYTHONUNBUFFERED=1
+export XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp/randopt-xdg-config}
+mkdir -p "$XDG_CONFIG_HOME"
 export VLLM_USE_DEEP_GEMM=${VLLM_USE_DEEP_GEMM:-0}
 export VLLM_DEEP_GEMM_WARMUP=${VLLM_DEEP_GEMM_WARMUP:-skip}
 
