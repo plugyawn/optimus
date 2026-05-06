@@ -9,13 +9,15 @@ from pathlib import Path
 
 import torch
 
-from .countdown import load_examples, prompts as make_prompts, unique_example_count
+from .countdown import load_examples, prompts as make_prompts, unique_example_count, unique_semantic_example_count
 from .experiments import (
     anzo_anchor_prompts,
     candidate_panel,
     evaluate_candidate,
     make_backend,
     parse_candidate_key,
+    reset_outputs,
+    tag_rows,
     write_jsonl,
 )
 from .lora_space import Candidate, lora_noise_tensors
@@ -199,6 +201,15 @@ def jsonable_eval(ev: dict, **extra) -> dict:
 def run_search(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    reset_outputs(
+        out,
+        [
+            "per_prompt.jsonl",
+            "candidate_summary.jsonl",
+            "holdout_per_prompt.jsonl",
+            "basis_summary.json",
+        ],
+    )
     backend = make_backend(args)
     screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     holdout = load_examples(
@@ -212,6 +223,8 @@ def run_search(args):
 
     base_screen = evaluate_candidate(backend, None, screen)
     base_holdout = evaluate_candidate(backend, None, holdout)
+    write_jsonl(out / "per_prompt.jsonl", tag_rows(base_screen["rows"], mode="base_screen"))
+    write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
 
     all_rows: list[dict] = []
     round_states: list[dict] = []
@@ -235,7 +248,7 @@ def run_search(args):
             ev = evaluate_candidate(backend, cand, screen, state)
             row = jsonable_eval(ev, round=round_idx, mode=args.mode)
             all_rows.append(row)
-            prompt_rows = [dict(x, round=round_idx, mode=args.mode) for x in ev["rows"]]
+            prompt_rows = [dict(x, round=round_idx, mode="screen", family_mode=args.mode) for x in ev["rows"]]
             write_jsonl(out / "per_prompt.jsonl", prompt_rows)
             print(
                 f"round={round_idx} {i+1}/{len(candidates)} {cand.key} exact={ev['exact_mean']:.4f} "
@@ -252,7 +265,10 @@ def run_search(args):
         ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, state)
         holdout_row = jsonable_eval(ev, round=int(row["round"]), mode=args.mode, screen_exact_mean=row["exact_mean"])
         holdout_rows.append(holdout_row)
-        write_jsonl(out / "holdout_per_prompt.jsonl", [dict(x, round=int(row["round"]), mode=args.mode) for x in ev["rows"]])
+        write_jsonl(
+            out / "holdout_per_prompt.jsonl",
+            [dict(x, round=int(row["round"]), mode="holdout", family_mode=args.mode) for x in ev["rows"]],
+        )
 
     total_s = time.time() - start
     best_holdout = max((x["exact_mean"] for x in holdout_rows), default=None)
@@ -271,6 +287,8 @@ def run_search(args):
         "holdout_prompts": len(holdout),
         "screen_unique_prompts": unique_example_count(screen),
         "holdout_unique_prompts": unique_example_count(holdout),
+        "screen_unique_semantic_prompts": unique_semantic_example_count(screen),
+        "holdout_unique_semantic_prompts": unique_semantic_example_count(holdout),
         "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "max_new_tokens": args.max_new_tokens,
         "stop_at_answer": args.stop_at_answer,

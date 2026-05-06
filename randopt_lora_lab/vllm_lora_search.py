@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .countdown import load_examples, prompts as make_prompts, unique_example_count
+from .countdown import load_examples, prompts as make_prompts, unique_example_count, unique_semantic_example_count
 from .vllm_lora_bench import (
     AdapterSpec,
     Candidate,
@@ -255,6 +255,8 @@ def run_search(args) -> dict:
         "holdout_prompts": len(holdout),
         "screen_unique_prompts": unique_example_count(screen),
         "holdout_unique_prompts": unique_example_count(holdout),
+        "screen_unique_semantic_prompts": unique_semantic_example_count(screen),
+        "holdout_unique_semantic_prompts": unique_semantic_example_count(holdout),
         "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "promote": args.promote,
         "max_loras": args.max_loras,

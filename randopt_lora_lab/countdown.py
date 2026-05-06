@@ -71,8 +71,29 @@ def assert_unique_example_ids(examples: Iterable[CountdownExample], *, label: st
         raise ValueError(f"{label} contains duplicate example ids: {sample}")
 
 
+def semantic_example_key(example: CountdownExample) -> tuple[tuple[int, ...], int]:
+    return tuple(sorted(example.numbers)), example.target
+
+
+def assert_unique_example_semantics(examples: Iterable[CountdownExample], *, label: str = "examples") -> None:
+    seen: set[tuple[tuple[int, ...], int]] = set()
+    duplicates: list[tuple[tuple[int, ...], int]] = []
+    for ex in examples:
+        key = semantic_example_key(ex)
+        if key in seen:
+            duplicates.append(key)
+        seen.add(key)
+    if duplicates:
+        sample = ", ".join(f"{numbers}->{target}" for numbers, target in duplicates[:8])
+        raise ValueError(f"{label} contains duplicate semantic Countdown examples: {sample}")
+
+
 def unique_example_count(examples: Iterable[CountdownExample]) -> int:
     return len({ex.id for ex in examples})
+
+
+def unique_semantic_example_count(examples: Iterable[CountdownExample]) -> int:
+    return len({semantic_example_key(ex) for ex in examples})
 
 
 def load_examples(
@@ -92,6 +113,7 @@ def load_examples(
     else:
         examples = built_in_examples()
     assert_unique_example_ids(examples, label=path or "built-in Countdown examples")
+    assert_unique_example_semantics(examples, label=path or "built-in Countdown examples")
     if exclude_ids:
         examples = [ex for ex in examples if ex.id not in exclude_ids]
     rng = random.Random(seed)

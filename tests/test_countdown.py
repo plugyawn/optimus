@@ -1,6 +1,9 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
-from randopt_lora_lab.countdown import CountdownExample, load_examples, score_completion
+from randopt_lora_lab.countdown import CountdownExample, load_examples, score_completion, unique_semantic_example_count
 from randopt_lora_lab.backends import TransformersLoraBackend
 
 
@@ -18,6 +21,25 @@ class CountdownDataTests(unittest.TestCase):
         examples = load_examples(None, 8, seed=1, exclude_ids=set(range(24)))
         self.assertEqual(len(examples), 8)
         self.assertTrue(all(ex.id not in set(range(24)) for ex in examples))
+
+    def test_load_examples_refuses_semantic_duplicates(self):
+        rows = [
+            {"id": 1, "numbers": [1, 2, 3], "target": 6},
+            {"id": 2, "numbers": [3, 2, 1], "target": 6},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "data.json"
+            path.write_text(json.dumps(rows))
+            with self.assertRaisesRegex(ValueError, "duplicate semantic"):
+                load_examples(str(path), 1, seed=1)
+
+    def test_unique_semantic_count(self):
+        examples = [
+            CountdownExample(1, (1, 2, 3), 6),
+            CountdownExample(2, (3, 2, 1), 6),
+            CountdownExample(3, (3, 2, 1), 7),
+        ]
+        self.assertEqual(unique_semantic_example_count(examples), 2)
 
 
 class CountdownParserTests(unittest.TestCase):

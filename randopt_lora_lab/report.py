@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -40,6 +41,88 @@ def wilson_interval(rate: float | None, n: int | None, z: float = 1.96) -> tuple
     return max(0.0, center - margin), min(1.0, center + margin)
 
 
+def binomial_tail_ge(k: int, n: int, p: float | None) -> float | None:
+    if p is None or n <= 0:
+        return None
+    p = max(0.0, min(1.0, float(p)))
+    k = max(0, min(n, int(k)))
+    return sum(math.comb(n, i) * (p**i) * ((1.0 - p) ** (n - i)) for i in range(k, n + 1))
+
+
+def best_of_n_null_p(rate: float | None, prompts: int | None, population: int | None, base_rate: float | None) -> float | None:
+    if rate is None or not prompts or not population:
+        return None
+    successes = int(math.ceil(float(rate) * prompts - 1e-12))
+    single = binomial_tail_ge(successes, prompts, base_rate)
+    if single is None:
+        return None
+    return 1.0 - (1.0 - single) ** int(population)
+
+
+def exact_binomial_sign_p(gains: int, losses: int) -> float | None:
+    n = gains + losses
+    if n == 0:
+        return None
+    tail = sum(math.comb(n, i) for i in range(0, min(gains, losses) + 1)) / (2**n)
+    return min(1.0, 2.0 * tail)
+
+
+def paired_quality_metrics(run_dir: Path, top_holdout: list[dict]) -> dict:
+    best = max(top_holdout, key=lambda x: x.get("exact_mean", 0.0), default=None)
+    if not best:
+        return {}
+    best_candidate = best.get("candidate")
+    rows = read_jsonl(run_dir / "holdout_per_prompt.jsonl")
+    base_rows = [
+        row
+        for row in rows
+        if row.get("candidate") == "base" and row.get("mode") in {None, "base_holdout"}
+    ]
+    candidate_rows = [
+        row
+        for row in rows
+        if row.get("candidate") == best_candidate and row.get("mode") in {None, "holdout"}
+    ]
+    if not base_rows or not candidate_rows:
+        return {"best_holdout_candidate": best_candidate, "paired_available": False}
+    base_by_id = {row["example_id"]: row for row in base_rows}
+    cand_by_id = {row["example_id"]: row for row in candidate_rows}
+    common_ids = sorted(set(base_by_id) & set(cand_by_id))
+    gains = losses = both = neither = 0
+    deltas = []
+    malformed_deltas = []
+    cap_deltas = []
+    for example_id in common_ids:
+        base = base_by_id[example_id]
+        cand = cand_by_id[example_id]
+        b = float(base.get("exact", 0.0))
+        c = float(cand.get("exact", 0.0))
+        deltas.append(c - b)
+        malformed_deltas.append(float(cand.get("malformed", 0.0)) - float(base.get("malformed", 0.0)))
+        cap_deltas.append(float(cand.get("cap_hit", 0.0)) - float(base.get("cap_hit", 0.0)))
+        if c > b:
+            gains += 1
+        elif b > c:
+            losses += 1
+        elif c > 0:
+            both += 1
+        else:
+            neither += 1
+    return {
+        "best_holdout_candidate": best_candidate,
+        "paired_available": bool(common_ids),
+        "paired_n": len(common_ids),
+        "paired_gain_count": gains,
+        "paired_loss_count": losses,
+        "paired_both_correct_count": both,
+        "paired_neither_correct_count": neither,
+        "paired_lift": None if not deltas else float(sum(deltas) / len(deltas)),
+        "paired_sign_test_p": exact_binomial_sign_p(gains, losses),
+        "paired_malformed_delta": None if not malformed_deltas else float(sum(malformed_deltas) / len(malformed_deltas)),
+        "paired_cap_hit_delta": None if not cap_deltas else float(sum(cap_deltas) / len(cap_deltas)),
+    }
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--root", required=True)
@@ -56,7 +139,9 @@ def main():
     flat = []
     for row in summaries:
         top_holdout = row.get("top_holdout") or []
+        top_screen = row.get("top_screen") or []
         best_holdout = max((x.get("exact_mean", 0.0) for x in top_holdout), default=None)
+        best_screen = max((x.get("exact_mean", 0.0) for x in top_screen), default=None)
         holdout_n = row.get("holdout_unique_prompts") or row.get("holdout_prompts")
         best_ci_low, best_ci_high = wilson_interval(best_holdout, holdout_n)
         base_holdout = row.get("base_holdout_exact")
@@ -79,8 +164,21 @@ def main():
             throughput_mode = "sequential_lora"
         else:
             throughput_mode = "native"
-        flat.append(
-            {
+        paired = {
+            "best_holdout_candidate": None,
+            "paired_available": False,
+            "paired_n": None,
+            "paired_gain_count": None,
+            "paired_loss_count": None,
+            "paired_both_correct_count": None,
+            "paired_neither_correct_count": None,
+            "paired_lift": None,
+            "paired_sign_test_p": None,
+            "paired_malformed_delta": None,
+            "paired_cap_hit_delta": None,
+            **paired_quality_metrics(path.parent, top_holdout),
+        }
+        flat_row = {
                 "run": row["run"],
                 "kind": row.get("kind"),
                 "family": row.get("family", ""),
@@ -101,7 +199,16 @@ def main():
                 else best_holdout - row.get("base_holdout_exact"),
                 "screen_unique_prompts": row.get("screen_unique_prompts"),
                 "holdout_unique_prompts": row.get("holdout_unique_prompts"),
+                "screen_unique_semantic_prompts": row.get("screen_unique_semantic_prompts"),
+                "holdout_unique_semantic_prompts": row.get("holdout_unique_semantic_prompts"),
                 "screen_holdout_overlap": row.get("screen_holdout_overlap"),
+                "best_screen_exact": best_screen,
+                "screen_best_of_n_null_p": best_of_n_null_p(
+                    best_screen,
+                    row.get("screen_unique_prompts") or row.get("screen_prompts"),
+                    row.get("population") or row.get("population_total"),
+                    row.get("base_screen_exact", row.get("base_exact")),
+                ),
                 "best_cap_hit_mean": max_present(top_holdout, "cap_hit_mean"),
                 "best_answer_closed_mean": max_present(top_holdout, "answer_closed_mean"),
                 "best_malformed_mean": max_present(top_holdout, "malformed_mean"),
@@ -113,7 +220,8 @@ def main():
                 "throughput_mode": throughput_mode,
                 "best_batch_size": row.get("best_batch_size"),
             }
-        )
+        flat_row.update(paired)
+        flat.append(flat_row)
     df = pd.DataFrame(flat)
     df.to_csv(out / "summary.csv", index=False)
     quality = df[df["best_holdout_exact"].notna()].copy()
@@ -123,6 +231,12 @@ def main():
         invalid = quality[
             (quality["screen_holdout_overlap"].fillna(0) > 0)
             | (quality["holdout_unique_prompts"].fillna(quality["holdout_prompts"]) < quality["holdout_prompts"])
+            | (
+                quality["holdout_unique_semantic_prompts"]
+                .fillna(quality["holdout_unique_prompts"])
+                .fillna(quality["holdout_prompts"])
+                < quality["holdout_prompts"]
+            )
         ]
         if not invalid.empty:
             invalid.to_csv(out / "quality_invalid_eval_rows.csv", index=False)
@@ -154,6 +268,9 @@ def main():
             plt.tight_layout()
             plt.savefig(out / "quality_lift.png", dpi=160)
             plt.close()
+        paired = quality[quality.get("paired_available", False) == True] if "paired_available" in quality else pd.DataFrame()
+        if not paired.empty:
+            paired.sort_values("paired_lift", ascending=False).to_csv(out / "paired_quality_summary.csv", index=False)
     if "best_cap_hit_mean" in df and df["best_cap_hit_mean"].notna().any():
         audit = df.dropna(subset=["best_cap_hit_mean"])
         ax = audit.plot.bar(x="run", y=["best_cap_hit_mean", "best_answer_closed_mean"], figsize=(10, 4))
@@ -258,6 +375,11 @@ def main():
                 "base_holdout_exact",
                 "best_holdout_exact",
                 "holdout_lift",
+                "paired_lift",
+                "paired_gain_count",
+                "paired_loss_count",
+                "paired_sign_test_p",
+                "screen_best_of_n_null_p",
                 "best_holdout_ci_low",
                 "best_holdout_ci_high",
                 "screen_holdout_overlap",

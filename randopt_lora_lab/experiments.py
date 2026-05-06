@@ -9,7 +9,13 @@ import numpy as np
 import torch
 
 from .backends import TransformersLoraBackend
-from .countdown import load_examples, prompts as make_prompts, score_completion, unique_example_count
+from .countdown import (
+    load_examples,
+    prompts as make_prompts,
+    score_completion,
+    unique_example_count,
+    unique_semantic_example_count,
+)
 from .lora_space import Candidate
 
 
@@ -18,6 +24,17 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
     with path.open("a") as f:
         for row in rows:
             f.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def reset_outputs(out: Path, names: list[str]) -> None:
+    for name in names:
+        path = out / name
+        if path.exists():
+            path.unlink()
+
+
+def tag_rows(rows: list[dict], **extra) -> list[dict]:
+    return [dict(row, **extra) for row in rows]
 
 
 def evaluate_candidate(backend, candidate: Candidate | None, examples, family_state=None) -> dict:
@@ -85,6 +102,7 @@ def make_backend(args):
 def run_oracle(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    reset_outputs(out, ["probes.jsonl"])
     backend = make_backend(args)
     examples = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     sig0 = backend.logits_signature(make_prompts(examples[:4]))
@@ -194,6 +212,7 @@ def maybe_build_family_state(args, backend, screen):
 def run_search(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    reset_outputs(out, ["per_prompt.jsonl", "candidate_summary.jsonl", "holdout_per_prompt.jsonl"])
     backend = make_backend(args)
     screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     holdout = load_examples(
@@ -205,6 +224,8 @@ def run_search(args):
     )
     base_screen = evaluate_candidate(backend, None, screen)
     base_holdout = evaluate_candidate(backend, None, holdout)
+    write_jsonl(out / "per_prompt.jsonl", tag_rows(base_screen["rows"], mode="base_screen"))
+    write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
     family_state = maybe_build_family_state(args, backend, screen)
     candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic)
     summaries = []
@@ -212,14 +233,14 @@ def run_search(args):
     for i, cand in enumerate(candidates):
         ev = evaluate_candidate(backend, cand, screen, family_state)
         summaries.append({k: v for k, v in ev.items() if k != "rows"})
-        write_jsonl(out / "per_prompt.jsonl", ev["rows"])
+        write_jsonl(out / "per_prompt.jsonl", tag_rows(ev["rows"], mode="screen"))
         print(f"{i+1}/{len(candidates)} {cand.key} exact={ev['exact_mean']:.4f} elapsed={ev['elapsed_s']:.2f}", flush=True)
     top = sorted(summaries, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(summaries))]
     holdout_rows = []
     for row in top:
         ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, family_state)
         holdout_rows.append({k: v for k, v in ev.items() if k != "rows"})
-        write_jsonl(out / "holdout_per_prompt.jsonl", ev["rows"])
+        write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(ev["rows"], mode="holdout"))
     total_s = time.time() - start
     summary = {
         "kind": "search",
@@ -229,6 +250,8 @@ def run_search(args):
         "holdout_prompts": len(holdout),
         "screen_unique_prompts": unique_example_count(screen),
         "holdout_unique_prompts": unique_example_count(holdout),
+        "screen_unique_semantic_prompts": unique_semantic_example_count(screen),
+        "holdout_unique_semantic_prompts": unique_semantic_example_count(holdout),
         "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "base_screen_exact": base_screen["exact_mean"],
         "base_holdout_exact": base_holdout["exact_mean"],
@@ -247,6 +270,16 @@ def run_search(args):
 def run_halving(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    reset_outputs(
+        out,
+        [
+            "stage_per_prompt.jsonl",
+            "full_per_prompt.jsonl",
+            "stage_candidate_summary.jsonl",
+            "candidate_summary.jsonl",
+            "holdout_per_prompt.jsonl",
+        ],
+    )
     backend = make_backend(args)
     screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     holdout = load_examples(
@@ -260,6 +293,9 @@ def run_halving(args):
     base_stage = evaluate_candidate(backend, None, stage)
     base_screen = evaluate_candidate(backend, None, screen)
     base_holdout = evaluate_candidate(backend, None, holdout)
+    write_jsonl(out / "stage_per_prompt.jsonl", tag_rows(base_stage["rows"], mode="base_stage"))
+    write_jsonl(out / "full_per_prompt.jsonl", tag_rows(base_screen["rows"], mode="base_screen"))
+    write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
     family_state = maybe_build_family_state(args, backend, screen)
     candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic)
     stage_rows = []
@@ -268,7 +304,7 @@ def run_halving(args):
         ev = evaluate_candidate(backend, cand, stage, family_state)
         row = {k: v for k, v in ev.items() if k != "rows"}
         stage_rows.append(row)
-        write_jsonl(out / "stage_per_prompt.jsonl", ev["rows"])
+        write_jsonl(out / "stage_per_prompt.jsonl", tag_rows(ev["rows"], mode="stage"))
         print(f"stage {i+1}/{len(candidates)} {cand.key} exact={ev['exact_mean']:.4f}", flush=True)
     survivor_n = min(args.survivors, len(stage_rows))
     survivors = sorted(stage_rows, key=lambda r: r["exact_mean"], reverse=True)[:survivor_n]
@@ -279,14 +315,14 @@ def run_halving(args):
         full = {k: v for k, v in ev.items() if k != "rows"}
         full["stage_exact_mean"] = row["exact_mean"]
         full_rows.append(full)
-        write_jsonl(out / "full_per_prompt.jsonl", ev["rows"])
+        write_jsonl(out / "full_per_prompt.jsonl", tag_rows(ev["rows"], mode="screen"))
         print(f"full {i+1}/{len(survivors)} {cand.key} exact={ev['exact_mean']:.4f}", flush=True)
     top = sorted(full_rows, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(full_rows))]
     holdout_rows = []
     for row in top:
         ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, family_state)
         holdout_rows.append({k: v for k, v in ev.items() if k != "rows"})
-        write_jsonl(out / "holdout_per_prompt.jsonl", ev["rows"])
+        write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(ev["rows"], mode="holdout"))
     total_s = time.time() - start
     effective_prompt_evals = len(candidates) * len(stage) + len(survivors) * len(screen) + len(top) * len(holdout)
     full_prompt_evals = len(candidates) * len(screen) + len(top) * len(holdout)
@@ -300,6 +336,9 @@ def run_halving(args):
         "stage_unique_prompts": unique_example_count(stage),
         "screen_unique_prompts": unique_example_count(screen),
         "holdout_unique_prompts": unique_example_count(holdout),
+        "stage_unique_semantic_prompts": unique_semantic_example_count(stage),
+        "screen_unique_semantic_prompts": unique_semantic_example_count(screen),
+        "holdout_unique_semantic_prompts": unique_semantic_example_count(holdout),
         "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "survivors": len(survivors),
         "base_stage_exact": base_stage["exact_mean"],
@@ -329,6 +368,7 @@ def parse_int_list(text: str) -> list[int]:
 def run_sysbench(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    reset_outputs(out, ["rows.jsonl"])
     backend = make_backend(args)
     examples = load_examples(
         args.data,
