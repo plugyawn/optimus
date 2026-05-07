@@ -44,9 +44,34 @@ def direct_tagged_prompt(example: CountdownExample) -> str:
     )
 
 
+def reordered_tagged_prompt(example: CountdownExample) -> str:
+    nums = ", ".join(str(x) for x in example.numbers)
+    return (
+        f"Numbers: {nums}. Target: {example.target}. "
+        "Use the given numbers exactly once. "
+        "Return only one arithmetic expression wrapped in <answer> </answer> tags. "
+        "Do not include an equals sign, reasoning, or any other text."
+    )
+
+
+def xml_tagged_prompt(example: CountdownExample) -> str:
+    nums = ", ".join(str(x) for x in example.numbers)
+    return (
+        "Write exactly one arithmetic expression and nothing else. "
+        "Put it between <answer> and </answer>. "
+        "The expression must use each provided number exactly once, must not contain an equals sign, "
+        "must not include reasoning or any other text, "
+        f"and must evaluate to the target. Provided numbers: {nums}. Target: {example.target}."
+    )
+
+
 def prompt_fn(name: str) -> PromptFn:
     if name == "default":
         return default_prompt
+    if name == "reordered":
+        return reordered_tagged_prompt
+    if name == "xml":
+        return xml_tagged_prompt
     if name == "compact":
         return compact_tagged_prompt
     if name == "direct":
@@ -300,7 +325,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--weight-mode", choices=["uniform", "score", "centered"], default="score")
     parser.add_argument("--targets", default="q_proj,v_proj")
     parser.add_argument("--max-new-tokens-grid", default="32,64,128,256")
-    parser.add_argument("--prompt-variants", default="default,compact,direct")
+    parser.add_argument("--prompt-variants", default="default,reordered,xml")
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
     parser.add_argument("--stop-at-answer", action="store_true")

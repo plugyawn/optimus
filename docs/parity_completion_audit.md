@@ -97,3 +97,9 @@ candidate lift relative to the base model for each prompt template. Prompt
 templates that collapse the base model's malformed/cap-hit rate are marked
 protocol-invalid stress conditions, not used as evidence for or against the
 method.
+
+Prompt variants used for robustness must preserve the same answer contract:
+tagged answer, one expression, every number exactly once, no equals sign, no
+reasoning, and no extra text. Shorter prompts that omit these constraints have
+already collapsed the base model and should be logged as stress tests rather
+than used as robustness evidence.
