@@ -98,6 +98,11 @@ templates that collapse the base model's malformed/cap-hit rate are marked
 protocol-invalid stress conditions, not used as evidence for or against the
 method.
 
+The prompt gate counts distinct protocol-valid prompt variants, not repeated
+token caps. A variant passes only if every protocol-valid cap condition has
+nonnegative lift and does not regress malformed or cap-hit rate beyond the
+configured tolerance. Exact-score lift alone is not enough.
+
 Prompt variants used for robustness must preserve the same answer contract:
 tagged answer, one expression, every number exactly once, no equals sign, no
 reasoning, and no extra text. Shorter prompts that omit these constraints have
