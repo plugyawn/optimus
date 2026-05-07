@@ -114,4 +114,6 @@ The highest-leverage backend fixes are:
 3. Audit whether vLLM chat-template, stop-token, EOS, or added-special-token handling differs from the HF path.
 4. Test whether answer-only output with stricter stop handling reduces backend divergence without changing the task semantics.
 
+New backend probes should save `prompt_contract.json` before generation. That file must include exact HF prompt token IDs, best-effort exact vLLM prompt token IDs, tokenizer special-token IDs, answer-stop token IDs, and the requested/actual vLLM sampling stop settings. Without that artifact, a generation-parity failure cannot be cleanly separated from prompt/tokenizer/stop-contract drift.
+
 Until those pass, the search pipeline should be vLLM-screen plus PEFT-confirm, not vLLM-only search.

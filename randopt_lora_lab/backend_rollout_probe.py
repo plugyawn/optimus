@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 from statistics import mean
 
+from .backend_contract import backend_contract, vllm_tokenizer_contract
 from .backend_next_token_probe import make_adapter_specs, parse_candidate_key
 from .backends import TransformersLoraBackend
 from .countdown import load_examples, prompts as make_prompts, score_completion
@@ -140,7 +141,7 @@ def run(args) -> dict:
     targets = parse_targets(args.targets)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    for name in ["rows.jsonl", "adapters.jsonl"]:
+    for name in ["rows.jsonl", "adapters.jsonl", "prompt_contract.json"]:
         path = out / name
         if path.exists():
             path.unlink()
@@ -165,6 +166,8 @@ def run(args) -> dict:
         stop_at_answer=args.stop_at_answer,
     )
     LLM, SamplingParams, LoRARequest = import_vllm_lora_request()
+    contract = backend_contract(hf.tokenizer, prompt_texts, args, SamplingParams)
+    write_json(out / "prompt_contract.json", contract)
     load_start = time.time()
     llm = LLM(
         model=args.model,
@@ -179,6 +182,8 @@ def run(args) -> dict:
         enforce_eager=args.enforce_eager,
     )
     load_s = time.time() - load_start
+    contract["vllm_tokenizer"] = vllm_tokenizer_contract(llm, prompt_texts)
+    write_json(out / "prompt_contract.json", contract)
 
     rows = []
     for condition, candidate, spec in candidate_conditions(args, specs):
