@@ -1,0 +1,99 @@
+{
+  "candidate_conditions": [
+    "factor_gaussian_lora:seed1411240924:s0.0075:sign1",
+    "factor_gaussian_lora:seed1632697641:s0.0075:sign-1",
+    "factor_gaussian_lora:seed326653716:s0.0075:sign1",
+    "factor_gaussian_lora:seed221822464:s0.0075:sign-1"
+  ],
+  "conditions": {
+    "base|hf": {
+      "condition": "base",
+      "examples": 4,
+      "first_mismatch_rate": 0.25,
+      "max_common_abs_logprob_delta": 2.1249332427978516,
+      "mean_first_mismatch_step": 4,
+      "mean_generated_text_equal": 0.9841269841269841,
+      "mean_topk_overlap": 19.444444444444443,
+      "prefix_mode": "hf",
+      "rows": 63,
+      "top1_equal_rate": 0.9841269841269841
+    },
+    "factor_gaussian_lora:seed1411240924:s0.0075:sign1|hf": {
+      "condition": "factor_gaussian_lora:seed1411240924:s0.0075:sign1",
+      "examples": 4,
+      "first_mismatch_rate": 0.25,
+      "max_common_abs_logprob_delta": 1.7997488975524902,
+      "mean_first_mismatch_step": 8,
+      "mean_generated_text_equal": 0.9726027397260274,
+      "mean_topk_overlap": 19.438356164383563,
+      "prefix_mode": "hf",
+      "rows": 73,
+      "top1_equal_rate": 0.9726027397260274
+    },
+    "factor_gaussian_lora:seed1632697641:s0.0075:sign-1|hf": {
+      "condition": "factor_gaussian_lora:seed1632697641:s0.0075:sign-1",
+      "examples": 4,
+      "first_mismatch_rate": 0.25,
+      "max_common_abs_logprob_delta": 1.3507061004638672,
+      "mean_first_mismatch_step": 12,
+      "mean_generated_text_equal": 0.9824561403508771,
+      "mean_topk_overlap": 19.29824561403509,
+      "prefix_mode": "hf",
+      "rows": 57,
+      "top1_equal_rate": 0.9824561403508771
+    },
+    "factor_gaussian_lora:seed221822464:s0.0075:sign-1|hf": {
+      "condition": "factor_gaussian_lora:seed221822464:s0.0075:sign-1",
+      "examples": 4,
+      "first_mismatch_rate": 0.0,
+      "max_common_abs_logprob_delta": 1.3554022312164307,
+      "mean_first_mismatch_step": null,
+      "mean_generated_text_equal": 1,
+      "mean_topk_overlap": 19.363636363636363,
+      "prefix_mode": "hf",
+      "rows": 66,
+      "top1_equal_rate": 1
+    },
+    "factor_gaussian_lora:seed326653716:s0.0075:sign1|hf": {
+      "condition": "factor_gaussian_lora:seed326653716:s0.0075:sign1",
+      "examples": 4,
+      "first_mismatch_rate": 0.25,
+      "max_common_abs_logprob_delta": 1.6238651275634766,
+      "mean_first_mismatch_step": 11,
+      "mean_generated_text_equal": 0.9863013698630136,
+      "mean_topk_overlap": 19.34246575342466,
+      "prefix_mode": "hf",
+      "rows": 73,
+      "top1_equal_rate": 0.9863013698630136
+    },
+    "zero|hf": {
+      "condition": "zero",
+      "examples": 4,
+      "first_mismatch_rate": 0.25,
+      "max_common_abs_logprob_delta": 2.1249332427978516,
+      "mean_first_mismatch_step": 4,
+      "mean_generated_text_equal": 0.9841269841269841,
+      "mean_topk_overlap": 19.444444444444443,
+      "prefix_mode": "hf",
+      "rows": 63,
+      "top1_equal_rate": 0.9841269841269841
+    }
+  },
+  "include_zero": true,
+  "kind": "backend_step_parity_probe",
+  "load_s": 66.63184785842896,
+  "max_steps": 24,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "overall_top1_equal_rate": 0.9848101265822785,
+  "prefix_modes": [
+    "hf"
+  ],
+  "prompts": 4,
+  "rank": 8,
+  "rows": 395,
+  "targets": [
+    "q_proj",
+    "v_proj"
+  ],
+  "top_k": 20
+}
