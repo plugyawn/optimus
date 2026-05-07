@@ -8,7 +8,13 @@ from safetensors.torch import load_file
 
 from randopt_lora_lab.dense_space import dense_noise_tensor
 from randopt_lora_lab.gaussian_parity import best_rank_projection, lora_update
-from randopt_lora_lab.lora_space import Candidate, canonical_module_name, lora_noise_tensors, sparse_lora_density
+from randopt_lora_lab.lora_space import (
+    Candidate,
+    canonical_module_name,
+    lora_noise_tensors,
+    sparse_lora_density,
+    spectral_projected_scale,
+)
 from randopt_lora_lab.vllm_lora_bench import save_seed_adapter
 
 
@@ -90,6 +96,18 @@ class LoraMaterializerTests(unittest.TestCase):
         self.assertTrue(torch.equal(b1, b2))
         self.assertLessEqual(int(torch.linalg.matrix_rank(update, atol=1e-6).item()), rank)
         self.assertTrue(torch.isfinite(update).all())
+
+    def test_spectral_projected_scale_variants_change_update_norm(self):
+        rank = 3
+        module = "model.layers.0.self_attn.q_proj"
+        base = Candidate("spectral_projected_gaussian_rank_r", seed=456, sigma=0.01, sign=1)
+        scaled = Candidate("spectral_projected_gaussian_rank_r_c2", seed=456, sigma=0.01, sign=1)
+
+        a_base, b_base = lora_noise_tensors(module, (rank, 8), (7, rank), base, rank)
+        a_scaled, b_scaled = lora_noise_tensors(module, (rank, 8), (7, rank), scaled, rank)
+
+        self.assertEqual(spectral_projected_scale(scaled.family), 2.0)
+        self.assertGreater(torch.linalg.norm(lora_update(a_scaled, b_scaled)), torch.linalg.norm(lora_update(a_base, b_base)))
 
     def test_sparse_low_rank_lora_materializes_sparse_scaled_factors(self):
         candidate = Candidate("sparse_low_rank_lora_d0p25", seed=789, sigma=0.01, sign=1)

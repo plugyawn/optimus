@@ -86,9 +86,19 @@ Preserve these as evidence:
 3. Cheap spectral projection is systemically attractive but not robust enough in this P16 smoke.
 4. Factor LoRA remains a useful cheap baseline, not a proven dense Gaussian replacement.
 
-The next high-leverage run is not a larger P with the same families. It should
-test whether the spectral family can be corrected with a better singular-value
-schedule or calibrated sigma, then compare it under an accelerated vLLM/SGLang
-screen where adapter construction and hotswap costs are measured separately
-from generation throughput.
+The next high-leverage run is not a larger P with the same hard-coded family.
+The code now exposes explicit spectral scale variants:
 
+```text
+spectral_projected_gaussian_rank_r_c0p5
+spectral_projected_gaussian_rank_r_c0p75
+spectral_projected_gaussian_rank_r_c1p25
+spectral_projected_gaussian_rank_r_c1p5
+spectral_projected_gaussian_rank_r_c2
+```
+
+Use those to test whether the spectral family can be corrected with a better
+singular-value scale before spending a larger population. Then compare the best
+calibrated spectral variant under an accelerated vLLM/SGLang screen where
+adapter construction and hotswap costs are measured separately from generation
+throughput.

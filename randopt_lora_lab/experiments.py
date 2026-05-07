@@ -318,8 +318,9 @@ def maybe_build_family_state(args, backend, screen):
         "factor_gaussian_lora",
         "projected_gaussian_rank_r",
         "randomized_projected_gaussian_rank_r",
-        "spectral_projected_gaussian_rank_r",
     }:
+        return None
+    if args.family.startswith("spectral_projected_gaussian_rank_r"):
         return None
     if args.family.startswith("sparse_low_rank_lora"):
         return None
@@ -642,6 +643,11 @@ def main():
                 "projected_gaussian_rank_r",
                 "randomized_projected_gaussian_rank_r",
                 "spectral_projected_gaussian_rank_r",
+                "spectral_projected_gaussian_rank_r_c0p5",
+                "spectral_projected_gaussian_rank_r_c0p75",
+                "spectral_projected_gaussian_rank_r_c1p25",
+                "spectral_projected_gaussian_rank_r_c1p5",
+                "spectral_projected_gaussian_rank_r_c2",
                 "sparse_low_rank_lora",
                 "sparse_low_rank_lora_d0p125",
                 "sparse_low_rank_lora_d0p25",

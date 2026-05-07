@@ -51,6 +51,18 @@ def sparse_lora_density(family: str) -> float:
     return density
 
 
+def spectral_projected_scale(family: str) -> float:
+    if family == "spectral_projected_gaussian_rank_r":
+        return 1.0
+    match = re.fullmatch(r"spectral_projected_gaussian_rank_r_c([0-9]+(?:p[0-9]+)?)", family)
+    if not match:
+        raise ValueError(f"not a spectral projected Gaussian family: {family}")
+    scale = float(match.group(1).replace("p", "."))
+    if scale <= 0.0:
+        raise ValueError(f"spectral projected scale must be positive, got {scale}")
+    return scale
+
+
 def lora_noise_tensors(
     module_name: str,
     a_shape: torch.Size | tuple[int, ...],
@@ -88,13 +100,14 @@ def lora_noise_tensors(
         dense.mul_(candidate.sign * candidate.sigma)
         sketch_seed = (candidate.seed + stable_int(canonical_name + ":randomized_projection")) % (2**63 - 1)
         return randomized_low_rank_factors_from_dense(dense, rank, oversample=8, n_iter=1, seed=sketch_seed)
-    if candidate.family == "spectral_projected_gaussian_rank_r":
+    if candidate.family.startswith("spectral_projected_gaussian_rank_r"):
         spectral_seed = (candidate.seed + stable_int(canonical_name + ":spectral_projection")) % (2**63 - 1)
+        scale = spectral_projected_scale(candidate.family)
         return spectral_projected_gaussian_factors(
             int(b_shape[0]),
             int(a_shape[1]),
             rank,
-            sigma=candidate.sigma,
+            sigma=candidate.sigma * scale,
             sign=candidate.sign,
             seed=spectral_seed,
             dtype=torch.float32,
