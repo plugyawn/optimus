@@ -96,3 +96,9 @@ Acceptance:
 ```
 
 If rank-8 fails but rank-32 passes, the result is still useful: the question becomes the minimum serveable rank needed for dense-Gaussian search-utility parity.
+
+## Note From Sparse SGD RLVR
+
+ArXiv 2602.07729 reports that successful SGD RLVR full fine-tuning can be extremely sparse and low-effective-rank compared with AdamW. That means dense Gaussian is a useful reference baseline, but not necessarily the target geometry we ultimately want. Future parity reports should include sparse/low-rank update geometry metrics, not only dense-vs-LoRA candidate ranking.
+
+See `docs/sgd_rlvr_sparse_updates.md`.
