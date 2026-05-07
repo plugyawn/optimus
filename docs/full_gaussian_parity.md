@@ -97,6 +97,20 @@ Acceptance:
 
 If rank-8 fails but rank-32 passes, the result is still useful: the question becomes the minimum serveable rank needed for dense-Gaussian search-utility parity.
 
+## Rank Sweep Result
+
+`results/gaussian_parity_rank_sweep_factor_only` tested `factor_gaussian_lora`
+against the same dense Gaussian panel at ranks 8 and 32:
+
+| rank | Spearman vs dense | top-8 overlap | selected regret | speed ratio LoRA/dense | pass |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 8 | -0.071053 | 1 | 0.09375 | 0.949662 | false |
+| 32 | -0.018490 | 2 | 0.09375 | 0.931810 | false |
+
+This is a clean negative result for the current factor-Gaussian LoRA family in
+the trusted HF reference backend. Increasing rank from 8 to 32 did not recover
+dense-Gaussian ranking parity and did not improve reference-path speed.
+
 ## Note From Sparse SGD RLVR
 
 ArXiv 2602.07729 reports that successful SGD RLVR full fine-tuning can be extremely sparse and low-effective-rank compared with AdamW. That means dense Gaussian is a useful reference baseline, but not necessarily the target geometry we ultimately want. Future parity reports should include sparse/low-rank update geometry metrics, not only dense-vs-LoRA candidate ranking.

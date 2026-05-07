@@ -1,0 +1,37 @@
+{
+  "dense_best_cap_hit_mean": 0.0,
+  "dense_best_key": "seed410114451:s0.01:sign1",
+  "dense_best_lora_score": 0.015625,
+  "dense_best_malformed_mean": 0.046875,
+  "dense_best_output_tokens": 1984,
+  "dense_best_score": 0.09375,
+  "dense_candidate_sec": 0.21211323021571146,
+  "dense_candidates": 64,
+  "dense_score_at_lora_pick": 0.0,
+  "gates": {
+    "selected_regret": false,
+    "shared_panel": true,
+    "spearman": false,
+    "speed": false,
+    "topk_overlap": false
+  },
+  "lora_candidate_sec": 0.20143579658984104,
+  "lora_candidates": 64,
+  "lora_pick_cap_hit_mean": 0.015625,
+  "lora_pick_key": "seed1109140247:s0.01:sign1",
+  "lora_pick_malformed_mean": 0.015625,
+  "lora_pick_output_tokens": 1984,
+  "lora_pick_score": 0.140625,
+  "pass": false,
+  "selected_regret": 0.09375,
+  "shared_candidates": 64,
+  "spearman": -0.07105301492957512,
+  "speed_ratio_lora_over_dense": 0.9496616330107657,
+  "thresholds": {
+    "max_selected_regret": 0.0,
+    "min_spearman": 0.85,
+    "min_topk_overlap": 6
+  },
+  "top_k": 8,
+  "topk_overlap": 1
+}

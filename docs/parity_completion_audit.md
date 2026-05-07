@@ -30,10 +30,10 @@ search-utility parity.
 | Dense Gaussian reference exists | `dense_gaussian` backend and P=16 baseline | partial |
 | Serveable LoRA-style family exists | `factor_gaussian_lora` adapter path and vLLM LoRA probes | partial |
 | Rank-r dense bridge exists | `projected_gaussian_rank_r` factors best rank-r dense projection | implemented, not yet run at scale |
-| Quality parity | P=16 dense-vs-factor LoRA failed rank-correlation and selected-regret gates | missing |
-| Stability parity | parity report measures Spearman/top-k/regret for one panel | missing multi-seed |
+| Quality parity | P=64 rank sweep failed at rank 8 and rank 32 | missing |
+| Stability parity | parity report measures Spearman/top-k/regret for one panel; rank 8 Spearman -0.071, rank 32 Spearman -0.018 | missing multi-seed |
 | Drift parity | update geometry audit reports update norm/effective rank/sparsity | missing logit drift / token KL matching |
-| Eval speed parity | P=16 dense-vs-factor LoRA speed gate passed; vLLM LoRA probes exist | partial, quality-coupled speed not proven |
+| Eval speed parity | P=64 HF reference path has LoRA slower than dense at rank 8 and rank 32; vLLM LoRA probes exist | partial, quality-coupled speed not proven |
 | Convenience | LoRA adapters are materialized as portable safetensors | partial |
 | Robustness | generated non-overlap data, cap-hit/malformed logging, paired holdout rows | partial |
 | Paper-aligned geometry | sparse SGD RLVR note added after arXiv 2602.07729 | hypothesis only |
