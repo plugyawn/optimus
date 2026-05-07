@@ -22,6 +22,18 @@ The upstream Countdown script uses:
 Any claim about reproducing the paper must match these semantics, or explicitly
 state every deviation.
 
+Run the guardrail before making that claim:
+
+```bash
+python -m randopt_lora_lab.reproduction_audit \
+  --run results/YOUR_RUN_DIR \
+  --out results/YOUR_RUN_DIR/reproduction_audit
+```
+
+The audit must pass for an official-style reproduction claim. A failed audit can
+still describe a useful local parity panel, but it must not be presented as a
+paper reproduction.
+
 ## Corrected Local Parity Panel
 
 The local dense-vs-LoRA panel is a systems and geometry parity test, not an
