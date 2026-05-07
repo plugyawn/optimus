@@ -17,6 +17,7 @@ class GenerationResult:
     output_tokens: int
     token_counts: list[int]
     elapsed_s: float
+    token_ids: list[list[int]] | None = None
 
 
 class StopAfterAllContain(StoppingCriteria):
@@ -94,6 +95,7 @@ class TransformersLoraBackend:
         texts = []
         output_tokens = 0
         token_counts = []
+        all_token_ids = []
         start = time.time()
         for i in range(0, len(prompts), self.batch_size):
             batch = prompts[i : i + self.batch_size]
@@ -114,11 +116,15 @@ class TransformersLoraBackend:
             counts = (new_ids != self.tokenizer.pad_token_id).sum(dim=1).tolist()
             token_counts.extend(int(x) for x in counts)
             output_tokens += int(sum(counts))
+            token_id_rows = []
+            for row, count in zip(new_ids.tolist(), counts):
+                token_id_rows.append([int(token_id) for token_id in row[: int(count)]])
+            all_token_ids.extend(token_id_rows)
             decoded = self.tokenizer.batch_decode(new_ids, skip_special_tokens=True)
             if self.stop_at_answer:
                 decoded = [self._truncate_at_answer_stop(text) for text in decoded]
             texts.extend(decoded)
-        return GenerationResult(texts, output_tokens, token_counts, time.time() - start)
+        return GenerationResult(texts, output_tokens, token_counts, time.time() - start, all_token_ids)
 
     @torch.no_grad()
     def logits_signature(self, prompts: list[str]) -> torch.Tensor:
@@ -196,6 +202,7 @@ class TransformersDenseGaussianBackend:
         texts = []
         output_tokens = 0
         token_counts = []
+        all_token_ids = []
         start = time.time()
         for i in range(0, len(prompts), self.batch_size):
             batch = prompts[i : i + self.batch_size]
@@ -216,11 +223,15 @@ class TransformersDenseGaussianBackend:
             counts = (new_ids != self.tokenizer.pad_token_id).sum(dim=1).tolist()
             token_counts.extend(int(x) for x in counts)
             output_tokens += int(sum(counts))
+            token_id_rows = []
+            for row, count in zip(new_ids.tolist(), counts):
+                token_id_rows.append([int(token_id) for token_id in row[: int(count)]])
+            all_token_ids.extend(token_id_rows)
             decoded = self.tokenizer.batch_decode(new_ids, skip_special_tokens=True)
             if self.stop_at_answer:
                 decoded = [self._truncate_at_answer_stop(text) for text in decoded]
             texts.extend(decoded)
-        return GenerationResult(texts, output_tokens, token_counts, time.time() - start)
+        return GenerationResult(texts, output_tokens, token_counts, time.time() - start, all_token_ids)
 
     @torch.no_grad()
     def logits_signature(self, prompts: list[str]) -> torch.Tensor:

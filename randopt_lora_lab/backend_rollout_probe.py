@@ -23,14 +23,16 @@ def vllm_generate(llm, SamplingParams, LoRARequest, prompts: list[str], args, sp
     elapsed_s = time.time() - start
     texts = []
     token_counts = []
+    token_id_rows = []
     finish_reasons = []
     for output in outputs:
         completion = output.outputs[0]
         token_ids = list(completion.token_ids or [])
         texts.append(completion.text)
         token_counts.append(len(token_ids))
+        token_id_rows.append([int(token_id) for token_id in token_ids])
         finish_reasons.append(getattr(completion, "finish_reason", ""))
-    return texts, token_counts, finish_reasons, elapsed_s
+    return texts, token_counts, token_id_rows, finish_reasons, elapsed_s
 
 
 def candidate_conditions(args, specs: dict[str, AdapterSpec]) -> list[tuple[str, Candidate | None, AdapterSpec | None]]:
@@ -42,11 +44,32 @@ def candidate_conditions(args, specs: dict[str, AdapterSpec]) -> list[tuple[str,
     return conditions
 
 
-def compare_one(condition: str, ex, hf_text: str, vllm_text: str, hf_tokens: int, vllm_tokens: int, vllm_finish_reason: str, args) -> dict:
+def first_divergence(left: list[int], right: list[int]) -> int | None:
+    for idx, (left_id, right_id) in enumerate(zip(left, right)):
+        if left_id != right_id:
+            return idx
+    if len(left) != len(right):
+        return min(len(left), len(right))
+    return None
+
+
+def compare_one(
+    condition: str,
+    ex,
+    hf_text: str,
+    vllm_text: str,
+    hf_tokens: int,
+    vllm_tokens: int,
+    hf_token_ids: list[int],
+    vllm_token_ids: list[int],
+    vllm_finish_reason: str,
+    args,
+) -> dict:
     hf_score = score_completion(hf_text, ex)
     vllm_score = score_completion(vllm_text, ex)
     hf_cap_hit = float(hf_tokens >= args.max_new_tokens)
     vllm_cap_hit = float(vllm_tokens >= args.max_new_tokens or vllm_finish_reason == "length")
+    divergence = first_divergence(hf_token_ids, vllm_token_ids)
     return {
         "condition": condition,
         "example_id": ex.id,
@@ -66,6 +89,11 @@ def compare_one(condition: str, ex, hf_text: str, vllm_text: str, hf_tokens: int
         "malformed_equal": bool(hf_score["malformed"]) == bool(vllm_score["malformed"]),
         "hf_output_tokens": int(hf_tokens),
         "vllm_output_tokens": int(vllm_tokens),
+        "hf_token_ids": hf_token_ids,
+        "vllm_token_ids": vllm_token_ids,
+        "token_ids_equal": hf_token_ids == vllm_token_ids,
+        "first_token_divergence": divergence,
+        "shared_prefix_tokens": len(hf_token_ids) if divergence is None else divergence,
         "output_token_delta": int(vllm_tokens) - int(hf_tokens),
         "hf_cap_hit": hf_cap_hit,
         "vllm_cap_hit": vllm_cap_hit,
@@ -79,6 +107,7 @@ def summarize(rows: list[dict]) -> dict:
     for condition in sorted({row["condition"] for row in rows}):
         subset = [row for row in rows if row["condition"] == condition]
         exact_deltas = [row["vllm_exact"] - row["hf_exact"] for row in subset]
+        finite_divergences = [row["first_token_divergence"] for row in subset if row.get("first_token_divergence") is not None]
         by_condition[condition] = {
             "n": len(subset),
             "text_equal_rate": mean(row["text_equal"] for row in subset),
@@ -93,6 +122,9 @@ def summarize(rows: list[dict]) -> dict:
             "hf_cap_hit_mean": mean(row["hf_cap_hit"] for row in subset),
             "vllm_cap_hit_mean": mean(row["vllm_cap_hit"] for row in subset),
             "mean_abs_output_token_delta": mean(abs(row["output_token_delta"]) for row in subset),
+            "token_ids_equal_rate": mean(row.get("token_ids_equal", False) for row in subset),
+            "first_token_divergence_rate": len(finite_divergences) / max(len(subset), 1),
+            "mean_first_token_divergence": mean(finite_divergences) if finite_divergences else None,
         }
     return {
         "kind": "backend_rollout_probe",
@@ -155,7 +187,7 @@ def run(args) -> dict:
         else:
             hf.set_candidate(candidate)
         hf_result = hf.generate(prompt_texts)
-        vllm_texts, vllm_token_counts, vllm_finish_reasons, vllm_elapsed_s = vllm_generate(
+        vllm_texts, vllm_token_counts, vllm_token_id_rows, vllm_finish_reasons, vllm_elapsed_s = vllm_generate(
             llm,
             SamplingParams,
             LoRARequest,
@@ -171,6 +203,8 @@ def run(args) -> dict:
                 vllm_texts[idx],
                 hf_result.token_counts[idx],
                 vllm_token_counts[idx],
+                hf_result.token_ids[idx] if hf_result.token_ids else [],
+                vllm_token_id_rows[idx],
                 vllm_finish_reasons[idx],
                 args,
             )
