@@ -76,6 +76,7 @@ python -m randopt_lora_lab.logit_drift \
 | Sparse-low-rank family | `sparse_low_rank_lora` implemented with density variants and variance matching | implemented, not run |
 | Prompt robustness | prompt-relative report gate added; method claims require multiple valid prompt templates | implemented, not passed |
 | vLLM backend parity | P=16 gate passed protocol/base/tensor checks but failed ranking with Spearman -0.181 | missing |
+| Two-stage acceleration | tokenized vLLM proposal + PEFT confirmation recovered PEFT best at k=1 with 10.55x eval-only speedup and 1.93x speedup including vLLM load/build | systems path passed on one P64 panel |
 
 ## Next Gate
 
@@ -143,6 +144,27 @@ Pass criteria:
 
 Only after that gate passes should vLLM results be used as quality-selection
 evidence. Until then, vLLM results are systems/plumbing evidence only.
+
+There is a narrower systems claim that does not require vLLM-only selector
+parity: vLLM can propose candidates and trusted PEFT/HF can confirm the
+promoted set. The first tokenized P64 confirmation-economics gate passed:
+
+```text
+results/confirmation_economics_p64_tokenized_vllm
+best recovered at k = 1
+zero-regret k = 1
+eval-only speedup = 10.55x
+full-without-PEFT-load speedup = 1.93x
+```
+
+This should be treated as the current systems route. It is not a quality parity
+result and does not rescue vLLM-only selection. Future runs should report both
+gates separately:
+
+```text
+vLLM-only selector parity: strict, currently failing.
+vLLM proposal + PEFT confirmation: recall/speed gate, currently passed on one P64 panel.
+```
 
 First gate result: `results/backend_parity_gate_p16` failed. The run had
 matching protocol metadata, saved base rows, and `576/576` sampled adapter tensor

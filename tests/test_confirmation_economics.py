@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from randopt_lora_lab.confirmation_economics import analyze
+from randopt_lora_lab.confirmation_economics import analyze, confirmation_gate
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -46,6 +46,7 @@ class ConfirmationEconomicsTests(unittest.TestCase):
             )
 
             rows, summary = analyze(trusted, proposal, ks=[1, 2, 4])
+            gate = confirmation_gate(rows, summary, max_confirm_k=2, min_eval_only_speedup=1.0, min_full_without_load_speedup=0.7)
 
             self.assertEqual(summary["best_recovered_k"], 2)
             self.assertEqual(summary["zero_regret_k"], 2)
@@ -55,6 +56,34 @@ class ConfirmationEconomicsTests(unittest.TestCase):
             self.assertEqual(rows[1]["confirmed_candidate"], "a")
             self.assertAlmostEqual(rows[1]["eval_only_speedup_vs_trusted_full"], 4 / 3)
             self.assertAlmostEqual(rows[1]["full_without_peft_load_speedup_vs_trusted_full"], 4 / 5.5)
+            self.assertTrue(gate["pass"])
+
+    def test_gate_fails_when_best_requires_too_large_k_or_speed_regresses(self):
+        rows = [
+            {
+                "k": 1,
+                "contains_trusted_best": False,
+                "regret_vs_trusted_best": 0.1,
+                "eval_only_speedup_vs_trusted_full": 2.0,
+                "full_without_peft_load_speedup_vs_trusted_full": 2.0,
+            },
+            {
+                "k": 4,
+                "contains_trusted_best": True,
+                "regret_vs_trusted_best": 0.0,
+                "eval_only_speedup_vs_trusted_full": 0.8,
+                "full_without_peft_load_speedup_vs_trusted_full": 0.7,
+            },
+        ]
+        summary = {"best_recovered_k": 4, "zero_regret_k": 4}
+
+        gate = confirmation_gate(rows, summary, max_confirm_k=2, min_eval_only_speedup=1.0)
+
+        self.assertFalse(gate["pass"])
+        self.assertIn("trusted_best_recovered_within_k", gate["failed"])
+        self.assertIn("zero_regret_within_k", gate["failed"])
+        self.assertIn("eval_only_speedup", gate["failed"])
+        self.assertIn("full_without_peft_load_speedup", gate["failed"])
 
 
 if __name__ == "__main__":

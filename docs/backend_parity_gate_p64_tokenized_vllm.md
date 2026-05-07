@@ -84,6 +84,39 @@ Operational rule remains:
 3. Do not claim vLLM-only selector parity from this backend.
 4. Investigate LoRA/backend generation differences next, not prompt retokenization.
 
+## Two-Stage Confirmation Path
+
+The vLLM-only selector gate fails, but the proposal-plus-confirmation path passes
+on this P64 panel:
+
+```text
+results/confirmation_economics_p64_tokenized_vllm
+```
+
+The trusted PEFT-best candidate was present at vLLM rank 1, so PEFT confirmation
+of the top-1 proposal recovered zero regret. This is not enough for a general
+quality claim, but it is a valid systems pattern for future searches:
+
+```text
+vLLM proposes a small top-K set
+trusted PEFT/HF confirms that set
+only confirmed PEFT/HF scores decide quality claims
+```
+
+Gate outcome:
+
+| check | value |
+| --- | ---: |
+| best recovered at k | 1 |
+| zero-regret k | 1 |
+| eval-only speedup vs full PEFT screen | 10.55x |
+| speedup including vLLM load/build but excluding PEFT load | 1.93x |
+| confirmation gate | PASS |
+
+This reframes the systems axis: vLLM does not need to be an exact selector if
+its recall of PEFT-good candidates is high at small K and the trusted
+confirmation cost stays below the full PEFT screen cost.
+
 ## Next Probe
 
 The next useful probe should focus on candidate-level generation divergence under token-ID prompts:

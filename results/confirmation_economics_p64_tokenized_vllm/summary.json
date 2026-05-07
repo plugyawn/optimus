@@ -1,5 +1,61 @@
 {
   "best_recovered_k": 1,
+  "gate": {
+    "checks": [
+      {
+        "check": "trusted_best_recovered_within_k",
+        "detail": {
+          "best_recovered_k": 1,
+          "max_confirm_k": 16
+        },
+        "passed": true
+      },
+      {
+        "check": "zero_regret_within_k",
+        "detail": {
+          "max_confirm_k": 16,
+          "max_regret": 0.0,
+          "zero_regret_k": 1
+        },
+        "passed": true
+      },
+      {
+        "check": "zero_regret_score_threshold",
+        "detail": {
+          "k": 1,
+          "max_regret": 0.0,
+          "regret": 0.0
+        },
+        "passed": true
+      },
+      {
+        "check": "eval_only_speedup",
+        "detail": {
+          "k": 1,
+          "min_speedup": 1.0,
+          "speedup": 10.549169810364441
+        },
+        "passed": true
+      },
+      {
+        "check": "full_without_peft_load_speedup",
+        "detail": {
+          "k": 1,
+          "min_speedup": 1.0,
+          "speedup": 1.9313351095042466
+        },
+        "passed": true
+      }
+    ],
+    "failed": [],
+    "pass": true,
+    "thresholds": {
+      "max_confirm_k": 16,
+      "max_regret": 0.0,
+      "min_eval_only_speedup": 1.0,
+      "min_full_without_load_speedup": 1.0
+    }
+  },
   "kind": "confirmation_economics",
   "proposal_candidates": 64,
   "proposal_dir": "results/backend_parity_gate_p64_tokenized_vllm/vllm",

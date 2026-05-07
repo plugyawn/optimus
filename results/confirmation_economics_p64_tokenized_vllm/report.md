@@ -1,5 +1,7 @@
 # Confirmation Economics
 
+Two-stage confirmation gate: **PASS**
+
 | metric | value |
 | --- | ---: |
 | trusted candidates | 64 |
@@ -11,6 +13,18 @@
 | trusted best score | 0.21875 |
 | best recovered at k | 1 |
 | zero-regret k | 1 |
+
+## Gate
+
+| check | pass | detail |
+| --- | ---: | --- |
+| trusted_best_recovered_within_k | True | `{"best_recovered_k": 1, "max_confirm_k": 16}` |
+| zero_regret_within_k | True | `{"max_confirm_k": 16, "max_regret": 0.0, "zero_regret_k": 1}` |
+| zero_regret_score_threshold | True | `{"k": 1, "max_regret": 0.0, "regret": 0.0}` |
+| eval_only_speedup | True | `{"k": 1, "min_speedup": 1.0, "speedup": 10.549169810364441}` |
+| full_without_peft_load_speedup | True | `{"k": 1, "min_speedup": 1.0, "speedup": 1.9313351095042466}` |
+
+Failed checks: none
 
 ## Top-K Confirmation
 

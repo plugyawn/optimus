@@ -138,6 +138,91 @@ def analyze(
     return rows, summary
 
 
+def gate_check(check: str, passed: bool, detail: dict) -> dict:
+    return {"check": check, "passed": bool(passed), "detail": detail}
+
+
+def first_row_at_or_below(rows: list[dict], k: int | None) -> dict | None:
+    if k is None:
+        return None
+    eligible = [row for row in rows if int(row["k"]) >= int(k)]
+    return min(eligible, key=lambda row: int(row["k"])) if eligible else None
+
+
+def confirmation_gate(
+    rows: list[dict],
+    summary: dict,
+    *,
+    max_confirm_k: int,
+    min_eval_only_speedup: float = 1.0,
+    min_full_without_load_speedup: float = 1.0,
+    max_regret: float = 0.0,
+) -> dict:
+    zero_regret_k = summary.get("zero_regret_k")
+    best_recovered_k = summary.get("best_recovered_k")
+    zero_regret_row = first_row_at_or_below(rows, zero_regret_k)
+    checks = [
+        gate_check(
+            "trusted_best_recovered_within_k",
+            best_recovered_k is not None and int(best_recovered_k) <= max_confirm_k,
+            {
+                "best_recovered_k": best_recovered_k,
+                "max_confirm_k": max_confirm_k,
+            },
+        ),
+        gate_check(
+            "zero_regret_within_k",
+            zero_regret_k is not None and int(zero_regret_k) <= max_confirm_k,
+            {
+                "zero_regret_k": zero_regret_k,
+                "max_confirm_k": max_confirm_k,
+                "max_regret": max_regret,
+            },
+        ),
+        gate_check(
+            "zero_regret_score_threshold",
+            zero_regret_row is not None and float(zero_regret_row["regret_vs_trusted_best"]) <= max_regret,
+            {
+                "regret": None if zero_regret_row is None else zero_regret_row["regret_vs_trusted_best"],
+                "max_regret": max_regret,
+                "k": None if zero_regret_row is None else zero_regret_row["k"],
+            },
+        ),
+        gate_check(
+            "eval_only_speedup",
+            zero_regret_row is not None
+            and float(zero_regret_row["eval_only_speedup_vs_trusted_full"]) >= min_eval_only_speedup,
+            {
+                "speedup": None if zero_regret_row is None else zero_regret_row["eval_only_speedup_vs_trusted_full"],
+                "min_speedup": min_eval_only_speedup,
+                "k": None if zero_regret_row is None else zero_regret_row["k"],
+            },
+        ),
+        gate_check(
+            "full_without_peft_load_speedup",
+            zero_regret_row is not None
+            and float(zero_regret_row["full_without_peft_load_speedup_vs_trusted_full"]) >= min_full_without_load_speedup,
+            {
+                "speedup": None if zero_regret_row is None else zero_regret_row["full_without_peft_load_speedup_vs_trusted_full"],
+                "min_speedup": min_full_without_load_speedup,
+                "k": None if zero_regret_row is None else zero_regret_row["k"],
+            },
+        ),
+    ]
+    failed = [row["check"] for row in checks if not row["passed"]]
+    return {
+        "pass": not failed,
+        "failed": failed,
+        "checks": checks,
+        "thresholds": {
+            "max_confirm_k": max_confirm_k,
+            "min_eval_only_speedup": min_eval_only_speedup,
+            "min_full_without_load_speedup": min_full_without_load_speedup,
+            "max_regret": max_regret,
+        },
+    }
+
+
 def write_csv(path: Path, rows: list[dict]) -> None:
     columns = sorted({key for row in rows for key in row})
     with path.open("w", newline="") as f:
@@ -160,8 +245,11 @@ def markdown_table(rows: list[dict], columns: list[str]) -> str:
 
 
 def write_report(path: Path, rows: list[dict], summary: dict) -> None:
+    gate = summary.get("gate") or {}
     lines = [
         "# Confirmation Economics",
+        "",
+        f"Two-stage confirmation gate: **{'PASS' if gate.get('pass') else 'FAIL'}**",
         "",
         "| metric | value |",
         "| --- | ---: |",
@@ -175,6 +263,18 @@ def write_report(path: Path, rows: list[dict], summary: dict) -> None:
         f"| best recovered at k | {summary['best_recovered_k']} |",
         f"| zero-regret k | {summary['zero_regret_k']} |",
         "",
+        "## Gate",
+        "",
+        "| check | pass | detail |",
+        "| --- | ---: | --- |",
+    ]
+    for check in gate.get("checks", []):
+        lines.append(f"| {check['check']} | {check['passed']} | `{json.dumps(check['detail'], sort_keys=True)}` |")
+    lines.extend(
+        [
+            "",
+            "Failed checks: " + (", ".join(gate.get("failed", [])) if gate.get("failed") else "none"),
+            "",
         "## Top-K Confirmation",
         "",
         markdown_table(
@@ -195,7 +295,8 @@ def write_report(path: Path, rows: list[dict], summary: dict) -> None:
         "",
         "The full-without-PEFT-load estimate includes vLLM load and adapter build time but not a separate PEFT model load.",
         "",
-    ]
+        ]
+    )
     path.write_text("\n".join(lines))
 
 
@@ -207,6 +308,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--ks", default="1,2,4,8,16,32")
     p.add_argument("--trusted-score-col", default="exact_mean")
     p.add_argument("--proposal-score-col", default="exact_mean")
+    p.add_argument("--max-confirm-k", type=int, default=16)
+    p.add_argument("--min-eval-only-speedup", type=float, default=1.0)
+    p.add_argument("--min-full-without-load-speedup", type=float, default=1.0)
+    p.add_argument("--max-regret", type=float, default=0.0)
     args = p.parse_args(argv)
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -216,6 +321,14 @@ def main(argv: list[str] | None = None) -> int:
         ks=parse_ks(args.ks),
         trusted_score_col=args.trusted_score_col,
         proposal_score_col=args.proposal_score_col,
+    )
+    summary["gate"] = confirmation_gate(
+        rows,
+        summary,
+        max_confirm_k=args.max_confirm_k,
+        min_eval_only_speedup=args.min_eval_only_speedup,
+        min_full_without_load_speedup=args.min_full_without_load_speedup,
+        max_regret=args.max_regret,
     )
     write_csv(args.out / "rows.csv", rows)
     (args.out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
