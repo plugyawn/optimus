@@ -50,6 +50,7 @@ The follow-up proposal audit sharpened the failure mode:
 
 | Diagnostic | Power-subspace | Matched random |
 | --- | ---: | ---: |
+| scale gate | FAIL | control |
 | prompt-variant selection Spearman | 0.206 | 0.236 |
 | prompt-variant exact Spearman | 0.139 | 0.184 |
 | top-16 prompt-variant overlap | 1/16 | 0/16 |
@@ -58,6 +59,15 @@ The follow-up proposal audit sharpened the failure mode:
 | screen valid fraction | 9.18% | 8.20% |
 
 So the issue is not only that final holdout tied. The proposal did not improve the actual screen pool, and the screen ranking remained very prompt-sensitive. Its small holdout edge came from one promoted candidate and is not strong enough to distinguish from random search noise.
+
+The scale gate failed these checks:
+
+- candidate throughput was slower than random (`0.981x`)
+- screen throughput was slower than random (`0.980x`)
+- screen top-16 exact was lower than random (`-0.49` percentage points)
+- prompt-variant selection ranking was not stable (`rho=0.206`, threshold `0.5`)
+- prompt-variant selection ranking was worse than random (`-0.030 rho`)
+- screen-to-holdout transfer was worse than random (`-0.237 rho`)
 
 The current proposal rule ranks candidates by sign-symmetric `power_energy`. That may be throwing away useful sign and coefficient information. If power iteration remains useful, it should next be tested as a small learned coefficient/sign search inside the subspace, not as a simple top-energy candidate filter.
 

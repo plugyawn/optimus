@@ -1,5 +1,7 @@
 # Proposal Audit
 
+Scale gate: **FAIL**
+
 Compared `subspace_power` against `random_iso` using saved run artifacts.
 
 | Metric | subspace_power | random_iso | delta |
@@ -10,6 +12,22 @@ Compared `subspace_power` against `random_iso` using saved run artifacts.
 | screen valid fraction | 0.0917969 | 0.0820312 | 0.00976562 |
 | screen top16 selection mean | 0.00537109 | 0.0107422 | -0.00537109 |
 | screen top16 exact mean | 0.120117 | 0.125 | -0.00488281 |
+
+## Scale Gate
+
+| Check | pass | detail |
+| --- | ---: | --- |
+| candidate_throughput_not_slower | False | `{"left": 1.5563107298948171, "min_ratio": 1.0, "ratio": 0.9808107469527648, "right": 1.5867594586723752}` |
+| screen_throughput_not_slower | False | `{"left": 1.735114146858158, "min_ratio": 1.0, "ratio": 0.9795742908049699, "right": 1.771294084731766}` |
+| ensemble_quality_not_worse | True | `{"delta": 0.001953125, "left": 0.19140625, "min_delta": 0.0, "right": 0.189453125}` |
+| screen_top16_quality_not_worse | False | `{"delta": -0.0048828125, "left": 0.1201171875, "min_delta": 0.0, "right": 0.125}` |
+| screen_valid_fraction_not_worse | True | `{"delta": 0.009765625, "left": 0.091796875, "min_delta": 0.0, "right": 0.08203125}` |
+| prompt_selection_rank_stable | False | `{"left": 0.20642369523078127, "min_spearman": 0.5}` |
+| prompt_selection_rank_not_worse_than_control | False | `{"delta": -0.029615582560169995, "left": 0.20642369523078127, "min_delta": 0.0, "right": 0.23603927779095127}` |
+| screen_to_holdout_transfer_not_worse_than_control | False | `{"delta": -0.23665693503858243, "left": 0.2976582399304869, "min_delta": 0.0, "right": 0.5343151749690693}` |
+| screen_selected_regret_not_worse_than_control | True | `{"delta": -0.01171875, "left": 0.00390625, "max_increase": 0.0, "right": 0.015625}` |
+
+Failed checks: candidate_throughput_not_slower, screen_throughput_not_slower, screen_top16_quality_not_worse, prompt_selection_rank_stable, prompt_selection_rank_not_worse_than_control, screen_to_holdout_transfer_not_worse_than_control
 
 ## Prompt Variant Stability
 

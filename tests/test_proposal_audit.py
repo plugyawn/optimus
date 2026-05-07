@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from randopt_lora_lab.proposal_audit import compare_summaries, summarize_run
+from randopt_lora_lab.proposal_audit import compare_summaries, proposal_gate, summarize_run
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -102,10 +102,37 @@ class ProposalAuditTests(unittest.TestCase):
             root = Path(tmp)
             left = summarize_run(self.make_run(root, "left", 0.1), top_k=2)
             right = summarize_run(self.make_run(root, "right", 0.0), top_k=2)
-            comparison = compare_summaries(left, right, left_name="left", right_name="right")
+            comparison = compare_summaries(left, right, left_name="left", right_name="right", top_k=2)
 
         self.assertAlmostEqual(comparison["delta"]["candidate_sec_left_minus_right"], 0.1)
         self.assertAlmostEqual(comparison["delta"]["best_ensemble_holdout_exact_left_minus_right"], 0.1)
+
+    def test_gate_fails_slower_prompt_brittle_proposal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            left_run = self.make_run(root, "left", -0.5)
+            write_jsonl(
+                left_run / "candidate_condition_summary.jsonl",
+                [
+                    condition(1, 1, "default", 0.30, 0.25),
+                    condition(1, 1, "reordered", -0.30, 0.00),
+                    condition(1, -1, "default", 0.20, 0.20),
+                    condition(1, -1, "reordered", -0.20, 0.05),
+                    condition(2, 1, "default", -0.20, 0.05),
+                    condition(2, 1, "reordered", 0.20, 0.20),
+                    condition(2, -1, "default", -0.30, 0.00),
+                    condition(2, -1, "reordered", 0.30, 0.25),
+                ],
+            )
+            left = summarize_run(left_run, top_k=2)
+            right = summarize_run(self.make_run(root, "right", 0.0), top_k=2)
+            comparison = compare_summaries(left, right, left_name="left", right_name="right", top_k=2)
+            gate = proposal_gate(comparison, top_k=2, min_prompt_selection_spearman=0.99)
+
+        self.assertFalse(gate["pass"])
+        self.assertIn("candidate_throughput_not_slower", gate["failed"])
+        self.assertIn("ensemble_quality_not_worse", gate["failed"])
+        self.assertIn("prompt_selection_rank_stable", gate["failed"])
 
 
 if __name__ == "__main__":
