@@ -98,6 +98,19 @@ quality claims must read `ensemble_holdout`: candidates are selected by screen
 score, the top-K candidates are evaluated on holdout, and Countdown votes by
 valid numeric result rather than formula string.
 
+Result validity audit before quality claims:
+
+```bash
+python -m randopt_lora_lab.result_validity \
+  --run results/YOUR_SEARCH_RUN \
+  --out results/YOUR_SEARCH_RUN/validity
+```
+
+This rescans saved per-prompt rows with the current strict parser, verifies
+base screen/holdout rows are present, checks ID and semantic disjointness, and
+fails selected candidates whose cap-hit or malformed rates exceed the configured
+thresholds.
+
 Dense vs LoRA parity baseline:
 
 ```bash

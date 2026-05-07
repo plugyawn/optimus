@@ -99,6 +99,17 @@ def check_drift(path: Path | None, payload: dict | None) -> GoalCheck:
     return GoalCheck("drift parity", passed, str(path), payload.get("gates", payload))
 
 
+def check_eval_validity(path: Path | None, payload: dict | None) -> GoalCheck:
+    if payload is None:
+        return GoalCheck("eval validity", False, str(path) if path else "missing", "missing result validity audit")
+    return GoalCheck(
+        "eval validity",
+        bool(payload.get("pass")),
+        str(path),
+        payload.get("failed", payload),
+    )
+
+
 def check_adapter_convenience(path: Path | None) -> GoalCheck:
     if path is None:
         return GoalCheck("adapter convenience", False, "missing", "missing adapter run directory")
@@ -126,6 +137,7 @@ def run_goal_audit(args) -> dict:
     backend = read_json(args.backend_gate)
     prompt = read_json(args.prompt_robustness)
     drift = read_json(args.drift_report)
+    eval_validity = read_json(args.eval_validity)
     checks.append(
         check_present_pass(
             "official full-Gaussian baseline validity",
@@ -145,6 +157,7 @@ def run_goal_audit(args) -> dict:
     )
     checks.append(check_prompt_robustness(args.prompt_robustness, prompt))
     checks.append(check_drift(args.drift_report, drift))
+    checks.append(check_eval_validity(args.eval_validity, eval_validity))
     checks.append(check_adapter_convenience(args.adapter_run))
     rows = [asdict(check) for check in checks]
     return {
@@ -179,6 +192,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--backend-gate", type=Path)
     parser.add_argument("--prompt-robustness", type=Path)
     parser.add_argument("--drift-report", type=Path)
+    parser.add_argument("--eval-validity", type=Path)
     parser.add_argument("--adapter-run", type=Path)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)

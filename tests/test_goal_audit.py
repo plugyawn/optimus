@@ -20,6 +20,7 @@ class GoalAuditTests(unittest.TestCase):
             backend_gate=None,
             prompt_robustness=None,
             drift_report=None,
+            eval_validity=None,
             adapter_run=None,
         )
 
@@ -29,6 +30,7 @@ class GoalAuditTests(unittest.TestCase):
         self.assertIn("official full-Gaussian baseline validity", summary["failed"])
         self.assertIn("quality parity", summary["failed"])
         self.assertIn("drift parity", summary["failed"])
+        self.assertIn("eval validity", summary["failed"])
 
     def test_full_evidence_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -38,6 +40,7 @@ class GoalAuditTests(unittest.TestCase):
             backend = root / "backend" / "summary.json"
             prompt = root / "prompt" / "summary.json"
             drift = root / "drift" / "summary.json"
+            eval_validity = root / "eval_validity" / "summary.json"
             adapter = root / "adapter"
             write_json(reproduction, {"pass": True})
             write_json(
@@ -58,6 +61,7 @@ class GoalAuditTests(unittest.TestCase):
             write_json(backend, {"pass": True})
             write_json(prompt, {"gate": {"pass": True, "valid_prompt_variants": 2, "passing_prompt_variants": 2, "min_valid_prompts": 2}})
             write_json(drift, {"pass": True})
+            write_json(eval_validity, {"pass": True})
             write_json(adapter / "summary.json", {"adapters_kept": True})
             args = Namespace(
                 reproduction_audit=reproduction,
@@ -65,6 +69,7 @@ class GoalAuditTests(unittest.TestCase):
                 backend_gate=backend,
                 prompt_robustness=prompt,
                 drift_report=drift,
+                eval_validity=eval_validity,
                 adapter_run=adapter,
             )
 
@@ -100,6 +105,7 @@ class GoalAuditTests(unittest.TestCase):
                 backend_gate=None,
                 prompt_robustness=None,
                 drift_report=None,
+                eval_validity=None,
                 adapter_run=None,
             )
 

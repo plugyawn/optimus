@@ -33,6 +33,7 @@ python -m randopt_lora_lab.goal_audit \
   --backend-gate results/BACKEND_GATE/summary.json \
   --prompt-robustness results/PROMPT_ROBUSTNESS/summary.json \
   --drift-report results/DRIFT_AUDIT/summary.json \
+  --eval-validity results/SEARCH_RUN/validity/summary.json \
   --adapter-run results/VLLM_LORA_SEARCH \
   --out results/goal_audit
 ```
@@ -69,6 +70,7 @@ python -m randopt_lora_lab.logit_drift \
 | Eval speed parity | P=64 HF reference path has LoRA slower than dense at rank 8 and rank 32; vLLM LoRA probes exist | partial, quality-coupled speed not proven |
 | Convenience | LoRA adapters are materialized as portable safetensors | partial |
 | Robustness | generated non-overlap data, cap-hit/malformed logging, paired holdout rows | partial |
+| Eval validity | strict parser rescoring, semantic split audit, base row checks, cap/malformed thresholds | implemented, must pass per claim |
 | Paper-aligned geometry | sparse SGD RLVR note added after arXiv 2602.07729 | hypothesis only |
 | Sample-size aggregation | rank-32 top-4 score-weighted aggregate improved holdout, but with high cap-hit | promising, invalid until cap audit |
 | Sparse-low-rank family | `sparse_low_rank_lora` implemented with density variants and variance matching | implemented, not run |
@@ -76,6 +78,44 @@ python -m randopt_lora_lab.logit_drift \
 | vLLM backend parity | P=16 gate passed protocol/base/tensor checks but failed ranking with Spearman -0.181 | missing |
 
 ## Next Gate
+
+Run the result validity audit on every search run before comparing quality:
+
+```bash
+python -m randopt_lora_lab.result_validity \
+  --run results/SEARCH_RUN \
+  --out results/SEARCH_RUN/validity
+```
+
+Pass criteria:
+
+```text
+1. Base screen and base holdout rows are present.
+2. Screen and holdout IDs are disjoint.
+3. Screen and holdout semantic Countdown examples are disjoint.
+4. Saved rows match the current strict parser.
+5. Selected candidates do not exceed cap-hit or malformed thresholds.
+6. Ensemble rows exist for every reported K.
+```
+
+This gate is deliberately separate from quality. A run can have high exact
+score and still fail validity if it wins by truncation, stale parsing, repeated
+examples, or missing per-prompt base rows.
+
+First validity audit results:
+
+```text
+results/paper_style_p128_qwen3b/dense: failed only because the old summary
+  lacked candidate_score_metric / ensemble_vote_metric metadata.
+results/paper_style_p128_qwen3b/lora: same metadata failure.
+results/vllm_lora_search_iso_s0p01_p512_stop: failed semantic split,
+  stale-parser, cap-hit, malformed, and metadata checks.
+```
+
+That means the corrected local paper-style dense/LoRA runs are cleaner than the
+older vLLM search rows, but they still are not current-valid claim artifacts
+because their summaries predate the metric-metadata guard. Future reruns must
+pass this audit before entering parity or goal-audit evidence.
 
 Run the backend parity gate before any broader vLLM quality claim:
 
