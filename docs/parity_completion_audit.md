@@ -38,6 +38,7 @@ search-utility parity.
 | Robustness | generated non-overlap data, cap-hit/malformed logging, paired holdout rows | partial |
 | Paper-aligned geometry | sparse SGD RLVR note added after arXiv 2602.07729 | hypothesis only |
 | Sample-size aggregation | rank-32 top-4 score-weighted aggregate improved holdout, but with high cap-hit | promising, invalid until cap audit |
+| Sparse-low-rank family | `sparse_low_rank_lora` implemented with density variants and variance matching | implemented, not run |
 
 ## Next Gate
 

@@ -83,3 +83,27 @@ For this lab, the paper should push us toward sparse-plus-low-rank search
 families and skepticism toward accumulated stale directions. It should not make
 us skip parity gates, because the paper studies trained RLVR gradients rather
 than sampled zeroth-order perturbations.
+
+## Implemented Probe Family
+
+`sparse_low_rank_lora` now samples sparse LoRA factors while keeping the
+expected `B @ A` entry variance matched to `factor_gaussian_lora`:
+
+```text
+A = sigma * mask_A * N(0, 1) / sqrt(density)
+B = mask_B * N(0, 1) / sqrt(rank * density)
+```
+
+Available density names:
+
+```text
+sparse_low_rank_lora        # density 0.25
+sparse_low_rank_lora_d0p125
+sparse_low_rank_lora_d0p25
+sparse_low_rank_lora_d0p5
+```
+
+This is a geometry probe, not a proven systems win. Standard vLLM LoRA serving
+will still store dense adapter tensors unless we add sparse-aware packing or a
+custom kernel, but the family directly tests whether the sparse factor prior
+increases lucky-candidate density without changing the serving abstraction.
