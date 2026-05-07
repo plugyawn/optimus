@@ -14,7 +14,9 @@ from pathlib import Path
 
 import numpy as np
 
-from .countdown import load_examples, prompts as make_prompts, unique_example_count, unique_semantic_example_count
+from .countdown import load_examples, unique_example_count, unique_semantic_example_count
+from .prompt_variants import make_variant_prompts
+from .selection_score import combine_candidate_conditions, enrich_condition_rows, parse_prompt_variants
 from .vllm_lora_bench import (
     AdapterSpec,
     Candidate,
@@ -91,14 +93,30 @@ def make_adapter_specs(args, out: Path, targets: list[str], candidates: list[Can
 
 
 def reset_outputs(out: Path) -> None:
-    for name in ["adapters.jsonl", "candidate_summary.jsonl", "per_prompt.jsonl", "holdout_per_prompt.jsonl"]:
+    for name in [
+        "adapters.jsonl",
+        "candidate_summary.jsonl",
+        "candidate_condition_summary.jsonl",
+        "per_prompt.jsonl",
+        "holdout_per_prompt.jsonl",
+    ]:
         path = out / name
         if path.exists():
             path.unlink()
 
 
-def mixed_eval(llm, LoRARequest, sampling, examples, specs: list[AdapterSpec], args, *, mode: str) -> tuple[list[dict], list[dict], dict]:
-    prompt_texts = make_prompts(examples)
+def mixed_eval(
+    llm,
+    LoRARequest,
+    sampling,
+    examples,
+    specs: list[AdapterSpec],
+    args,
+    *,
+    mode: str,
+    prompt_variant: str = "default",
+) -> tuple[list[dict], list[dict], dict]:
+    prompt_texts = make_variant_prompts(examples, prompt_variant)
     per_prompt_rows = []
     candidate_rows = []
     total_elapsed = 0.0
@@ -122,7 +140,7 @@ def mixed_eval(llm, LoRARequest, sampling, examples, specs: list[AdapterSpec], a
             prompts_per_adapter=len(prompt_texts),
             max_new_tokens=args.max_new_tokens,
         )
-        per_prompt_rows.extend(dict(row, mode=mode) for row in rows)
+        per_prompt_rows.extend(dict(row, mode=mode, prompt_variant=prompt_variant) for row in rows)
         total_elapsed += elapsed
         total_tokens += int(metrics["output_tokens"])
         by_candidate = metrics.pop("by_candidate")
@@ -134,6 +152,7 @@ def mixed_eval(llm, LoRARequest, sampling, examples, specs: list[AdapterSpec], a
                     "adapter_index": spec.index,
                     "adapter": spec.name,
                     "mode": mode,
+                    "prompt_variant": prompt_variant,
                     "elapsed_s": elapsed / max(len(chunk), 1),
                     "prompts": len(prompt_texts),
                 }
@@ -149,8 +168,8 @@ def mixed_eval(llm, LoRARequest, sampling, examples, specs: list[AdapterSpec], a
     return per_prompt_rows, candidate_rows, aggregate
 
 
-def base_eval(llm, sampling, examples, args, *, mode: str) -> tuple[list[dict], dict]:
-    prompt_texts = make_prompts(examples)
+def base_eval(llm, sampling, examples, args, *, mode: str, prompt_variant: str = "default") -> tuple[list[dict], dict]:
+    prompt_texts = make_variant_prompts(examples, prompt_variant)
     start = time.time()
     outputs = llm.generate(prompt_texts, sampling, use_tqdm=False)
     elapsed = time.time() - start
@@ -161,6 +180,8 @@ def base_eval(llm, sampling, examples, args, *, mode: str) -> tuple[list[dict], 
         outputs=outputs,
         max_new_tokens=args.max_new_tokens,
     )
+    rows = [dict(row, prompt_variant=prompt_variant) for row in rows]
+    metrics["prompt_variant"] = prompt_variant
     metrics["elapsed_s"] = elapsed
     metrics["tokens_per_sec"] = metrics["output_tokens"] / max(elapsed, 1e-9)
     metrics["prompts_per_sec"] = len(prompt_texts) / max(elapsed, 1e-9)
@@ -169,6 +190,7 @@ def base_eval(llm, sampling, examples, args, *, mode: str) -> tuple[list[dict], 
 
 def run_search(args) -> dict:
     targets = parse_targets(args.targets)
+    prompt_variants = parse_prompt_variants(args.prompt_variants)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     reset_outputs(out)
@@ -207,40 +229,98 @@ def run_search(args) -> dict:
     )
     load_s = time.time() - load_start
 
-    base_screen_rows, base_screen = base_eval(llm, sampling, screen, args, mode="base_screen")
-    base_holdout_rows, base_holdout = base_eval(llm, sampling, holdout, args, mode="base_holdout")
+    base_screen_rows = []
+    base_holdout_rows = []
+    base_screen_by_variant = {}
+    base_holdout_by_variant = {}
+    for variant in prompt_variants:
+        rows, metrics = base_eval(llm, sampling, screen, args, mode="base_screen", prompt_variant=variant)
+        base_screen_rows.extend(rows)
+        base_screen_by_variant[variant] = metrics
+        rows, metrics = base_eval(llm, sampling, holdout, args, mode="base_holdout", prompt_variant=variant)
+        base_holdout_rows.extend(rows)
+        base_holdout_by_variant[variant] = metrics
     write_jsonl(out / "per_prompt.jsonl", base_screen_rows)
     write_jsonl(out / "holdout_per_prompt.jsonl", base_holdout_rows)
 
-    screen_rows, candidate_rows, screen_aggregate = mixed_eval(
-        llm,
-        LoRARequest,
-        sampling,
-        screen,
-        specs,
-        args,
-        mode="screen",
-    )
+    screen_rows = []
+    screen_condition_rows = []
+    screen_aggregate = {"elapsed_s": 0.0, "output_tokens": 0}
+    for variant in prompt_variants:
+        rows, condition_rows, aggregate = mixed_eval(
+            llm,
+            LoRARequest,
+            sampling,
+            screen,
+            specs,
+            args,
+            mode="screen",
+            prompt_variant=variant,
+        )
+        screen_rows.extend(rows)
+        screen_condition_rows.extend(condition_rows)
+        screen_aggregate["elapsed_s"] += aggregate["elapsed_s"]
+        screen_aggregate["output_tokens"] += aggregate["output_tokens"]
     write_jsonl(out / "per_prompt.jsonl", screen_rows)
+    screen_condition_rows = enrich_condition_rows(
+        screen_condition_rows,
+        base_screen_by_variant,
+        malformed_penalty=args.malformed_penalty,
+        cap_hit_penalty=args.cap_hit_penalty,
+    )
+    candidate_rows = combine_candidate_conditions(
+        screen_condition_rows,
+        base_screen_by_variant,
+        score_mode=args.score_mode,
+        malformed_penalty=args.malformed_penalty,
+        cap_hit_penalty=args.cap_hit_penalty,
+    )
+    write_jsonl(out / "candidate_condition_summary.jsonl", screen_condition_rows)
     write_jsonl(out / "candidate_summary.jsonl", candidate_rows)
 
-    top = sorted(candidate_rows, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(candidate_rows))]
+    top = sorted(candidate_rows, key=lambda r: r["selection_score"], reverse=True)[: min(args.promote, len(candidate_rows))]
     top_specs = {spec.candidate: spec for spec in specs}
     holdout_specs = [top_specs[row["candidate"]] for row in top]
-    holdout_rows, holdout_candidate_rows, holdout_aggregate = mixed_eval(
-        llm,
-        LoRARequest,
-        sampling,
-        holdout,
-        holdout_specs,
-        args,
-        mode="holdout",
+    holdout_rows = []
+    holdout_condition_rows = []
+    holdout_aggregate = {"elapsed_s": 0.0, "output_tokens": 0}
+    for variant in prompt_variants:
+        rows, condition_rows, aggregate = mixed_eval(
+            llm,
+            LoRARequest,
+            sampling,
+            holdout,
+            holdout_specs,
+            args,
+            mode="holdout",
+            prompt_variant=variant,
+        )
+        holdout_rows.extend(rows)
+        holdout_condition_rows.extend(condition_rows)
+        holdout_aggregate["elapsed_s"] += aggregate["elapsed_s"]
+        holdout_aggregate["output_tokens"] += aggregate["output_tokens"]
+    holdout_condition_rows = enrich_condition_rows(
+        holdout_condition_rows,
+        base_holdout_by_variant,
+        malformed_penalty=args.malformed_penalty,
+        cap_hit_penalty=args.cap_hit_penalty,
+    )
+    holdout_candidate_rows = combine_candidate_conditions(
+        holdout_condition_rows,
+        base_holdout_by_variant,
+        score_mode=args.score_mode,
+        malformed_penalty=args.malformed_penalty,
+        cap_hit_penalty=args.cap_hit_penalty,
     )
     write_jsonl(out / "holdout_per_prompt.jsonl", holdout_rows)
 
     by_candidate_holdout = {row["candidate"]: row for row in holdout_candidate_rows}
     top_holdout = [by_candidate_holdout[row["candidate"]] for row in top if row["candidate"] in by_candidate_holdout]
     total_eval_s = screen_aggregate["elapsed_s"] + holdout_aggregate["elapsed_s"]
+    screen_tokens_per_sec = screen_aggregate["output_tokens"] / max(screen_aggregate["elapsed_s"], 1e-9)
+    screen_prompts_per_sec = (len(specs) * len(screen) * len(prompt_variants)) / max(screen_aggregate["elapsed_s"], 1e-9)
+    screen_candidate_sec = len(specs) / max(screen_aggregate["elapsed_s"], 1e-9)
+    holdout_tokens_per_sec = holdout_aggregate["output_tokens"] / max(holdout_aggregate["elapsed_s"], 1e-9)
     adapters_kept = bool(args.keep_adapters or args.adapter_dir)
     if not adapters_kept:
         shutil.rmtree(out / "adapters", ignore_errors=True)
@@ -253,6 +333,10 @@ def run_search(args) -> dict:
         "sigma": args.sigma,
         "targets": targets,
         "antithetic": args.antithetic,
+        "prompt_variants": prompt_variants,
+        "score_mode": args.score_mode,
+        "malformed_penalty": args.malformed_penalty,
+        "cap_hit_penalty": args.cap_hit_penalty,
         "screen_prompts": len(screen),
         "holdout_prompts": len(holdout),
         "screen_unique_prompts": unique_example_count(screen),
@@ -270,16 +354,18 @@ def run_search(args) -> dict:
         "adapter_build_s": adapter_build_s,
         "adapters_kept": adapters_kept,
         "load_s": load_s,
-        "base_screen_exact": base_screen["exact_mean"],
-        "base_holdout_exact": base_holdout["exact_mean"],
-        "screen_tokens_per_sec": screen_aggregate["tokens_per_sec"],
-        "screen_prompts_per_sec": screen_aggregate["prompts_per_sec"],
-        "screen_candidate_sec": screen_aggregate["candidate_sec"],
-        "holdout_tokens_per_sec": holdout_aggregate["tokens_per_sec"],
+        "base_screen_exact": sum(row["exact_mean"] for row in base_screen_by_variant.values()) / len(base_screen_by_variant),
+        "base_holdout_exact": sum(row["exact_mean"] for row in base_holdout_by_variant.values()) / len(base_holdout_by_variant),
+        "base_screen_by_prompt": base_screen_by_variant,
+        "base_holdout_by_prompt": base_holdout_by_variant,
+        "screen_tokens_per_sec": screen_tokens_per_sec,
+        "screen_prompts_per_sec": screen_prompts_per_sec,
+        "screen_candidate_sec": screen_candidate_sec,
+        "holdout_tokens_per_sec": holdout_tokens_per_sec,
         "eval_elapsed_s": total_eval_s,
         "candidate_sec": len(specs) / max(total_eval_s, 1e-9),
-        "best_tokens_per_sec": screen_aggregate["tokens_per_sec"],
-        "best_prompts_per_sec": screen_aggregate["prompts_per_sec"],
+        "best_tokens_per_sec": screen_tokens_per_sec,
+        "best_prompts_per_sec": screen_prompts_per_sec,
         "top_screen": top,
         "top_holdout": top_holdout,
     }
@@ -328,6 +414,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rank", type=int, default=8)
     p.add_argument("--sigma", type=float, default=0.01)
     p.add_argument("--targets", default="q_proj,v_proj")
+    p.add_argument("--prompt-variants", default="default")
+    p.add_argument("--score-mode", default="exact", choices=["exact", "robust_mean", "robust_min"])
+    p.add_argument("--malformed-penalty", type=float, default=1.0)
+    p.add_argument("--cap-hit-penalty", type=float, default=1.0)
     p.add_argument(
         "--family",
         default="isotropic",

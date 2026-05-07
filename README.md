@@ -35,6 +35,21 @@ vLLM LoRA serving probe:
 python -m randopt_lora_lab.vllm_lora_bench --out results/vllm_lora_bench --data "$DATA" --adapters 8 --prompts 64 --preload
 ```
 
+Prompt-robust vLLM LoRA search:
+
+```bash
+python -m randopt_lora_lab.vllm_lora_search \
+  --out results/vllm_robust_search \
+  --data "$DATA" \
+  --family sparse_low_rank_lora_d0p25 \
+  --population 512 \
+  --prompts 64 \
+  --holdout-prompts 256 \
+  --prompt-variants default,reordered \
+  --score-mode robust_min \
+  --stop-at-answer
+```
+
 Dense Gaussian vs LoRA capacity audit:
 
 ```bash
@@ -128,6 +143,7 @@ rank-`k*r` adapter by concatenating the factors.
 - Log per-prompt rewards, not just aggregate means.
 - Report cap-hit, malformed, and exact-answer rates separately.
 - Compare lift vs base on the same prompt split.
+- Search winners must survive distinct protocol-valid prompt variants; repeated token caps do not count as separate prompt evidence.
 - Built-in 32-example data is smoke-test only; use `--allow-repeat-data` only when repetition is intentional.
 - Search and holdout splits must report zero overlap before a method ranking is treated as evidence.
 - vLLM candidate selection is allowed only after adapter tensor parity and rank-correlation checks pass.
