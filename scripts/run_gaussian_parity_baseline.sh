@@ -18,6 +18,7 @@ PROMPT_VARIANT=${PROMPT_VARIANT:-default}
 USE_CHAT_TEMPLATE=${USE_CHAT_TEMPLATE:-0}
 PROMOTE=${PROMOTE:-4}
 ENSEMBLE_KS=${ENSEMBLE_KS:-}
+ENSEMBLE_RATIOS=${ENSEMBLE_RATIOS:-}
 DENSE_SNAPSHOT_DEVICE=${DENSE_SNAPSHOT_DEVICE:-model}
 DENSE_NOISE_MODE=${DENSE_NOISE_MODE:-canonical}
 INCLUDE_PROJECTED=${INCLUDE_PROJECTED:-1}
@@ -30,6 +31,9 @@ if [[ -n "$SIGMA_VALUES" ]]; then
 fi
 if [[ -n "$ENSEMBLE_KS" ]]; then
   extra_search_args+=(--ensemble-ks "$ENSEMBLE_KS")
+fi
+if [[ -n "$ENSEMBLE_RATIOS" ]]; then
+  extra_search_args+=(--ensemble-ratios "$ENSEMBLE_RATIOS")
 fi
 if [[ "$PROMPT_VARIANT" != "default" ]]; then
   extra_search_args+=(--prompt-variant "$PROMPT_VARIANT")

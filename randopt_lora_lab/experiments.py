@@ -202,6 +202,17 @@ def parse_k_list(text: str) -> list[int]:
     return sorted({int(x) for x in text.split(",") if x.strip()})
 
 
+def parse_ratio_list(text: str) -> list[float]:
+    return [float(x) for x in text.split(",") if x.strip()]
+
+
+def ensemble_ks_from_values(population: int, k_text: str = "", ratio_text: str = "") -> list[int]:
+    ks = set(parse_k_list(k_text) if k_text else [])
+    for ratio in parse_ratio_list(ratio_text) if ratio_text else []:
+        ks.add(max(1, int(float(population) * ratio)))
+    return sorted(ks)
+
+
 def rows_by_candidate_and_example(rows: list[dict]) -> dict[str, dict[int, dict]]:
     out: dict[str, dict[int, dict]] = {}
     for row in rows:
@@ -350,7 +361,7 @@ def run_search(args):
         summaries.append({k: v for k, v in ev.items() if k != "rows"})
         write_jsonl(out / "per_prompt.jsonl", tag_rows(ev["rows"], mode="screen"))
         print(f"{i+1}/{len(candidates)} {cand.key} exact={ev['exact_mean']:.4f} elapsed={ev['elapsed_s']:.2f}", flush=True)
-    ensemble_ks = parse_k_list(args.ensemble_ks) if args.ensemble_ks else []
+    ensemble_ks = ensemble_ks_from_values(len(candidates), args.ensemble_ks, args.ensemble_ratios)
     promote_n = max(args.promote, max(ensemble_ks, default=0))
     top = sorted(summaries, key=lambda r: r["exact_mean"], reverse=True)[: min(promote_n, len(summaries))]
     holdout_rows = []
@@ -404,6 +415,7 @@ def run_search(args):
         "max_new_tokens": args.max_new_tokens,
         "stop_at_answer": args.stop_at_answer,
         "ensemble_ks": ensemble_ks,
+        "ensemble_ratios": parse_ratio_list(args.ensemble_ratios) if args.ensemble_ratios else [],
         "ensemble_holdout": ensemble_rows,
         "best_ensemble_holdout_exact": max((row["exact_mean"] for row in ensemble_rows), default=None),
         "top_screen": top,
@@ -632,6 +644,7 @@ def main():
         sp.add_argument("--population", type=int, default=32)
         sp.add_argument("--promote", type=int, default=4)
         sp.add_argument("--ensemble-ks", default="")
+        sp.add_argument("--ensemble-ratios", default="")
         sp.add_argument("--stage-prompts", type=int, default=8)
         sp.add_argument("--survivors", type=int, default=8)
         sp.add_argument("--batch-sizes", default="4,8,16,32")

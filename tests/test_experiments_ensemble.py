@@ -1,13 +1,17 @@
 import unittest
 
 from randopt_lora_lab.countdown import CountdownExample
-from randopt_lora_lab.experiments import candidate_panel, majority_vote_evaluation, parse_k_list
+from randopt_lora_lab.experiments import candidate_panel, ensemble_ks_from_values, majority_vote_evaluation, parse_k_list
 from randopt_lora_lab.vllm_lora_search import candidate_panel as vllm_candidate_panel
 
 
 class ExperimentEnsembleTests(unittest.TestCase):
     def test_parse_k_list_sorts_and_deduplicates(self):
         self.assertEqual(parse_k_list("4,1,4,2"), [1, 2, 4])
+
+    def test_ensemble_ks_can_be_derived_from_paper_ratios(self):
+        self.assertEqual(ensemble_ks_from_values(5000, ratio_text="0.04,0.01,0.05,0.1"), [50, 200, 250, 500])
+        self.assertEqual(ensemble_ks_from_values(128, k_text="8,16", ratio_text="0.04,0.01"), [1, 5, 8, 16])
 
     def test_candidate_panel_samples_only_requested_sigmas(self):
         candidates = candidate_panel(

@@ -125,7 +125,7 @@ python -m randopt_lora_lab.experiments search \
   --holdout-prompts 256 \
   --sigma-values 0.0005,0.001,0.002 \
   --promote 32 \
-  --ensemble-ks 1,5,6,12,32 \
+  --ensemble-ratios 0.04,0.01,0.05,0.1 \
   --prompt-variant paper \
   --use-chat-template \
   --max-new-tokens 1024

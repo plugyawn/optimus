@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from .countdown import load_examples, unique_example_count, unique_semantic_example_count
-from .experiments import majority_vote_evaluation, parse_float_list, parse_k_list
+from .experiments import ensemble_ks_from_values, majority_vote_evaluation, parse_float_list, parse_ratio_list
 from .prompt_variants import make_variant_prompts
 from .selection_score import (
     combine_candidate_conditions,
@@ -341,7 +341,7 @@ def run_search(args) -> dict:
     write_jsonl(out / "candidate_condition_summary.jsonl", screen_condition_rows)
     write_jsonl(out / "candidate_summary.jsonl", candidate_rows)
 
-    ensemble_ks = parse_k_list(args.ensemble_ks) if args.ensemble_ks else []
+    ensemble_ks = ensemble_ks_from_values(len(specs), args.ensemble_ks, args.ensemble_ratios)
     promote_n = max(args.promote, max(ensemble_ks, default=0))
     top = sorted(candidate_rows, key=lambda r: r["selection_score"], reverse=True)[: min(promote_n, len(candidate_rows))]
     top_specs = {spec.candidate: spec for spec in specs}
@@ -460,6 +460,7 @@ def run_search(args) -> dict:
         "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "promote": args.promote,
         "ensemble_ks": ensemble_ks,
+        "ensemble_ratios": parse_ratio_list(args.ensemble_ratios) if args.ensemble_ratios else [],
         "max_loras": args.max_loras,
         "chunk_adapters": args.chunk_adapters,
         "enforce_eager": args.enforce_eager,
@@ -536,6 +537,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--sigma-values", default="")
     p.add_argument("--targets", default="q_proj,v_proj")
     p.add_argument("--ensemble-ks", default="")
+    p.add_argument("--ensemble-ratios", default="")
     p.add_argument("--prompt-variants", default="default")
     p.add_argument("--use-chat-template", action="store_true")
     p.add_argument("--score-mode", default="exact", choices=["exact", "robust_mean", "robust_min"])
