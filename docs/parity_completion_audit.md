@@ -40,6 +40,22 @@ python -m randopt_lora_lab.goal_audit \
 Missing evidence is a failure. The audit only passes when every objective axis
 has a concrete artifact.
 
+Drift evidence should be task-conditioned, not only a parameter-norm proxy:
+
+```bash
+python -m randopt_lora_lab.logit_drift \
+  --out results/logit_drift \
+  --data data/countdown_generated_1200_seed20260507.json \
+  --perturbation-backend lora \
+  --family factor_gaussian_lora \
+  --population 64 \
+  --prompts 32 \
+  --rank 8 \
+  --sigma-values 0.0005,0.001,0.002 \
+  --max-mean-kl 0.05 \
+  --min-top1-equal 0.95
+```
+
 ## Requirement Checklist
 
 | requirement | current evidence | status |
