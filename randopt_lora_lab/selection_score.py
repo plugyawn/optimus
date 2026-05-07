@@ -9,6 +9,26 @@ def parse_prompt_variants(value: str) -> list[str]:
     return variants or ["default"]
 
 
+def base_protocol_valid(base: dict, *, max_malformed: float, max_cap_hit: float) -> bool:
+    return (
+        float(base.get("malformed_mean", 1.0)) <= max_malformed
+        and float(base.get("cap_hit_mean", 1.0)) <= max_cap_hit
+    )
+
+
+def protocol_valid_variants(base_by_variant: dict[str, dict], *, max_malformed: float, max_cap_hit: float) -> list[str]:
+    return [
+        variant
+        for variant, base in sorted(base_by_variant.items())
+        if base_protocol_valid(base, max_malformed=max_malformed, max_cap_hit=max_cap_hit)
+    ]
+
+
+def filter_condition_rows_by_variants(condition_rows: list[dict], variants: Iterable[str]) -> list[dict]:
+    allowed = set(variants)
+    return [row for row in condition_rows if str(row.get("prompt_variant", "default")) in allowed]
+
+
 def condition_score(
     candidate: dict,
     base: dict,

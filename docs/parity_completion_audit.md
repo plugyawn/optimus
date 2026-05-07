@@ -189,6 +189,12 @@ templates that collapse the base model's malformed/cap-hit rate are marked
 protocol-invalid stress conditions, not used as evidence for or against the
 method.
 
+Selector-side scoring follows the same rule: collapsed base prompt variants are
+excluded from candidate selection and holdout ranking, while still being logged
+as stress diagnostics. This prevents a bad prompt rewrite from deciding the
+winner, but it does not rescue a prompt-brittle method; a quality claim still
+requires passing multiple base-valid prompt variants.
+
 The prompt gate counts distinct protocol-valid prompt variants, not repeated
 token caps. A variant passes only if every protocol-valid cap condition has
 nonnegative lift and does not regress malformed or cap-hit rate beyond the

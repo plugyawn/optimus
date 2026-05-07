@@ -47,8 +47,14 @@ python -m randopt_lora_lab.vllm_lora_search \
   --holdout-prompts 256 \
   --prompt-variants default,reordered \
   --score-mode robust_min \
+  --min-selection-prompt-variants 2 \
   --stop-at-answer
 ```
+
+Search scoring excludes prompt variants where the base model itself violates
+the malformed/cap-hit protocol thresholds; those variants remain logged as
+stress conditions. Method-quality claims still require multiple base-valid,
+semantically equivalent prompt variants.
 
 Dense Gaussian vs LoRA capacity audit:
 

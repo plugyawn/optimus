@@ -16,7 +16,13 @@ import numpy as np
 
 from .countdown import load_examples, unique_example_count, unique_semantic_example_count
 from .prompt_variants import make_variant_prompts
-from .selection_score import combine_candidate_conditions, enrich_condition_rows, parse_prompt_variants
+from .selection_score import (
+    combine_candidate_conditions,
+    enrich_condition_rows,
+    filter_condition_rows_by_variants,
+    parse_prompt_variants,
+    protocol_valid_variants,
+)
 from .vllm_lora_bench import (
     AdapterSpec,
     Candidate,
@@ -97,12 +103,30 @@ def reset_outputs(out: Path) -> None:
         "adapters.jsonl",
         "candidate_summary.jsonl",
         "candidate_condition_summary.jsonl",
+        "holdout_candidate_summary.jsonl",
+        "holdout_candidate_condition_summary.jsonl",
         "per_prompt.jsonl",
         "holdout_per_prompt.jsonl",
     ]:
         path = out / name
         if path.exists():
             path.unlink()
+
+
+def selection_variants_or_raise(base_by_variant: dict[str, dict], args, *, split: str) -> list[str]:
+    valid = protocol_valid_variants(
+        base_by_variant,
+        max_malformed=args.max_base_malformed_for_selection,
+        max_cap_hit=args.max_base_cap_hit_for_selection,
+    )
+    if len(valid) < args.min_selection_prompt_variants:
+        invalid = sorted(set(base_by_variant) - set(valid))
+        raise RuntimeError(
+            f"{split} has only {len(valid)} base-valid prompt variants {valid}; "
+            f"need at least {args.min_selection_prompt_variants}. "
+            f"Stress/invalid variants: {invalid}."
+        )
+    return valid
 
 
 def mixed_eval(
@@ -243,6 +267,10 @@ def run_search(args) -> dict:
         rows, metrics = base_eval(llm, sampling, holdout, args, mode="base_holdout", prompt_variant=variant)
         base_holdout_rows.extend(rows)
         base_holdout_by_variant[variant] = metrics
+    screen_selection_variants = selection_variants_or_raise(base_screen_by_variant, args, split="screen")
+    holdout_selection_variants = selection_variants_or_raise(base_holdout_by_variant, args, split="holdout")
+    screen_stress_variants = sorted(set(prompt_variants) - set(screen_selection_variants))
+    holdout_stress_variants = sorted(set(prompt_variants) - set(holdout_selection_variants))
     write_jsonl(out / "per_prompt.jsonl", base_screen_rows)
     write_jsonl(out / "holdout_per_prompt.jsonl", base_holdout_rows)
 
@@ -265,14 +293,24 @@ def run_search(args) -> dict:
         screen_aggregate["elapsed_s"] += aggregate["elapsed_s"]
         screen_aggregate["output_tokens"] += aggregate["output_tokens"]
     write_jsonl(out / "per_prompt.jsonl", screen_rows)
+    screen_selection_condition_rows = filter_condition_rows_by_variants(
+        screen_condition_rows,
+        screen_selection_variants,
+    )
     screen_condition_rows = enrich_condition_rows(
         screen_condition_rows,
         base_screen_by_variant,
         malformed_penalty=args.malformed_penalty,
         cap_hit_penalty=args.cap_hit_penalty,
     )
+    screen_selection_condition_rows = enrich_condition_rows(
+        screen_selection_condition_rows,
+        base_screen_by_variant,
+        malformed_penalty=args.malformed_penalty,
+        cap_hit_penalty=args.cap_hit_penalty,
+    )
     candidate_rows = combine_candidate_conditions(
-        screen_condition_rows,
+        screen_selection_condition_rows,
         base_screen_by_variant,
         score_mode=args.score_mode,
         malformed_penalty=args.malformed_penalty,
@@ -302,20 +340,32 @@ def run_search(args) -> dict:
         holdout_condition_rows.extend(condition_rows)
         holdout_aggregate["elapsed_s"] += aggregate["elapsed_s"]
         holdout_aggregate["output_tokens"] += aggregate["output_tokens"]
+    holdout_selection_condition_rows = filter_condition_rows_by_variants(
+        holdout_condition_rows,
+        holdout_selection_variants,
+    )
     holdout_condition_rows = enrich_condition_rows(
         holdout_condition_rows,
         base_holdout_by_variant,
         malformed_penalty=args.malformed_penalty,
         cap_hit_penalty=args.cap_hit_penalty,
     )
+    holdout_selection_condition_rows = enrich_condition_rows(
+        holdout_selection_condition_rows,
+        base_holdout_by_variant,
+        malformed_penalty=args.malformed_penalty,
+        cap_hit_penalty=args.cap_hit_penalty,
+    )
     holdout_candidate_rows = combine_candidate_conditions(
-        holdout_condition_rows,
+        holdout_selection_condition_rows,
         base_holdout_by_variant,
         score_mode=args.score_mode,
         malformed_penalty=args.malformed_penalty,
         cap_hit_penalty=args.cap_hit_penalty,
     )
     write_jsonl(out / "holdout_per_prompt.jsonl", holdout_rows)
+    write_jsonl(out / "holdout_candidate_condition_summary.jsonl", holdout_condition_rows)
+    write_jsonl(out / "holdout_candidate_summary.jsonl", holdout_candidate_rows)
 
     by_candidate_holdout = {row["candidate"]: row for row in holdout_candidate_rows}
     top_holdout = [by_candidate_holdout[row["candidate"]] for row in top if row["candidate"] in by_candidate_holdout]
@@ -339,9 +389,16 @@ def run_search(args) -> dict:
         "targets": targets,
         "antithetic": args.antithetic,
         "prompt_variants": prompt_variants,
+        "screen_selection_prompt_variants": screen_selection_variants,
+        "screen_stress_prompt_variants": screen_stress_variants,
+        "holdout_selection_prompt_variants": holdout_selection_variants,
+        "holdout_stress_prompt_variants": holdout_stress_variants,
         "score_mode": args.score_mode,
         "malformed_penalty": args.malformed_penalty,
         "cap_hit_penalty": args.cap_hit_penalty,
+        "max_base_malformed_for_selection": args.max_base_malformed_for_selection,
+        "max_base_cap_hit_for_selection": args.max_base_cap_hit_for_selection,
+        "min_selection_prompt_variants": args.min_selection_prompt_variants,
         "screen_prompts": len(screen),
         "holdout_prompts": len(holdout),
         "screen_unique_prompts": unique_example_count(screen),
@@ -426,6 +483,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--score-mode", default="exact", choices=["exact", "robust_mean", "robust_min"])
     p.add_argument("--malformed-penalty", type=float, default=1.0)
     p.add_argument("--cap-hit-penalty", type=float, default=1.0)
+    p.add_argument("--max-base-malformed-for-selection", type=float, default=0.05)
+    p.add_argument("--max-base-cap-hit-for-selection", type=float, default=0.05)
+    p.add_argument("--min-selection-prompt-variants", type=int, default=1)
     p.add_argument(
         "--family",
         default="isotropic",

@@ -1,6 +1,12 @@
 import unittest
 
-from randopt_lora_lab.selection_score import combine_candidate_conditions, enrich_condition_rows, parse_prompt_variants
+from randopt_lora_lab.selection_score import (
+    combine_candidate_conditions,
+    enrich_condition_rows,
+    filter_condition_rows_by_variants,
+    parse_prompt_variants,
+    protocol_valid_variants,
+)
 
 
 class SelectionScoreTests(unittest.TestCase):
@@ -46,6 +52,30 @@ class SelectionScoreTests(unittest.TestCase):
         self.assertAlmostEqual(row["malformed_regression_vs_base"], 0.1)
         self.assertAlmostEqual(row["cap_hit_regression_vs_base"], 0.2)
         self.assertAlmostEqual(row["condition_selection_score"], 0.1 - 2.0 * 0.1 - 3.0 * 0.2)
+
+    def test_protocol_valid_variants_excludes_collapsed_base_prompts(self):
+        base = {
+            "default": {"exact_mean": 0.1, "malformed_mean": 0.0, "cap_hit_mean": 0.0},
+            "tight": {"exact_mean": 0.0, "malformed_mean": 0.8, "cap_hit_mean": 0.2},
+            "capped": {"exact_mean": 0.05, "malformed_mean": 0.0, "cap_hit_mean": 0.2},
+        }
+
+        self.assertEqual(
+            protocol_valid_variants(base, max_malformed=0.05, max_cap_hit=0.05),
+            ["default"],
+        )
+
+    def test_filter_condition_rows_keeps_only_selector_variants(self):
+        rows = [
+            {"candidate": "x", "prompt_variant": "default"},
+            {"candidate": "x", "prompt_variant": "tight"},
+            {"candidate": "y", "prompt_variant": "default"},
+        ]
+
+        filtered = filter_condition_rows_by_variants(rows, ["default"])
+
+        self.assertEqual([row["candidate"] for row in filtered], ["x", "y"])
+        self.assertTrue(all(row["prompt_variant"] == "default" for row in filtered))
 
 
 if __name__ == "__main__":
