@@ -116,3 +116,24 @@ dense-Gaussian ranking parity and did not improve reference-path speed.
 ArXiv 2602.07729 reports that successful SGD RLVR full fine-tuning can be extremely sparse and low-effective-rank compared with AdamW. That means dense Gaussian is a useful reference baseline, but not necessarily the target geometry we ultimately want. Future parity reports should include sparse/low-rank update geometry metrics, not only dense-vs-LoRA candidate ranking.
 
 See `docs/sgd_rlvr_sparse_updates.md`.
+
+## Elite Aggregation Is A Separate Question
+
+The rank sweep also enabled a first probe of whether many sampled perturbations
+can be combined after screening. `results/aggregate_rank32_top4_score` builds a
+rank-128 adapter by concatenating the top four rank-32 factor-LoRA candidates
+and weighting the `B` factors by screen score.
+
+This is not evidence that factor-Gaussian LoRA matches dense Gaussian search:
+the single-candidate rank-8 and rank-32 parity gates failed. It is instead
+evidence that post-search aggregation may be a useful follow-on once the sample
+size is large enough.
+
+| aggregate | holdout exact | holdout lift over base | cap-hit |
+| --- | ---: | ---: | ---: |
+| rank-8 top-4 -> rank-32 | 1.172% | -7.812 pp | 1.562% |
+| rank-32 top-4 -> rank-128 | 14.062% | +5.078 pp | 25.781% |
+
+The rank-32 aggregate is promising but not clean. Its cap-hit rate is high, so
+the next evaluation must rerun the aggregate and its elite constituents under
+higher token caps and an answer-only prompt before treating the lift as real.

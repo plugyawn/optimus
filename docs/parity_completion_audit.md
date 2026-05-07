@@ -37,6 +37,7 @@ search-utility parity.
 | Convenience | LoRA adapters are materialized as portable safetensors | partial |
 | Robustness | generated non-overlap data, cap-hit/malformed logging, paired holdout rows | partial |
 | Paper-aligned geometry | sparse SGD RLVR note added after arXiv 2602.07729 | hypothesis only |
+| Sample-size aggregation | rank-32 top-4 score-weighted aggregate improved holdout, but with high cap-hit | promising, invalid until cap audit |
 
 ## Next Gate
 
@@ -72,3 +73,18 @@ wrong even though the rank budget can carry useful directions.
 
 If both projected and factor-Gaussian fail, low-rank serveable search is not yet
 competitive with dense Gaussian on this task and model.
+
+## Aggregate Probe Update
+
+`results/aggregate_rank32_top4_score` tested whether a large candidate sample
+can be turned into a stronger adapter by concatenating elite LoRA factors. This
+is not dense-Gaussian parity; it tests a separate "large sample unlock" idea.
+
+| base rank | aggregate rank | base holdout exact | aggregate holdout exact | holdout lift | holdout cap-hit | verdict |
+| ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 8 | 32 | 8.984% | 1.172% | -7.812 pp | 1.562% | fail |
+| 32 | 128 | 8.984% | 14.062% | +5.078 pp | 25.781% | promising but not valid yet |
+
+The rank-32 aggregate is the first positive evidence for combining sampled
+perturbations after search. The high cap-hit rate means it cannot support a
+quality claim until a token-cap and answer-only prompt audit confirms the lift.

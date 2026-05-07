@@ -67,3 +67,19 @@ python -m randopt_lora_lab.update_geometry \
 The paper does not prove LoRA RandOpt parity.
 
 It studies gradient-based RLVR over training trajectories, not one-shot zeroth-order perturbation selection. Its sparsity threshold is tied to bf16/numerical precision, so the exact sparsity values should not be transferred blindly. The result should steer our priors and evaluation design, not replace the dense-vs-LoRA baseline.
+
+## Re-read Notes
+
+The strongest project-relevant details are:
+
+```text
+1. AdamW's second-moment distribution is much less heterogeneous in RLVR than SFT.
+2. AdamW momentum can be stale in online RL; the paper reports near-zero RL gradient/momentum alignment at one profiled step.
+3. SGD needs much larger nominal learning rates because AdamW's effective per-parameter rates are far above its nominal LR.
+4. SGD-style RLVR updates in Table 4 have about 99.84%-99.99% sparsity and 99%-energy effective ranks around 23.6-26.1 in Qwen settings.
+```
+
+For this lab, the paper should push us toward sparse-plus-low-rank search
+families and skepticism toward accumulated stale directions. It should not make
+us skip parity gates, because the paper studies trained RLVR gradients rather
+than sampled zeroth-order perturbations.
