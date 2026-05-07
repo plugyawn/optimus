@@ -1,0 +1,66 @@
+{
+  "adapter_tensor_summary": {
+    "checked": 1152,
+    "pass": true,
+    "reason": "",
+    "sampled_adapters": 8
+  },
+  "candidate": "results/backend_parity_gate_current_p64/vllm",
+  "kind": "backend_parity_gate",
+  "output_diff_summary": {
+    "metrics": {
+      "answer_equal_rate": 0.597900390625,
+      "exact_disagreement_rate": 0.02587890625,
+      "max_abs_cap_hit_delta_by_candidate": 0.953125,
+      "max_abs_exact_delta_by_candidate": 0.125,
+      "max_abs_malformed_delta_by_candidate": 0.703125
+    },
+    "pass": false,
+    "summary": "results/backend_parity_gate_current_p64/output_diff/summary.json",
+    "thresholds": {
+      "max_abs_cap_hit_delta": 0.0,
+      "max_abs_exact_delta": 0.0,
+      "max_abs_malformed_delta": 0.0,
+      "max_exact_disagreement_rate": 0.0,
+      "min_answer_equal_rate": 0.99
+    }
+  },
+  "pass": false,
+  "pass_adapter_tensors": true,
+  "pass_base_rows": true,
+  "pass_output_diff": false,
+  "pass_protocol": true,
+  "pass_ranking": false,
+  "ranking": {
+    "candidate_best_candidate": "factor_gaussian_lora:seed1411240924:s0.0075:sign1",
+    "candidate_best_score": 0.1875,
+    "candidate_best_trusted_score": 0.21875,
+    "candidate_dir": "results/backend_parity_gate_current_p64/vllm",
+    "candidate_name": "vllm",
+    "kind": "backend_parity",
+    "max_abs_score_delta": 0.125,
+    "mean_abs_score_delta": 0.01953125,
+    "n_candidate": 64,
+    "n_common": 64,
+    "n_trusted": 64,
+    "pass": false,
+    "pass_spearman_gate": false,
+    "pass_top8_gate": true,
+    "pearson": 0.7930670922667058,
+    "selected_regret_vs_trusted": 0.0,
+    "spearman": 0.6191221684295777,
+    "spearman_gate": 0.85,
+    "top16_overlap": 10,
+    "top16_possible": 16,
+    "top4_overlap": 4,
+    "top4_possible": 4,
+    "top8_gate": 6,
+    "top8_overlap": 6,
+    "top8_possible": 8,
+    "trusted_best_candidate": "factor_gaussian_lora:seed1411240924:s0.0075:sign1",
+    "trusted_best_score": 0.21875,
+    "trusted_dir": "results/backend_parity_gate_current_p64/peft",
+    "trusted_name": "peft"
+  },
+  "trusted": "results/backend_parity_gate_current_p64/peft"
+}
