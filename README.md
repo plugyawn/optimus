@@ -162,6 +162,22 @@ python -m randopt_lora_lab.backend_next_token_probe \
   --candidate factor_gaussian_lora:seed1019282515:s0.0075:sign1
 ```
 
+Short rollout parity probe for the same failed gate:
+
+```bash
+python -m randopt_lora_lab.backend_rollout_probe \
+  --out results/backend_rollout_probe_p16 \
+  --data "$DATA" \
+  --prompts 8 \
+  --seed 4242 \
+  --rank 8 \
+  --max-new-tokens 32 \
+  --stop-at-answer \
+  --include-zero \
+  --candidate factor_gaussian_lora:seed509771609:s0.0075:sign-1 \
+  --candidate factor_gaussian_lora:seed1019282515:s0.0075:sign1
+```
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 The current completion checklist is in `docs/parity_completion_audit.md`.
 

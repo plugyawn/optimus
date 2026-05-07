@@ -1,0 +1,89 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files:  50%|█████     | 1/2 [00:11<00:11, 11.02s/it]Fetching 2 files: 100%|██████████| 2/2 [00:11<00:00,  5.51s/it]
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.21it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.62it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.54it/s]
+INFO 05-07 09:38:52 config.py:350] This model supports multiple tasks: {'embedding', 'generate'}. Defaulting to 'generate'.
+INFO 05-07 09:38:52 llm_engine.py:249] Initializing an LLM engine (v0.6.4.post1) with config: model='Qwen/Qwen2.5-3B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-3B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=True, dtype=torch.bfloat16, max_seq_len=1024, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, kv_cache_dtype=auto, quantization_param_path=None, device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='outlines'), observability_config=ObservabilityConfig(otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=0, served_model_name=Qwen/Qwen2.5-3B-Instruct, num_scheduler_steps=1, chunked_prefill_enabled=False multi_step_stream_outputs=True, enable_prefix_caching=False, use_async_output_proc=True, use_cached_outputs=False, chat_template_text_format=string, mm_processor_kwargs=None, pooler_config=None)
+INFO 05-07 09:38:53 selector.py:135] Using Flash Attention backend.
+INFO 05-07 09:38:53 model_runner.py:1072] Starting to load model Qwen/Qwen2.5-3B-Instruct...
+INFO 05-07 09:38:53 weight_utils.py:243] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:00<00:00,  1.58it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  1.73it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  1.70it/s]
+
+INFO 05-07 09:38:55 model_runner.py:1077] Loading model weights took 5.7915 GB
+INFO 05-07 09:38:58 worker.py:232] Memory profiling results: total_gpu_memory=79.25GiB initial_memory_usage=12.21GiB peak_torch_memory=13.02GiB memory_usage_post_profile=12.24GiB non_torch_memory=0.60GiB kv_cache_size=51.36GiB gpu_memory_utilization=0.82
+INFO 05-07 09:38:58 gpu_executor.py:113] # GPU blocks: 93491, # CPU blocks: 7281
+INFO 05-07 09:38:58 gpu_executor.py:117] Maximum concurrency for 1024 tokens per request: 1460.80x
+INFO 05-07 09:39:02 model_runner.py:1400] Capturing cudagraphs for decoding. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI.
+INFO 05-07 09:39:02 model_runner.py:1404] If out-of-memory error occurs during cudagraph capture, consider decreasing `gpu_memory_utilization` or switching to eager mode. You can also reduce the `max_num_seqs` as needed to decrease memory usage.
+INFO 05-07 09:39:24 model_runner.py:1518] Graph capturing finished in 22 secs, took 0.37 GiB
+Exception in thread Thread-3 (_report_usage_worker):
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/threading.py", line 1016, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.10/threading.py", line 953, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/ubuntu/work/randopt-lora-lab/.venv/lib/python3.10/site-packages/vllm/usage/usage_lib.py", line 148, in _report_usage_worker
+    self._report_usage_once(model_architecture, usage_context, extra_kvs)
+  File "/home/ubuntu/work/randopt-lora-lab/.venv/lib/python3.10/site-packages/vllm/usage/usage_lib.py", line 187, in _report_usage_once
+    self._write_to_file(data)
+  File "/home/ubuntu/work/randopt-lora-lab/.venv/lib/python3.10/site-packages/vllm/usage/usage_lib.py", line 216, in _write_to_file
+    os.makedirs(os.path.dirname(_USAGE_STATS_JSON_PATH), exist_ok=True)
+  File "/usr/lib/python3.10/os.py", line 225, in makedirs
+    mkdir(name, mode)
+PermissionError: [Errno 13] Permission denied: '/home/ubuntu/.config/vllm'
+/home/ubuntu/work/randopt-lora-lab/randopt_lora_lab/backend_next_token_probe.py:117: DeprecationWarning: The 'lora_local_path' attribute is deprecated and will be removed in a future version. Please use 'lora_path' instead.
+  request = None if spec is None else LoRARequest(spec.name, spec.lora_int_id, spec.path)
+WARNING 05-07 09:39:26 tokenizer.py:191] No tokenizer found in /home/ubuntu/work/randopt-lora-lab/results/backend_next_token_probe_p16/adapters/0000_zero, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:39:28 tokenizer.py:191] No tokenizer found in /home/ubuntu/work/randopt-lora-lab/results/backend_next_token_probe_p16/adapters/0001_factor_gaussian_lora_seed509771609_s0.0075_sign-1, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:39:29 tokenizer.py:191] No tokenizer found in /home/ubuntu/work/randopt-lora-lab/results/backend_next_token_probe_p16/adapters/0002_factor_gaussian_lora_seed1019282515_s0.0075_sign1, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+{
+  "candidate_conditions": [
+    "factor_gaussian_lora:seed509771609:s0.0075:sign-1",
+    "factor_gaussian_lora:seed1019282515:s0.0075:sign1"
+  ],
+  "conditions": {
+    "base": {
+      "max_common_abs_logprob_delta": 0.9999208450317383,
+      "mean_text_equal": 1.0,
+      "mean_topk_overlap": 19.125,
+      "n": 8,
+      "top1_equal_rate": 1.0
+    },
+    "factor_gaussian_lora:seed1019282515:s0.0075:sign1": {
+      "max_common_abs_logprob_delta": 0.42329835891723633,
+      "mean_text_equal": 1.0,
+      "mean_topk_overlap": 19.25,
+      "n": 8,
+      "top1_equal_rate": 1.0
+    },
+    "factor_gaussian_lora:seed509771609:s0.0075:sign-1": {
+      "max_common_abs_logprob_delta": 0.8708066940307617,
+      "mean_text_equal": 1.0,
+      "mean_topk_overlap": 19.25,
+      "n": 8,
+      "top1_equal_rate": 1.0
+    },
+    "zero": {
+      "max_common_abs_logprob_delta": 0.9999208450317383,
+      "mean_text_equal": 1.0,
+      "mean_topk_overlap": 19.125,
+      "n": 8,
+      "top1_equal_rate": 1.0
+    }
+  },
+  "kind": "backend_next_token_probe",
+  "load_s": 38.72544240951538,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "overall_top1_equal_rate": 1.0,
+  "prompts": 8,
+  "rank": 8,
+  "rows": 32,
+  "targets": [
+    "q_proj",
+    "v_proj"
+  ],
+  "top_k": 20
+}
+[rank0]:[W507 09:39:32.516578543 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())

@@ -121,6 +121,41 @@ interpreted. If base/zero fails, the issue is backend decoding/logprob
 semantics. If base/zero passes and candidates fail, the issue is LoRA adapter
 application/scaling semantics.
 
+First next-token probe: `results/backend_next_token_probe_p16` passed top-1
+parity for base, zero, and the two disagreement candidates on 8 prompts
+(`overall_top1_equal_rate=1.0`). That rules out a first-token top-1 mismatch as
+the main reason for the P=16 ranking failure, but the common-token logprob
+deltas were still large.
+
+Short rollout probe:
+
+```bash
+python -m randopt_lora_lab.backend_rollout_probe \
+  --out results/backend_rollout_probe_p16 \
+  --data data/countdown_generated_1200_seed20260507.json \
+  --prompts 8 \
+  --seed 4242 \
+  --rank 8 \
+  --max-new-tokens 32 \
+  --stop-at-answer \
+  --include-zero \
+  --candidate factor_gaussian_lora:seed509771609:s0.0075:sign-1 \
+  --candidate factor_gaussian_lora:seed1019282515:s0.0075:sign1
+```
+
+Rollout result: `results/backend_rollout_probe_p16` shows base and zero are
+mostly aligned (`text_equal_rate=0.875`), but adapter rollouts diverge even
+though first-token top-1 matched. Candidate
+`factor_gaussian_lora:seed509771609:s0.0075:sign-1` had `text_equal_rate=0.25`,
+PEFT cap-hit `1.0`, vLLM cap-hit `0.0`, and mean absolute output-token delta
+`16.625`. Candidate `factor_gaussian_lora:seed1019282515:s0.0075:sign1` had
+`text_equal_rate=0.0`, PEFT cap-hit `0.875`, vLLM cap-hit `0.375`, and mean
+absolute output-token delta `9.5`.
+
+Interpretation: first-token checks are necessary but not sufficient. Exact
+reward can hide backend disagreement when both completions are wrong; rollout
+parity and cap/malformed parity must be part of the vLLM selector gate.
+
 Then run a rank sweep before any broader LoRA-vs-dense claim:
 
 ```bash
