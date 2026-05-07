@@ -53,6 +53,11 @@ def lora_noise_tensors(
 
     family_state = family_state or {}
     canonical_name = canonical_module_name(module_name)
+    lookup_key = state_key or module_name
+    if lookup_key in family_state and isinstance(family_state[lookup_key], dict):
+        spec = family_state[lookup_key]
+        if "fixed_a" in spec and "fixed_b" in spec:
+            return spec["fixed_a"].cpu().float().contiguous(), spec["fixed_b"].cpu().float().contiguous()
     if candidate.family == "projected_gaussian_rank_r":
         gen = torch.Generator(device="cpu")
         gen.manual_seed((candidate.seed + stable_int(canonical_name + ":dense_gaussian")) % (2**63 - 1))
@@ -63,7 +68,6 @@ def lora_noise_tensors(
     gen.manual_seed((candidate.seed + stable_int(canonical_name)) % (2**63 - 1))
     a_noise = torch.randn(tuple(a_shape), generator=gen, dtype=torch.float32)
     b_noise = torch.randn(tuple(b_shape), generator=gen, dtype=torch.float32)
-    lookup_key = state_key or module_name
     if candidate.family in {"anzo", "target_svd", "random_ortho", "anzo_random_target"} and lookup_key in family_state:
         basis = family_state[lookup_key].cpu().float()
         rows = min(a_noise.shape[0], basis.shape[0])

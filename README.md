@@ -102,6 +102,25 @@ not depend on LoRA rank.
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 The current completion checklist is in `docs/parity_completion_audit.md`.
 
+Elite aggregate probe:
+
+```bash
+python -m randopt_lora_lab.aggregate_lora \
+  --source-run results/gaussian_parity_rank_sweep_factor_only/rank8/lora \
+  --out results/aggregate_rank8_top4 \
+  --base-rank 8 \
+  --top-k 4 \
+  --weight-mode score \
+  --data "$DATA" \
+  --prompts 64 \
+  --holdout-prompts 256 \
+  --stop-at-answer
+```
+
+This tests whether a population can be used to form a single serveable adapter:
+the weighted sum of `k` rank-`r` LoRA updates is represented exactly as one
+rank-`k*r` adapter by concatenating the factors.
+
 ## Evidence Rules
 
 - Zero LoRA must match base outputs.
