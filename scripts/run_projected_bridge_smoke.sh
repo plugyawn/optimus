@@ -3,6 +3,7 @@ set -euo pipefail
 
 BASE_OUT=${BASE_OUT:-results/projected_bridge_smoke_p16}
 DATA=${DATA:-data/countdown_generated_1200_seed20260507.json}
+PYTHON=${PYTHON:-python}
 RANKS=${RANKS:-8,32,64}
 POPULATION=${POPULATION:-16}
 PROMPTS=${PROMPTS:-64}
@@ -16,7 +17,7 @@ BATCH_SIZE=${BATCH_SIZE:-32}
 REUSE_DENSE=${REUSE_DENSE:-1}
 
 if [[ ! -f "$DATA" ]]; then
-  python -m randopt_lora_lab.make_countdown_data \
+  "$PYTHON" -m randopt_lora_lab.make_countdown_data \
     --out "$DATA" \
     --count 1200 \
     --seed 20260507
@@ -24,6 +25,7 @@ fi
 
 BASE_OUT="$BASE_OUT" \
 DATA="$DATA" \
+PYTHON="$PYTHON" \
 RANKS="$RANKS" \
 REUSE_DENSE="$REUSE_DENSE" \
 POPULATION="$POPULATION" \
@@ -45,7 +47,7 @@ for rank in "${rank_values[@]}"; do
   for arm in dense lora projected; do
     run_dir="$BASE_OUT/rank${rank}/${arm}"
     [[ -f "$run_dir/summary.json" ]] || continue
-    python -m randopt_lora_lab.result_validity \
+    "$PYTHON" -m randopt_lora_lab.result_validity \
       --run "$run_dir" \
       --out "$run_dir/validity"
   done

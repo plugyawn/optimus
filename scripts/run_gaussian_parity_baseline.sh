@@ -4,6 +4,7 @@ set -euo pipefail
 DATA=${DATA:-data/countdown_generated_1200_seed20260507.json}
 MODEL=${MODEL:-Qwen/Qwen2.5-3B-Instruct}
 OUT=${OUT:-results/gaussian_parity_baseline}
+PYTHON=${PYTHON:-python}
 POPULATION=${POPULATION:-64}
 PROMPTS=${PROMPTS:-64}
 HOLDOUT_PROMPTS=${HOLDOUT_PROMPTS:-256}
@@ -46,7 +47,7 @@ if [[ "$DENSE_NOISE_MODE" != "canonical" ]]; then
 fi
 
 if [[ ! -f "$DATA" ]]; then
-  python -m randopt_lora_lab.make_countdown_data \
+  "$PYTHON" -m randopt_lora_lab.make_countdown_data \
     --out "$DATA" \
     --count 1200 \
     --seed 20260507
@@ -57,7 +58,7 @@ if [[ -n "$DENSE_REF_DIR" ]]; then
   mkdir -p "$OUT"
   cp -a "$DENSE_REF_DIR" "$OUT/dense"
 elif [[ "$RUN_DENSE" == "1" ]]; then
-  python -m randopt_lora_lab.experiments search \
+  "$PYTHON" -m randopt_lora_lab.experiments search \
     --out "$OUT/dense" \
     --model "$MODEL" \
     --data "$DATA" \
@@ -81,7 +82,7 @@ elif [[ ! -f "$OUT/dense/summary.json" ]]; then
   exit 1
 fi
 
-python -m randopt_lora_lab.experiments search \
+"$PYTHON" -m randopt_lora_lab.experiments search \
   --out "$OUT/lora" \
   --model "$MODEL" \
   --data "$DATA" \
@@ -102,7 +103,7 @@ python -m randopt_lora_lab.experiments search \
 
 extra_candidates=()
 if [[ "$INCLUDE_PROJECTED" == "1" ]]; then
-  python -m randopt_lora_lab.experiments search \
+  "$PYTHON" -m randopt_lora_lab.experiments search \
     --out "$OUT/projected" \
     --model "$MODEL" \
     --data "$DATA" \
@@ -123,7 +124,7 @@ if [[ "$INCLUDE_PROJECTED" == "1" ]]; then
   extra_candidates+=(--candidate "projected=$OUT/projected")
 fi
 
-python -m randopt_lora_lab.parity_report \
+"$PYTHON" -m randopt_lora_lab.parity_report \
   --dense "$OUT/dense" \
   --lora "$OUT/lora" \
   "${extra_candidates[@]}" \
