@@ -111,11 +111,17 @@ def tensor_digest(tensor: torch.Tensor) -> str:
 def resolve_adapter_model_path(candidate_dir: Path, spec: dict) -> Path:
     recorded_dir = Path(spec["path"])
     recorded_path = recorded_dir / "adapter_model.safetensors"
-    if recorded_path.exists():
-        return recorded_path
+    try:
+        if recorded_path.exists():
+            return recorded_path
+    except OSError:
+        pass
     fallback_path = candidate_dir / "adapters" / recorded_dir.name / "adapter_model.safetensors"
-    if fallback_path.exists():
-        return fallback_path
+    try:
+        if fallback_path.exists():
+            return fallback_path
+    except OSError:
+        pass
     return recorded_path
 
 
