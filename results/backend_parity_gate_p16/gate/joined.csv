@@ -1,0 +1,17 @@
+abs_score_delta,candidate,candidate_rank,peft_exact_mean,rank_delta,trusted_rank,vllm_exact_mean
+0.0625,factor_gaussian_lora:seed1019282515:s0.0075:sign1,2.0,0.0,7.5,9.5,0.0625
+0.0625,factor_gaussian_lora:seed1837932928:s0.0075:sign-1,2.0,0.0,7.5,9.5,0.0625
+0.0625,factor_gaussian_lora:seed1530295774:s0.0075:sign-1,2.0,0.0,7.5,9.5,0.0625
+0.0,factor_gaussian_lora:seed1019282515:s0.0075:sign-1,10.0,0.0,0.5,9.5,0.0
+0.0,factor_gaussian_lora:seed1679872250:s0.0075:sign1,10.0,0.0,0.5,9.5,0.0
+0.0,factor_gaussian_lora:seed1679872250:s0.0075:sign-1,10.0,0.0,0.5,9.5,0.0
+0.0625,factor_gaussian_lora:seed1837932928:s0.0075:sign1,10.0,0.0625,8.0,2.0,0.0
+0.0,factor_gaussian_lora:seed1442006728:s0.0075:sign1,10.0,0.0,0.5,9.5,0.0
+0.0,factor_gaussian_lora:seed1442006728:s0.0075:sign-1,10.0,0.0,0.5,9.5,0.0
+0.0,factor_gaussian_lora:seed221822464:s0.0075:sign1,10.0,0.0,0.5,9.5,0.0
+0.0,factor_gaussian_lora:seed221822464:s0.0075:sign-1,10.0,0.0,0.5,9.5,0.0
+0.0,factor_gaussian_lora:seed509771609:s0.0075:sign1,10.0,0.0,0.5,9.5,0.0
+0.125,factor_gaussian_lora:seed509771609:s0.0075:sign-1,10.0,0.125,9.0,1.0,0.0
+0.0,factor_gaussian_lora:seed1530295774:s0.0075:sign1,10.0,0.0,0.5,9.5,0.0
+0.0,factor_gaussian_lora:seed385390264:s0.0075:sign1,10.0,0.0,0.5,9.5,0.0
+0.0,factor_gaussian_lora:seed385390264:s0.0075:sign-1,10.0,0.0,0.5,9.5,0.0

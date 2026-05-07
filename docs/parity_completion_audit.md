@@ -40,6 +40,7 @@ search-utility parity.
 | Sample-size aggregation | rank-32 top-4 score-weighted aggregate improved holdout, but with high cap-hit | promising, invalid until cap audit |
 | Sparse-low-rank family | `sparse_low_rank_lora` implemented with density variants and variance matching | implemented, not run |
 | Prompt robustness | prompt-relative report gate added; method claims require multiple valid prompt templates | implemented, not passed |
+| vLLM backend parity | P=16 gate passed protocol/base/tensor checks but failed ranking with Spearman -0.181 | missing |
 
 ## Next Gate
 
@@ -67,6 +68,22 @@ Pass criteria:
 
 Only after that gate passes should vLLM results be used as quality-selection
 evidence. Until then, vLLM results are systems/plumbing evidence only.
+
+First gate result: `results/backend_parity_gate_p16` failed. The run had
+matching protocol metadata, saved base rows, and `576/576` sampled adapter tensor
+checks passed across four kept adapters, but ranking parity failed:
+
+```text
+Spearman(PEFT, vLLM): -0.181164
+top-8 overlap: 7/8
+selected regret vs PEFT: 0.125
+PEFT candidate/sec: 0.717830
+vLLM candidate/sec: 6.616220
+```
+
+This preserves the systems speed signal but blocks vLLM as a selector of record.
+The next diagnosis is not a larger vLLM search; it is base/zero/candidate
+logit or next-token parity for the two disagreeing candidates.
 
 Then run a rank sweep before any broader LoRA-vs-dense claim:
 

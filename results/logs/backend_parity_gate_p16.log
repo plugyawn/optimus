@@ -1,0 +1,215 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files:  50%|█████     | 1/2 [00:28<00:28, 28.22s/it]Fetching 2 files: 100%|██████████| 2/2 [00:28<00:00, 14.11s/it]
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.30it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.78it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.68it/s]
+The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+1/16 factor_gaussian_lora:seed1019282515:s0.0075:sign1 exact=0.0000 elapsed=1.57
+2/16 factor_gaussian_lora:seed1019282515:s0.0075:sign-1 exact=0.0000 elapsed=1.53
+3/16 factor_gaussian_lora:seed1679872250:s0.0075:sign1 exact=0.0000 elapsed=1.46
+4/16 factor_gaussian_lora:seed1679872250:s0.0075:sign-1 exact=0.0000 elapsed=1.43
+5/16 factor_gaussian_lora:seed1837932928:s0.0075:sign1 exact=0.0625 elapsed=1.53
+6/16 factor_gaussian_lora:seed1837932928:s0.0075:sign-1 exact=0.0000 elapsed=0.83
+7/16 factor_gaussian_lora:seed1442006728:s0.0075:sign1 exact=0.0000 elapsed=1.50
+8/16 factor_gaussian_lora:seed1442006728:s0.0075:sign-1 exact=0.0000 elapsed=1.43
+9/16 factor_gaussian_lora:seed221822464:s0.0075:sign1 exact=0.0000 elapsed=0.81
+10/16 factor_gaussian_lora:seed221822464:s0.0075:sign-1 exact=0.0000 elapsed=1.52
+11/16 factor_gaussian_lora:seed509771609:s0.0075:sign1 exact=0.0000 elapsed=0.86
+12/16 factor_gaussian_lora:seed509771609:s0.0075:sign-1 exact=0.1250 elapsed=1.49
+13/16 factor_gaussian_lora:seed1530295774:s0.0075:sign1 exact=0.0000 elapsed=1.44
+14/16 factor_gaussian_lora:seed1530295774:s0.0075:sign-1 exact=0.0000 elapsed=1.46
+15/16 factor_gaussian_lora:seed385390264:s0.0075:sign1 exact=0.0000 elapsed=1.52
+16/16 factor_gaussian_lora:seed385390264:s0.0075:sign-1 exact=0.0000 elapsed=1.53
+{
+  "allow_repeat_data": false,
+  "antithetic": true,
+  "base_holdout_exact": 0.0,
+  "base_screen_exact": 0.0625,
+  "batch_size": 16,
+  "candidate_sec": 0.7178301195192941,
+  "data": "data/countdown_generated_1200_seed20260507.json",
+  "dtype": "bf16",
+  "family": "factor_gaussian_lora",
+  "holdout_prompts": 8,
+  "holdout_unique_prompts": 8,
+  "holdout_unique_semantic_prompts": 8,
+  "kind": "search",
+  "max_new_tokens": 32,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "pair_sec": 11.485281912308706,
+  "perturbation_backend": "lora",
+  "population": 16,
+  "promote": 0,
+  "rank": 8,
+  "screen_holdout_overlap": 0,
+  "screen_prompts": 16,
+  "screen_unique_prompts": 16,
+  "screen_unique_semantic_prompts": 16,
+  "seed": 4242,
+  "sigma": 0.0075,
+  "stop_at_answer": true,
+  "targets": "q_proj,v_proj",
+  "top_holdout": [],
+  "top_screen": []
+}
+`torch_dtype` is deprecated! Use `dtype` instead!
+INFO 05-07 09:03:57 config.py:350] This model supports multiple tasks: {'embedding', 'generate'}. Defaulting to 'generate'.
+INFO 05-07 09:03:57 llm_engine.py:249] Initializing an LLM engine (v0.6.4.post1) with config: model='Qwen/Qwen2.5-3B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-3B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=True, dtype=torch.bfloat16, max_seq_len=1024, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, kv_cache_dtype=auto, quantization_param_path=None, device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='outlines'), observability_config=ObservabilityConfig(otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=0, served_model_name=Qwen/Qwen2.5-3B-Instruct, num_scheduler_steps=1, chunked_prefill_enabled=False multi_step_stream_outputs=True, enable_prefix_caching=False, use_async_output_proc=True, use_cached_outputs=False, chat_template_text_format=string, mm_processor_kwargs=None, pooler_config=None)
+INFO 05-07 09:03:58 selector.py:135] Using Flash Attention backend.
+INFO 05-07 09:03:59 model_runner.py:1072] Starting to load model Qwen/Qwen2.5-3B-Instruct...
+INFO 05-07 09:03:59 weight_utils.py:243] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:00<00:00,  3.10it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  1.87it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:01<00:00,  1.99it/s]
+
+INFO 05-07 09:04:01 model_runner.py:1077] Loading model weights took 5.7915 GB
+INFO 05-07 09:04:04 worker.py:232] Memory profiling results: total_gpu_memory=79.14GiB initial_memory_usage=6.55GiB peak_torch_memory=7.43GiB memory_usage_post_profile=6.58GiB non_torch_memory=0.54GiB kv_cache_size=56.93GiB gpu_memory_utilization=0.82
+INFO 05-07 09:04:04 gpu_executor.py:113] # GPU blocks: 103629, # CPU blocks: 7281
+INFO 05-07 09:04:04 gpu_executor.py:117] Maximum concurrency for 1024 tokens per request: 1619.20x
+INFO 05-07 09:04:08 model_runner.py:1400] Capturing cudagraphs for decoding. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI.
+INFO 05-07 09:04:08 model_runner.py:1404] If out-of-memory error occurs during cudagraph capture, consider decreasing `gpu_memory_utilization` or switching to eager mode. You can also reduce the `max_num_seqs` as needed to decrease memory usage.
+INFO 05-07 09:04:28 model_runner.py:1518] Graph capturing finished in 20 secs, took 0.44 GiB
+/root/randopt-lora-lab/randopt_lora_lab/vllm_lora_search.py:130: DeprecationWarning: The 'lora_local_path' attribute is deprecated and will be removed in a future version. Please use 'lora_path' instead.
+  req = LoRARequest(spec.name, spec.lora_int_id, spec.path)
+WARNING 05-07 09:04:29 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00000_randopt_seed1019282515_s0.0075_pos, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:29 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00001_randopt_seed1019282515_s0.0075_neg, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:29 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00002_randopt_seed1679872250_s0.0075_pos, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:29 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00003_randopt_seed1679872250_s0.0075_neg, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:29 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00004_randopt_seed1837932928_s0.0075_pos, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:29 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00005_randopt_seed1837932928_s0.0075_neg, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:29 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00006_randopt_seed1442006728_s0.0075_pos, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:29 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00007_randopt_seed1442006728_s0.0075_neg, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:30 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00008_randopt_seed221822464_s0.0075_pos, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:30 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00009_randopt_seed221822464_s0.0075_neg, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:30 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00010_randopt_seed509771609_s0.0075_pos, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:30 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00011_randopt_seed509771609_s0.0075_neg, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:30 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00012_randopt_seed1530295774_s0.0075_pos, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:30 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00013_randopt_seed1530295774_s0.0075_neg, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:30 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00014_randopt_seed385390264_s0.0075_pos, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+WARNING 05-07 09:04:30 tokenizer.py:191] No tokenizer found in /root/randopt-lora-lab/results/backend_parity_gate_p16/vllm/adapters/00015_randopt_seed385390264_s0.0075_neg, using base model tokenizer instead. (Exception: expected str, bytes or os.PathLike object, not NoneType)
+{
+  "adapter_build_s": 1.3854236602783203,
+  "adapter_dtype": "bfloat16",
+  "adapters_kept": true,
+  "allow_repeat_data": false,
+  "antithetic": true,
+  "base_holdout_by_prompt": {
+    "default": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.172804594039917,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 133,
+      "prompt_variant": "default",
+      "prompts_per_sec": 46.29506550127967,
+      "tokens_per_sec": 769.6554639587746
+    }
+  },
+  "base_holdout_exact": 0.0,
+  "base_screen_by_prompt": {
+    "default": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.2178049087524414,
+      "exact_mean": 0.0625,
+      "malformed_mean": 0.0,
+      "output_tokens": 264,
+      "prompt_variant": "default",
+      "prompts_per_sec": 73.46023600499157,
+      "tokens_per_sec": 1212.093894082361
+    }
+  },
+  "base_screen_exact": 0.0625,
+  "best_prompts_per_sec": 105.85951273394883,
+  "best_tokens_per_sec": 2007.1956047288581,
+  "candidate_sec": 6.616219545871802,
+  "cap_hit_penalty": 1.0,
+  "chunk_adapters": 8,
+  "data": "data/countdown_generated_1200_seed20260507.json",
+  "dtype": "bfloat16",
+  "enforce_eager": false,
+  "eval_elapsed_s": 2.418299436569214,
+  "family": "factor_gaussian_lora",
+  "holdout_prompts": 8,
+  "holdout_tokens_per_sec": 0.0,
+  "holdout_unique_prompts": 8,
+  "holdout_unique_semantic_prompts": 8,
+  "kind": "vllm_lora_search",
+  "load_s": 37.894699573516846,
+  "malformed_penalty": 1.0,
+  "max_loras": 8,
+  "max_new_tokens": 32,
+  "max_num_batched_tokens": 0,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "population": 16,
+  "promote": 0,
+  "prompt_variants": [
+    "default"
+  ],
+  "rank": 8,
+  "score_mode": "exact",
+  "screen_candidate_sec": 6.616219545871802,
+  "screen_holdout_overlap": 0,
+  "screen_prompts": 16,
+  "screen_prompts_per_sec": 105.85951273394883,
+  "screen_tokens_per_sec": 2007.1956047288581,
+  "screen_unique_prompts": 16,
+  "screen_unique_semantic_prompts": 16,
+  "seed": 4242,
+  "sigma": 0.0075,
+  "stop_at_answer": true,
+  "targets": [
+    "q_proj",
+    "v_proj"
+  ],
+  "top_holdout": [],
+  "top_screen": []
+}
+[rank0]:[W507 09:04:32.231959631 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+{
+  "adapter_tensor_summary": {
+    "checked": 576,
+    "pass": true,
+    "reason": "",
+    "sampled_adapters": 4
+  },
+  "candidate": "results/backend_parity_gate_p16/vllm",
+  "kind": "backend_parity_gate",
+  "pass": false,
+  "pass_adapter_tensors": true,
+  "pass_base_rows": true,
+  "pass_protocol": true,
+  "pass_ranking": false,
+  "ranking": {
+    "candidate_best_candidate": "factor_gaussian_lora:seed1019282515:s0.0075:sign1",
+    "candidate_best_score": 0.0625,
+    "candidate_best_trusted_score": 0.0,
+    "candidate_dir": "results/backend_parity_gate_p16/vllm",
+    "candidate_name": "vllm",
+    "kind": "backend_parity",
+    "max_abs_score_delta": 0.125,
+    "mean_abs_score_delta": 0.0234375,
+    "n_candidate": 16,
+    "n_common": 16,
+    "n_trusted": 16,
+    "pass": false,
+    "pass_spearman_gate": false,
+    "pass_top8_gate": true,
+    "pearson": -0.17103344030668952,
+    "selected_regret_vs_trusted": 0.125,
+    "spearman": -0.1811643254631353,
+    "spearman_gate": 0.85,
+    "top16_overlap": 16,
+    "top16_possible": 16,
+    "top4_overlap": 2,
+    "top4_possible": 4,
+    "top8_gate": 6,
+    "top8_overlap": 7,
+    "top8_possible": 8,
+    "trusted_best_candidate": "factor_gaussian_lora:seed509771609:s0.0075:sign-1",
+    "trusted_best_score": 0.125,
+    "trusted_dir": "results/backend_parity_gate_p16/peft",
+    "trusted_name": "peft"
+  },
+  "trusted": "results/backend_parity_gate_p16/peft"
+}
