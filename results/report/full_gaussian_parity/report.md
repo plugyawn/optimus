@@ -8,8 +8,10 @@
 - Summed dense rank almost surely: `82944`
 - Summed LoRA rank cap: `576`
 - Summed rank fraction: `0.006944`
+- Expected Frobenius RMS ratio at sigma=0.01: `1.000000`
 
-A low-rank LoRA perturbation cannot exactly represent an arbitrary dense Gaussian perturbation unless the dense perturbation's rank is at most the LoRA rank.
+The current factor-Gaussian LoRA scaling matches dense Gaussian expected Frobenius norm per matrix, so Frobenius norm alone is not evidence of dense-Gaussian parity.
+A low-rank LoRA perturbation still cannot exactly represent an arbitrary dense Gaussian perturbation unless the dense perturbation's rank is at most the LoRA rank.
 
 ## Empirical Projection Samples
 

@@ -25,6 +25,8 @@ combined q/v rank fraction: about 0.6944%
 
 So exact expressivity parity with arbitrary dense Gaussian RandOpt is impossible at low rank. The right target is search-utility parity under a matched budget, or exact parity with the best rank-`r` projection of a dense Gaussian perturbation.
 
+One important scale fact: the current factor-Gaussian LoRA initializer uses `A = sigma * N(0,1)` and `B = N(0,1)/sqrt(rank)`. Each entry of `B @ A` therefore has variance `sigma^2`, matching a dense iid Gaussian perturbation with per-entry std `sigma`. So expected Frobenius norm matching is already built in; it does not prove dense-Gaussian parity. The remaining difference is low rank, entry correlation, drift through the network, and search utility.
+
 ## Three Perturbation Families
 
 Use precise names in reports:

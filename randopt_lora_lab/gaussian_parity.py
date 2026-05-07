@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -83,6 +84,46 @@ def summarize_specs(specs: list[MatrixSpec]) -> dict:
         "summed_dense_rank_almost_sure": weighted_dense_rank,
         "summed_lora_rank_cap": weighted_lora_rank,
         "summed_rank_fraction": weighted_lora_rank / weighted_dense_rank,
+    }
+
+
+def expected_update_stats(specs: list[MatrixSpec], sigma: float) -> dict:
+    """Expected scale for dense Gaussian and current factor-Gaussian LoRA.
+
+    The current LoRA materializer samples A = sigma * N(0, 1) and
+    B = N(0, 1) / sqrt(rank). For one update entry,
+
+        Delta W_ij = sum_k B_ik A_kj
+
+    has variance sigma^2. Therefore expected Frobenius norm matches a dense iid
+    Gaussian with per-entry std sigma, even though the LoRA update is low-rank
+    and has correlated entries.
+    """
+
+    rows = []
+    total_dense_frob_sq = 0.0
+    total_factor_lora_frob_sq = 0.0
+    for spec in specs:
+        dense_frob_sq = spec.dense_params * sigma * sigma
+        factor_lora_frob_sq = dense_frob_sq
+        rows.append({
+            "name": spec.name,
+            "shape": list(spec.shape),
+            "rank": spec.rank,
+            "dense_expected_frob_rms": math.sqrt(dense_frob_sq),
+            "factor_lora_expected_frob_rms": math.sqrt(factor_lora_frob_sq),
+            "expected_frob_ratio_factor_lora_over_dense": 1.0,
+            "dense_rank_almost_sure": spec.dense_rank_almost_sure,
+            "factor_lora_rank_cap": spec.lora_rank_cap,
+        })
+        total_dense_frob_sq += dense_frob_sq
+        total_factor_lora_frob_sq += factor_lora_frob_sq
+    return {
+        "sigma": sigma,
+        "per_matrix": rows,
+        "total_dense_expected_frob_rms": math.sqrt(total_dense_frob_sq),
+        "total_factor_lora_expected_frob_rms": math.sqrt(total_factor_lora_frob_sq),
+        "total_expected_frob_ratio_factor_lora_over_dense": 1.0,
     }
 
 
@@ -201,8 +242,10 @@ def _render_markdown(payload: dict) -> str:
         f"- Summed dense rank almost surely: `{payload['qwen25_3b_qv']['summed_dense_rank_almost_sure']}`",
         f"- Summed LoRA rank cap: `{payload['qwen25_3b_qv']['summed_lora_rank_cap']}`",
         f"- Summed rank fraction: `{payload['qwen25_3b_qv']['summed_rank_fraction']:.6f}`",
+        f"- Expected Frobenius RMS ratio at sigma={payload['expected_update_stats']['sigma']}: `{payload['expected_update_stats']['total_expected_frob_ratio_factor_lora_over_dense']:.6f}`",
         "",
-        "A low-rank LoRA perturbation cannot exactly represent an arbitrary dense Gaussian perturbation unless the dense perturbation's rank is at most the LoRA rank.",
+        "The current factor-Gaussian LoRA scaling matches dense Gaussian expected Frobenius norm per matrix, so Frobenius norm alone is not evidence of dense-Gaussian parity.",
+        "A low-rank LoRA perturbation still cannot exactly represent an arbitrary dense Gaussian perturbation unless the dense perturbation's rank is at most the LoRA rank.",
         "",
         "## Empirical Projection Samples",
         "",
@@ -225,6 +268,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Audit dense Gaussian vs low-rank LoRA parity limits.")
     parser.add_argument("--out", type=Path, required=True, help="Output directory for summary.json and report.md")
     parser.add_argument("--rank", type=int, default=8)
+    parser.add_argument("--sigma", type=float, default=0.01)
     parser.add_argument("--ranks", type=str, default="1,2,4,8,16,32,64")
     parser.add_argument("--shapes", type=str, default="128x128,256x128")
     parser.add_argument("--thresholds", type=str, default="0.5,0.9,0.99")
@@ -246,6 +290,7 @@ def main(argv: list[str] | None = None) -> None:
     payload = {
         "rank": args.rank,
         "qwen25_3b_qv": summarize_specs(qwen25_3b_qv_specs(rank=args.rank)),
+        "expected_update_stats": expected_update_stats(qwen25_3b_qv_specs(rank=args.rank), args.sigma),
         "projection_samples": samples,
     }
     args.out.mkdir(parents=True, exist_ok=True)

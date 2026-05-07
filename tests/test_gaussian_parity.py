@@ -5,6 +5,7 @@ import torch
 from randopt_lora_lab.gaussian_parity import (
     best_rank_projection,
     dense_gaussian_matrix,
+    expected_update_stats,
     lora_update,
     low_rank_factors_from_dense,
     projection_stats,
@@ -69,6 +70,16 @@ class GaussianParityTests(unittest.TestCase):
         self.assertEqual(summary["total_lora_params"], 36 * (8 * (2048 + 2048) + 8 * (256 + 2048)))
         self.assertLess(summary["total_param_fraction"], 0.011)
         self.assertLess(summary["summed_rank_fraction"], 0.02)
+
+    def test_factor_lora_expected_frobenius_matches_dense_gaussian(self):
+        specs = qwen25_3b_qv_specs(rank=8, layers=1)
+
+        stats = expected_update_stats(specs, sigma=0.01)
+
+        self.assertEqual(stats["total_expected_frob_ratio_factor_lora_over_dense"], 1.0)
+        for row in stats["per_matrix"]:
+            self.assertEqual(row["expected_frob_ratio_factor_lora_over_dense"], 1.0)
+            self.assertLess(row["factor_lora_rank_cap"], row["dense_rank_almost_sure"])
 
 
 if __name__ == "__main__":
