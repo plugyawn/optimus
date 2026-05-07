@@ -43,7 +43,32 @@ search-utility parity.
 
 ## Next Gate
 
-Run a rank sweep before any broader claim:
+Run the backend parity gate before any broader vLLM quality claim:
+
+```bash
+OUT_ROOT=results/backend_parity_gate \
+FAMILY=factor_gaussian_lora \
+POPULATION=64 \
+PROMPTS=64 \
+RANK=8 \
+SIGMA=0.0075 \
+scripts/run_backend_parity_gate.sh
+```
+
+Pass criteria:
+
+```text
+1. HF/PEFT and vLLM use the same candidate panel and protocol metadata.
+2. Base screen and base holdout rows are saved for both backends.
+3. Kept vLLM adapter tensors match the canonical materializer sample.
+4. Spearman >= 0.85 and top-8 overlap >= 6 on the same screen split.
+5. Selected-candidate regret versus the trusted HF/PEFT ranking is negligible.
+```
+
+Only after that gate passes should vLLM results be used as quality-selection
+evidence. Until then, vLLM results are systems/plumbing evidence only.
+
+Then run a rank sweep before any broader LoRA-vs-dense claim:
 
 ```bash
 BASE_OUT=results/gaussian_parity_rank_sweep \

@@ -114,6 +114,25 @@ factor-Gaussian sampling is the wrong low-rank distribution."
 Rank sweeps default to reusing the first dense panel because dense Gaussian does
 not depend on LoRA rank.
 
+HF/PEFT vs vLLM backend parity gate:
+
+```bash
+OUT_ROOT=results/backend_parity_gate \
+FAMILY=factor_gaussian_lora \
+POPULATION=64 \
+PROMPTS=64 \
+RANK=8 \
+SIGMA=0.0075 \
+scripts/run_backend_parity_gate.sh
+```
+
+This is the required gate before treating vLLM as the selector of record. It
+runs the same candidate panel through the trusted HF/PEFT path and the vLLM
+adapter path, keeps adapter files, checks sampled adapter tensors against the
+canonical materializer, and then requires ranking correlation/top-k overlap.
+Use `python -m randopt_lora_lab.backend_parity_gate` directly when comparing
+two already-existing matched run directories.
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 The current completion checklist is in `docs/parity_completion_audit.md`.
 
