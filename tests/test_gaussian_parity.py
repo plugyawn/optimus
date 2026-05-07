@@ -10,6 +10,7 @@ from randopt_lora_lab.gaussian_parity import (
     low_rank_factors_from_dense,
     projection_stats,
     qwen25_3b_qv_specs,
+    randomized_low_rank_factors_from_dense,
     required_rank_for_energy,
     summarize_specs,
 )
@@ -53,6 +54,22 @@ class GaussianParityTests(unittest.TestCase):
         self.assertEqual(tuple(a.shape), (rank, 7))
         self.assertEqual(tuple(b.shape), (9, rank))
         self.assertTrue(torch.allclose(lora_update(a, b), projected, atol=1e-10, rtol=1e-10))
+
+    def test_randomized_projection_is_low_rank_and_deterministic(self):
+        dense = dense_gaussian_matrix((16, 12), seed=2469).float()
+        rank = 4
+
+        a1, b1 = randomized_low_rank_factors_from_dense(dense, rank, oversample=4, n_iter=1, seed=99)
+        a2, b2 = randomized_low_rank_factors_from_dense(dense, rank, oversample=4, n_iter=1, seed=99)
+        update = lora_update(a1, b1)
+
+        self.assertEqual(tuple(a1.shape), (rank, 12))
+        self.assertEqual(tuple(b1.shape), (16, rank))
+        self.assertTrue(torch.equal(a1, a2))
+        self.assertTrue(torch.equal(b1, b2))
+        self.assertLessEqual(int(torch.linalg.matrix_rank(update.double(), atol=1e-6).item()), rank)
+        self.assertLessEqual(float((update * update).sum().item()), float((dense * dense).sum().item()))
+        self.assertGreater(float((update * update).sum().item()), 0.0)
 
     def test_required_rank_for_energy_is_monotonic(self):
         dense = dense_gaussian_matrix((16, 12), seed=1357)

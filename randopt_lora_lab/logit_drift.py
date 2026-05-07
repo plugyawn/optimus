@@ -93,6 +93,7 @@ def main(argv: list[str] | None = None) -> int:
             "isotropic",
             "factor_gaussian_lora",
             "projected_gaussian_rank_r",
+            "randomized_projected_gaussian_rank_r",
             "sparse_low_rank_lora",
             "sparse_low_rank_lora_d0p125",
             "sparse_low_rank_lora_d0p25",

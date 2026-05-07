@@ -312,7 +312,13 @@ def anzo_random_target_prompts(seed: int, n: int) -> list[str]:
 
 
 def maybe_build_family_state(args, backend, screen):
-    if args.family in {"isotropic", "dense_gaussian", "factor_gaussian_lora", "projected_gaussian_rank_r"}:
+    if args.family in {
+        "isotropic",
+        "dense_gaussian",
+        "factor_gaussian_lora",
+        "projected_gaussian_rank_r",
+        "randomized_projected_gaussian_rank_r",
+    }:
         return None
     if args.family.startswith("sparse_low_rank_lora"):
         return None
@@ -633,6 +639,7 @@ def main():
                 "isotropic",
                 "factor_gaussian_lora",
                 "projected_gaussian_rank_r",
+                "randomized_projected_gaussian_rank_r",
                 "sparse_low_rank_lora",
                 "sparse_low_rank_lora_d0p125",
                 "sparse_low_rank_lora_d0p25",

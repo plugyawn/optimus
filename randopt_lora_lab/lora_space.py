@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 
-from .gaussian_parity import low_rank_factors_from_dense
+from .gaussian_parity import low_rank_factors_from_dense, randomized_low_rank_factors_from_dense
 
 
 @dataclass(frozen=True)
@@ -77,6 +77,13 @@ def lora_noise_tensors(
         dense = torch.randn((int(b_shape[0]), int(a_shape[1])), generator=gen, dtype=torch.float32)
         dense.mul_(candidate.sign * candidate.sigma)
         return low_rank_factors_from_dense(dense, rank)
+    if candidate.family == "randomized_projected_gaussian_rank_r":
+        gen = torch.Generator(device="cpu")
+        gen.manual_seed((candidate.seed + stable_int(canonical_name + ":dense_gaussian")) % (2**63 - 1))
+        dense = torch.randn((int(b_shape[0]), int(a_shape[1])), generator=gen, dtype=torch.float32)
+        dense.mul_(candidate.sign * candidate.sigma)
+        sketch_seed = (candidate.seed + stable_int(canonical_name + ":randomized_projection")) % (2**63 - 1)
+        return randomized_low_rank_factors_from_dense(dense, rank, oversample=8, n_iter=1, seed=sketch_seed)
     gen = torch.Generator(device="cpu")
     gen.manual_seed((candidate.seed + stable_int(canonical_name)) % (2**63 - 1))
     a_noise = torch.randn(tuple(a_shape), generator=gen, dtype=torch.float32)

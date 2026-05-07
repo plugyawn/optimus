@@ -43,17 +43,24 @@ class UpdateGeometryTests(unittest.TestCase):
         result = family_geometry(
             specs,
             candidate,
-            ["dense_gaussian", "factor_gaussian_lora", "projected_gaussian_rank_r"],
+            [
+                "dense_gaussian",
+                "factor_gaussian_lora",
+                "projected_gaussian_rank_r",
+                "randomized_projected_gaussian_rank_r",
+            ],
             sparsity_threshold=0.0,
         )
 
         dense = result["dense_gaussian"]["summary"]
         factor = result["factor_gaussian_lora"]["summary"]
         projected = result["projected_gaussian_rank_r"]["summary"]
+        randomized = result["randomized_projected_gaussian_rank_r"]["summary"]
         self.assertEqual(dense["total_l0_sparsity"], 0.0)
         self.assertGreater(dense["weighted_effective_rank_fraction"], factor["weighted_effective_rank_fraction"])
         self.assertEqual(factor["mean_effective_rank"], 4)
         self.assertEqual(projected["mean_effective_rank"], 4)
+        self.assertEqual(randomized["mean_effective_rank"], 4)
 
 
 if __name__ == "__main__":

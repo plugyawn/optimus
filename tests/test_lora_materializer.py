@@ -59,6 +59,22 @@ class LoraMaterializerTests(unittest.TestCase):
         self.assertEqual(tuple(b.shape), (7, rank))
         self.assertTrue(torch.allclose(lora_update(a, b), projected.to(a.dtype), atol=1e-6, rtol=1e-6))
 
+    def test_randomized_projected_gaussian_family_is_deterministic_low_rank(self):
+        candidate = Candidate("randomized_projected_gaussian_rank_r", seed=456, sigma=0.01, sign=1)
+        rank = 3
+        module = "model.layers.0.self_attn.q_proj"
+
+        a1, b1 = lora_noise_tensors(module, (rank, 8), (7, rank), candidate, rank)
+        a2, b2 = lora_noise_tensors(module, (rank, 8), (7, rank), candidate, rank)
+        update = lora_update(a1.double(), b1.double())
+
+        self.assertEqual(tuple(a1.shape), (rank, 8))
+        self.assertEqual(tuple(b1.shape), (7, rank))
+        self.assertTrue(torch.equal(a1, a2))
+        self.assertTrue(torch.equal(b1, b2))
+        self.assertLessEqual(int(torch.linalg.matrix_rank(update, atol=1e-6).item()), rank)
+        self.assertTrue(torch.isfinite(update).all())
+
     def test_sparse_low_rank_lora_materializes_sparse_scaled_factors(self):
         candidate = Candidate("sparse_low_rank_lora_d0p25", seed=789, sigma=0.01, sign=1)
         rank = 8

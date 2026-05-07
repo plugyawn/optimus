@@ -183,6 +183,58 @@ def low_rank_factors_from_dense(delta: torch.Tensor, rank: int) -> tuple[torch.T
     return a.to(delta.dtype), b.to(delta.dtype)
 
 
+def randomized_low_rank_factors_from_dense(
+    delta: torch.Tensor,
+    rank: int,
+    *,
+    oversample: int = 8,
+    n_iter: int = 1,
+    seed: int = 0,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Approximate a rank-r projection using a randomized range finder.
+
+    This is the fast bridge candidate for dense-Gaussian-like LoRA directions:
+    it avoids a full SVD of the dense matrix and only factors a small sketched
+    matrix. The result is not the exact best rank-r projection.
+    """
+
+    if delta.ndim != 2:
+        raise ValueError("delta must be a matrix")
+    if rank < 0:
+        raise ValueError("rank must be nonnegative")
+    if oversample < 0:
+        raise ValueError("oversample must be nonnegative")
+    if n_iter < 0:
+        raise ValueError("n_iter must be nonnegative")
+    out_features, in_features = delta.shape
+    if rank == 0:
+        return torch.zeros((0, in_features), dtype=delta.dtype), torch.zeros((out_features, 0), dtype=delta.dtype)
+    max_rank = min(out_features, in_features)
+    if rank >= max_rank:
+        return low_rank_factors_from_dense(delta, rank)
+
+    sketch_rank = min(max_rank, rank + oversample)
+    work = delta.float()
+    gen = torch.Generator(device="cpu")
+    gen.manual_seed(int(seed) % (2**63 - 1))
+    omega = torch.randn((in_features, sketch_rank), generator=gen, dtype=torch.float32)
+    y = work @ omega
+    for _ in range(n_iter):
+        y = work @ (work.T @ y)
+    q, _ = torch.linalg.qr(y, mode="reduced")
+    small = q.T @ work
+    u_hat, s, vh = torch.linalg.svd(small.double(), full_matrices=False)
+    k = min(rank, s.numel())
+    u = q.double() @ u_hat[:, :k]
+    root_s = torch.sqrt(s[:k])
+    b = u * root_s.unsqueeze(0)
+    a = root_s.unsqueeze(1) * vh[:k, :]
+    if k < rank:
+        a = torch.cat([a, torch.zeros((rank - k, in_features), dtype=a.dtype)], dim=0)
+        b = torch.cat([b, torch.zeros((out_features, rank - k), dtype=b.dtype)], dim=1)
+    return a.to(delta.dtype), b.to(delta.dtype)
+
+
 def projection_stats(delta: torch.Tensor, ranks: list[int]) -> list[dict]:
     if delta.ndim != 2:
         raise ValueError("delta must be a matrix")
