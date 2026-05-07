@@ -445,6 +445,8 @@ def run_search(args) -> dict:
         "screen_stress_prompt_variants": screen_stress_variants,
         "holdout_selection_prompt_variants": holdout_selection_variants,
         "holdout_stress_prompt_variants": holdout_stress_variants,
+        "candidate_score_metric": "exact_answer",
+        "ensemble_vote_metric": "valid_numeric_majority_vote",
         "score_mode": args.score_mode,
         "malformed_penalty": args.malformed_penalty,
         "cap_hit_penalty": args.cap_hit_penalty,

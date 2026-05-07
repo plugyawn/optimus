@@ -6,10 +6,13 @@ from randopt_lora_lab.reproduction_audit import audit_official_countdown_run, of
 def official_summary():
     return {
         "model": "allenai/Olmo-3-7B-Instruct",
+        "data_source": "VsonicV/es-fine-tuning-paper/countdown/data/countdown.json",
         "perturbation_backend": "dense",
         "family": "dense_gaussian",
         "targets": "all_params",
         "dense_noise_mode": "paper",
+        "candidate_score_metric": "upstream_countdown_reward",
+        "ensemble_vote_metric": "valid_numeric_majority_vote",
         "screen_prompts": 200,
         "holdout_prompts": 1000,
         "population": 5000,
@@ -41,8 +44,10 @@ class ReproductionAuditTests(unittest.TestCase):
         row.update(
             {
                 "model": "Qwen/Qwen2.5-3B-Instruct",
+                "data_source": None,
                 "targets": "q_proj,v_proj",
                 "dense_noise_mode": "canonical",
+                "candidate_score_metric": "exact_answer",
                 "screen_prompts": 64,
                 "population": 128,
                 "max_new_tokens": 128,
@@ -57,7 +62,9 @@ class ReproductionAuditTests(unittest.TestCase):
 
         self.assertFalse(summary["pass"])
         self.assertIn("model", summary["failed"])
+        self.assertIn("official_countdown_data", summary["failed"])
         self.assertIn("full_parameter_targets", summary["failed"])
+        self.assertIn("candidate_score_metric", summary["failed"])
         self.assertIn("prompt_variant", summary["failed"])
         self.assertIn("ensemble_ks", summary["failed"])
 

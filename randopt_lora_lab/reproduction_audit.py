@@ -10,6 +10,9 @@ from typing import Any
 OFFICIAL_COUNTDOWN_MODEL = "allenai/Olmo-3-7B-Instruct"
 OFFICIAL_COUNTDOWN_SIGMAS = [0.0005, 0.001, 0.002]
 OFFICIAL_COUNTDOWN_TOP_K_RATIOS = [0.04, 0.01, 0.05, 0.1]
+OFFICIAL_COUNTDOWN_DATA_SOURCE = "VsonicV/es-fine-tuning-paper/countdown/data/countdown.json"
+OFFICIAL_COUNTDOWN_SCORE_METRIC = "upstream_countdown_reward"
+OFFICIAL_COUNTDOWN_VOTE_METRIC = "valid_numeric_majority_vote"
 
 
 @dataclass
@@ -45,6 +48,17 @@ def _check_bool(name: str, passed: bool, actual: Any, expected: Any, *, note: st
     return Check(name=name, passed=bool(passed), actual=actual, expected=expected, note=note)
 
 
+def _is_official_countdown_data(value: Any) -> bool:
+    if value == OFFICIAL_COUNTDOWN_DATA_SOURCE:
+        return True
+    text = str(value or "")
+    return (
+        "VsonicV/es-fine-tuning-paper" in text
+        or "countdown_official.json" in text
+        or text.endswith("es-fine-tuning-paper/countdown/data/countdown.json")
+    )
+
+
 def official_countdown_ensemble_ks(population: int) -> list[int]:
     return sorted({max(1, int(population * ratio)) for ratio in OFFICIAL_COUNTDOWN_TOP_K_RATIOS})
 
@@ -57,12 +71,21 @@ def audit_official_countdown_run(summary: dict) -> list[Check]:
     screen_unique = summary.get("screen_unique_semantic_prompts")
     holdout_unique = summary.get("holdout_unique_semantic_prompts")
     targets = str(summary.get("targets", ""))
+    data_source = summary.get("data_source", summary.get("data"))
     checks = [
         _check("model", summary.get("model"), OFFICIAL_COUNTDOWN_MODEL),
+        _check_bool(
+            "official_countdown_data",
+            _is_official_countdown_data(data_source),
+            data_source,
+            OFFICIAL_COUNTDOWN_DATA_SOURCE,
+        ),
         _check("perturbation_backend", summary.get("perturbation_backend"), "dense"),
         _check("family", summary.get("family"), "dense_gaussian"),
         _check_bool("full_parameter_targets", targets in {"all", "all_params", "*"}, targets, "all_params"),
         _check("dense_noise_mode", summary.get("dense_noise_mode"), "paper"),
+        _check("candidate_score_metric", summary.get("candidate_score_metric"), OFFICIAL_COUNTDOWN_SCORE_METRIC),
+        _check("ensemble_vote_metric", summary.get("ensemble_vote_metric"), OFFICIAL_COUNTDOWN_VOTE_METRIC),
         _check("train_or_screen_samples", screen_prompts, 200),
         _check("population", population, 5000),
         _check(

@@ -14,8 +14,13 @@ The upstream Countdown script uses:
 - max tokens: `1024`
 - prompt: Countdown handler's reasoning prompt with the paper system message
 - formatting: apply the tokenizer chat template for instruct/chat models
+- data: the official Countdown JSON linked by upstream
+  (`VsonicV/es-fine-tuning-paper/countdown/data/countdown.json`), not a
+  locally generated Countdown shard
 - perturbation support: all non-visual model parameters, not only selected
   attention projection matrices
+- candidate scoring: upstream Countdown reward
+  (`answer_reward + 0.1 * format_reward`), not exact-answer-only accuracy
 - evaluation: select top candidates by train reward, then majority-vote over top-K candidates on test prompts
 - Countdown voting: valid formulas vote by evaluated numeric result, not by raw formula string
 
