@@ -1,0 +1,78 @@
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]Loading weights:  15%|█▍        | 65/434 [00:00<00:00, 624.98it/s]Loading weights:  34%|███▍      | 147/434 [00:00<00:00, 728.61it/s]Loading weights:  51%|█████     | 220/434 [00:00<00:00, 710.10it/s]Loading weights:  69%|██████▊   | 298/434 [00:00<00:00, 733.39it/s]Loading weights:  86%|████████▌ | 373/434 [00:00<00:00, 738.81it/s]Loading weights: 100%|██████████| 434/434 [00:00<00:00, 724.74it/s]
+1/32 factor_gaussian_lora:seed1062333723:s0.001:sign1 kl=0.000926752
+2/32 factor_gaussian_lora:seed931683830:s0.001:sign1 kl=0.00357392
+3/32 factor_gaussian_lora:seed1091126466:s0.001:sign1 kl=0.000304291
+4/32 factor_gaussian_lora:seed990718095:s0.001:sign1 kl=0.0012563
+5/32 factor_gaussian_lora:seed1171715071:s0.001:sign1 kl=0.000614548
+6/32 factor_gaussian_lora:seed1477013529:s0.001:sign1 kl=0.000798828
+7/32 factor_gaussian_lora:seed246147040:s0.001:sign1 kl=0.000852636
+8/32 factor_gaussian_lora:seed1548206410:s0.001:sign1 kl=0.000804972
+9/32 factor_gaussian_lora:seed1278353962:s0.001:sign1 kl=0.000515186
+10/32 factor_gaussian_lora:seed1090660478:s0.001:sign1 kl=0.00196375
+11/32 factor_gaussian_lora:seed19037128:s0.001:sign1 kl=0.00242579
+12/32 factor_gaussian_lora:seed1729064507:s0.001:sign1 kl=0.00087476
+13/32 factor_gaussian_lora:seed1489214902:s0.001:sign1 kl=0.00095541
+14/32 factor_gaussian_lora:seed1972524579:s0.001:sign1 kl=0.000401779
+15/32 factor_gaussian_lora:seed1989327004:s0.001:sign1 kl=0.000777872
+16/32 factor_gaussian_lora:seed1112709546:s0.001:sign1 kl=0.000886824
+17/32 factor_gaussian_lora:seed1306350613:s0.001:sign1 kl=0.000857542
+18/32 factor_gaussian_lora:seed1252368710:s0.001:sign1 kl=0.000982366
+19/32 factor_gaussian_lora:seed320056936:s0.001:sign1 kl=0.00185395
+20/32 factor_gaussian_lora:seed1019436086:s0.001:sign1 kl=0.00132631
+21/32 factor_gaussian_lora:seed117003261:s0.001:sign1 kl=0.000514791
+22/32 factor_gaussian_lora:seed618254012:s0.001:sign1 kl=0.000697514
+23/32 factor_gaussian_lora:seed987894309:s0.001:sign1 kl=0.000842268
+24/32 factor_gaussian_lora:seed62519474:s0.001:sign1 kl=0.00559547
+25/32 factor_gaussian_lora:seed348810271:s0.001:sign1 kl=0.000539219
+26/32 factor_gaussian_lora:seed1251158349:s0.001:sign1 kl=0.00779801
+27/32 factor_gaussian_lora:seed311993413:s0.001:sign1 kl=0.000858517
+28/32 factor_gaussian_lora:seed1787940758:s0.001:sign1 kl=0.00154728
+29/32 factor_gaussian_lora:seed1924852974:s0.001:sign1 kl=0.000765133
+30/32 factor_gaussian_lora:seed1686084785:s0.001:sign1 kl=0.000386939
+31/32 factor_gaussian_lora:seed2072422341:s0.001:sign1 kl=0.00158376
+32/32 factor_gaussian_lora:seed576868863:s0.001:sign1 kl=0.000577319
+{
+  "data": "data/countdown_generated_1200_seed20260507.json",
+  "dense_noise_mode": "canonical",
+  "drift_metric": "full_vocab_next_token_kl",
+  "family": "factor_gaussian_lora",
+  "gates": {
+    "max_mean_kl": true,
+    "min_top1_equal": true
+  },
+  "kind": "logit_drift",
+  "kl_base_to_candidate_mean_max": 0.007798011414706707,
+  "kl_base_to_candidate_mean_mean": 0.0013956254288132186,
+  "kl_base_to_candidate_mean_min": 0.00030429125763475895,
+  "kl_candidate_to_base_mean_max": 0.01649795100092888,
+  "kl_candidate_to_base_mean_mean": 0.002024772807089903,
+  "kl_candidate_to_base_mean_min": 0.00025536061730235815,
+  "kl_direction": "base_to_candidate_and_candidate_to_base",
+  "kl_nonnegative_by_construction": true,
+  "logit_l2_mean_max": 236.64747619628906,
+  "logit_l2_mean_mean": 176.89380264282227,
+  "logit_l2_mean_min": 142.99847412109375,
+  "max_mean_kl_threshold": 0.05,
+  "min_top1_equal_threshold": 0.9,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "pass": true,
+  "perturbation_backend": "lora",
+  "population": 32,
+  "prompt_variant": "default",
+  "prompts": 32,
+  "rank": 8,
+  "rows": 32,
+  "sigma": 0.001,
+  "sigma_values": [
+    0.001
+  ],
+  "targets": "q_proj,v_proj",
+  "top1_equal_rate_max": 1.0,
+  "top1_equal_rate_mean": 1.0,
+  "top1_equal_rate_min": 1.0,
+  "use_chat_template": false,
+  "worst_kl_base_to_candidate_mean": 0.007798011414706707,
+  "worst_top1_equal_rate": 1.0
+}

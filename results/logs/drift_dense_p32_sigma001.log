@@ -1,0 +1,78 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]Loading weights:  12%|█▏        | 53/434 [00:00<00:00, 529.64it/s]Loading weights:  29%|██▊       | 124/434 [00:00<00:00, 630.62it/s]Loading weights:  45%|████▍     | 195/434 [00:00<00:00, 662.18it/s]Loading weights:  60%|██████    | 262/434 [00:00<00:00, 662.05it/s]Loading weights:  76%|███████▌  | 329/434 [00:00<00:00, 638.83it/s]Loading weights:  92%|█████████▏| 399/434 [00:00<00:00, 638.84it/s]Loading weights: 100%|██████████| 434/434 [00:00<00:00, 651.18it/s]
+1/32 dense_gaussian:seed1062333723:s0.001:sign1 kl=0.00102303
+2/32 dense_gaussian:seed931683830:s0.001:sign1 kl=0.00123578
+3/32 dense_gaussian:seed1091126466:s0.001:sign1 kl=0.00783186
+4/32 dense_gaussian:seed990718095:s0.001:sign1 kl=0.000836179
+5/32 dense_gaussian:seed1171715071:s0.001:sign1 kl=0.00173863
+6/32 dense_gaussian:seed1477013529:s0.001:sign1 kl=0.000339894
+7/32 dense_gaussian:seed246147040:s0.001:sign1 kl=0.00086864
+8/32 dense_gaussian:seed1548206410:s0.001:sign1 kl=0.000921768
+9/32 dense_gaussian:seed1278353962:s0.001:sign1 kl=0.00349279
+10/32 dense_gaussian:seed1090660478:s0.001:sign1 kl=0.00519184
+11/32 dense_gaussian:seed19037128:s0.001:sign1 kl=0.00203724
+12/32 dense_gaussian:seed1729064507:s0.001:sign1 kl=0.00261243
+13/32 dense_gaussian:seed1489214902:s0.001:sign1 kl=0.00171779
+14/32 dense_gaussian:seed1972524579:s0.001:sign1 kl=0.000551813
+15/32 dense_gaussian:seed1989327004:s0.001:sign1 kl=0.00072885
+16/32 dense_gaussian:seed1112709546:s0.001:sign1 kl=0.000489229
+17/32 dense_gaussian:seed1306350613:s0.001:sign1 kl=0.00102586
+18/32 dense_gaussian:seed1252368710:s0.001:sign1 kl=0.000917675
+19/32 dense_gaussian:seed320056936:s0.001:sign1 kl=0.00186191
+20/32 dense_gaussian:seed1019436086:s0.001:sign1 kl=0.00115024
+21/32 dense_gaussian:seed117003261:s0.001:sign1 kl=0.000621842
+22/32 dense_gaussian:seed618254012:s0.001:sign1 kl=0.00173458
+23/32 dense_gaussian:seed987894309:s0.001:sign1 kl=0.00181646
+24/32 dense_gaussian:seed62519474:s0.001:sign1 kl=0.00199504
+25/32 dense_gaussian:seed348810271:s0.001:sign1 kl=0.00236159
+26/32 dense_gaussian:seed1251158349:s0.001:sign1 kl=0.000741378
+27/32 dense_gaussian:seed311993413:s0.001:sign1 kl=0.000215943
+28/32 dense_gaussian:seed1787940758:s0.001:sign1 kl=0.000587158
+29/32 dense_gaussian:seed1924852974:s0.001:sign1 kl=0.000773489
+30/32 dense_gaussian:seed1686084785:s0.001:sign1 kl=0.000945001
+31/32 dense_gaussian:seed2072422341:s0.001:sign1 kl=0.00301076
+32/32 dense_gaussian:seed576868863:s0.001:sign1 kl=0.000512574
+{
+  "data": "data/countdown_generated_1200_seed20260507.json",
+  "dense_noise_mode": "canonical",
+  "drift_metric": "full_vocab_next_token_kl",
+  "family": "dense_gaussian",
+  "gates": {
+    "max_mean_kl": true,
+    "min_top1_equal": true
+  },
+  "kind": "logit_drift",
+  "kl_base_to_candidate_mean_max": 0.007831856608390808,
+  "kl_base_to_candidate_mean_mean": 0.0016215393657148525,
+  "kl_base_to_candidate_mean_min": 0.00021594252029899508,
+  "kl_candidate_to_base_mean_max": 0.015767257660627365,
+  "kl_candidate_to_base_mean_mean": 0.0023489449872613477,
+  "kl_candidate_to_base_mean_min": 0.00023660385340917856,
+  "kl_direction": "base_to_candidate_and_candidate_to_base",
+  "kl_nonnegative_by_construction": true,
+  "logit_l2_mean_max": 271.60693359375,
+  "logit_l2_mean_mean": 185.5974702835083,
+  "logit_l2_mean_min": 152.22622680664062,
+  "max_mean_kl_threshold": 0.05,
+  "min_top1_equal_threshold": 0.9,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "pass": true,
+  "perturbation_backend": "dense",
+  "population": 32,
+  "prompt_variant": "default",
+  "prompts": 32,
+  "rank": 8,
+  "rows": 32,
+  "sigma": 0.001,
+  "sigma_values": [
+    0.001
+  ],
+  "targets": "q_proj,v_proj",
+  "top1_equal_rate_max": 1.0,
+  "top1_equal_rate_mean": 1.0,
+  "top1_equal_rate_min": 1.0,
+  "use_chat_template": false,
+  "worst_kl_base_to_candidate_mean": 0.007831856608390808,
+  "worst_top1_equal_rate": 1.0
+}

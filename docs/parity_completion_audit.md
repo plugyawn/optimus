@@ -80,6 +80,24 @@ The drift parity gate must use true nonnegative full-vocab next-token KL from
 `logit_drift.py`; signed NLL deltas or anchor likelihood proxies are not valid
 KL evidence.
 
+First live drift gate:
+
+```text
+results/drift_parity_dense_vs_lora_rank8_p32_sigma001
+reference: dense_gaussian, P=32, prompts=32, sigma=0.001
+candidate: factor_gaussian_lora, rank=8, P=32, prompts=32, sigma=0.001
+```
+
+| metric | dense Gaussian | rank-8 factor LoRA | LoRA / dense |
+| --- | ---: | ---: | ---: |
+| KL(base || candidate) mean | 0.00162154 | 0.00139563 | 0.8607 |
+| logit L2 mean | 185.597 | 176.894 | 0.9531 |
+| top-1 equal mean | 1.0 | 1.0 | +0.0 |
+
+Gate: pass. This closes the narrow drift-evidence gap for this sigma/rank
+point. It does not prove quality parity, because the rank-sweep quality and
+stability gates are still red.
+
 ## Requirement Checklist
 
 | requirement | current evidence | status |
@@ -89,7 +107,7 @@ KL evidence.
 | Rank-r dense bridge exists | `projected_gaussian_rank_r` factors best rank-r dense projection | implemented, not yet run at scale |
 | Quality parity | P=64 rank sweep failed at rank 8 and rank 32 | missing |
 | Stability parity | parity report measures Spearman/top-k/regret for one panel; rank 8 Spearman -0.071, rank 32 Spearman -0.018 | missing multi-seed |
-| Drift parity | `logit_drift.py` computes true full-vocab next-token KL and `drift_parity.py` compares candidate-vs-dense drift | implemented, missing live dense-vs-candidate run |
+| Drift parity | `results/drift_parity_dense_vs_lora_rank8_p32_sigma001` compares true full-vocab next-token KL for dense Gaussian and rank-8 factor LoRA | passed at P=32 / 32 prompts / sigma 0.001 |
 | Eval speed parity | P=64 HF reference path has LoRA slower than dense at rank 8 and rank 32; vLLM LoRA probes exist | partial, quality-coupled speed not proven |
 | Convenience | LoRA adapters are materialized as portable safetensors | partial |
 | Robustness | generated non-overlap data, cap-hit/malformed logging, paired holdout rows | partial |

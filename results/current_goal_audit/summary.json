@@ -153,9 +153,136 @@
       "requirement": "prompt robustness"
     },
     {
-      "detail": "missing drift evidence",
-      "evidence": "missing",
-      "passed": false,
+      "detail": {
+        "candidate": {
+          "family": "factor_gaussian_lora",
+          "kind": "logit_drift",
+          "kl_base_to_candidate_mean_max": 0.007798011414706707,
+          "kl_base_to_candidate_mean_mean": 0.0013956254288132186,
+          "kl_candidate_to_base_mean_mean": 0.002024772807089903,
+          "logit_l2_mean_mean": 176.89380264282227,
+          "path": "results/drift_lora_rank8_p32_sigma001",
+          "population": 32,
+          "prompts": 32,
+          "rank": 8,
+          "rows": 32,
+          "sigma": 0.001,
+          "sigma_values": [
+            0.001
+          ],
+          "top1_equal_rate_mean": 1.0,
+          "top1_equal_rate_min": 1.0
+        },
+        "checks": [
+          {
+            "check": "reference_is_logit_drift",
+            "detail": {
+              "kind": "logit_drift",
+              "path": "results/drift_dense_p32_sigma001"
+            },
+            "passed": true
+          },
+          {
+            "check": "candidate_is_logit_drift",
+            "detail": {
+              "kind": "logit_drift",
+              "path": "results/drift_lora_rank8_p32_sigma001"
+            },
+            "passed": true
+          },
+          {
+            "check": "rows_present",
+            "detail": {
+              "candidate_rows": 32,
+              "min_rows": 32,
+              "reference_rows": 32
+            },
+            "passed": true
+          },
+          {
+            "check": "same_prompt_count",
+            "detail": {
+              "candidate_prompts": 32,
+              "reference_prompts": 32
+            },
+            "passed": true
+          },
+          {
+            "check": "kl_nonnegative",
+            "detail": {
+              "candidate_min_kl": 0.00025536061730235815,
+              "reference_min_kl": 0.00021594252029899508
+            },
+            "passed": true
+          },
+          {
+            "check": "candidate_mean_kl_not_higher",
+            "detail": {
+              "candidate": 0.0013956254288132186,
+              "max_ratio": 1.1,
+              "ratio": 0.860679338609803,
+              "reference": 0.0016215393657148525
+            },
+            "passed": true
+          },
+          {
+            "check": "candidate_logit_l2_not_higher",
+            "detail": {
+              "candidate": 176.89380264282227,
+              "max_ratio": 1.1,
+              "ratio": 0.9531045998235278,
+              "reference": 185.5974702835083
+            },
+            "passed": true
+          },
+          {
+            "check": "candidate_top1_not_worse",
+            "detail": {
+              "candidate": 1.0,
+              "delta": 0.0,
+              "min_delta": -0.01,
+              "reference": 1.0
+            },
+            "passed": true
+          }
+        ],
+        "comparison": {
+          "kl_base_to_candidate_mean_ratio": 0.860679338609803,
+          "logit_l2_mean_ratio": 0.9531045998235278,
+          "top1_equal_rate_delta": 0.0
+        },
+        "failed": [],
+        "kind": "drift_parity",
+        "pass": true,
+        "reference": {
+          "family": "dense_gaussian",
+          "kind": "logit_drift",
+          "kl_base_to_candidate_mean_max": 0.007831856608390808,
+          "kl_base_to_candidate_mean_mean": 0.0016215393657148525,
+          "kl_candidate_to_base_mean_mean": 0.0023489449872613477,
+          "logit_l2_mean_mean": 185.5974702835083,
+          "path": "results/drift_dense_p32_sigma001",
+          "population": 32,
+          "prompts": 32,
+          "rank": 8,
+          "rows": 32,
+          "sigma": 0.001,
+          "sigma_values": [
+            0.001
+          ],
+          "top1_equal_rate_mean": 1.0,
+          "top1_equal_rate_min": 1.0
+        },
+        "thresholds": {
+          "max_kl_ratio": 1.1,
+          "max_logit_l2_ratio": 1.1,
+          "min_rows": 32,
+          "min_top1_delta": -0.01,
+          "require_same_prompts": true
+        }
+      },
+      "evidence": "results/drift_parity_dense_vs_lora_rank8_p32_sigma001/summary.json",
+      "passed": true,
       "requirement": "drift parity"
     },
     {
@@ -183,7 +310,6 @@
     "speed parity",
     "trusted accelerated backend selector",
     "prompt robustness",
-    "drift parity",
     "eval validity"
   ],
   "pass": false
