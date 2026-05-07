@@ -235,6 +235,54 @@ def randomized_low_rank_factors_from_dense(
     return a.to(delta.dtype), b.to(delta.dtype)
 
 
+def spectral_projected_gaussian_factors(
+    out_features: int,
+    in_features: int,
+    rank: int,
+    *,
+    sigma: float = 1.0,
+    sign: int = 1,
+    seed: int = 0,
+    dtype: torch.dtype = torch.float32,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Sample a cheap spectral analogue of a dense Gaussian rank-r projection.
+
+    For a large Gaussian matrix with entry std `sigma`, the leading singular
+    values concentrate near `sigma * (sqrt(out_features) + sqrt(in_features))`
+    and the singular vectors are approximately Haar random. This family samples
+    that spectral form directly, avoiding dense materialization, power
+    iteration, or a full SVD.
+    """
+
+    if rank < 0:
+        raise ValueError("rank must be nonnegative")
+    if out_features < 0 or in_features < 0:
+        raise ValueError("features must be nonnegative")
+    if rank == 0:
+        return torch.zeros((0, in_features), dtype=dtype), torch.zeros((out_features, 0), dtype=dtype)
+    max_rank = min(out_features, in_features)
+    k = min(rank, max_rank)
+    if k == 0:
+        return torch.zeros((rank, in_features), dtype=dtype), torch.zeros((out_features, rank), dtype=dtype)
+
+    gen_u = torch.Generator(device="cpu")
+    gen_u.manual_seed(int(seed) % (2**63 - 1))
+    gen_v = torch.Generator(device="cpu")
+    gen_v.manual_seed((int(seed) + 0x9E3779B97F4A7C15) % (2**63 - 1))
+    u_raw = torch.randn((out_features, k), generator=gen_u, dtype=torch.float32)
+    v_raw = torch.randn((in_features, k), generator=gen_v, dtype=torch.float32)
+    u, _ = torch.linalg.qr(u_raw, mode="reduced")
+    v, _ = torch.linalg.qr(v_raw, mode="reduced")
+    edge = abs(float(sigma)) * (math.sqrt(float(out_features)) + math.sqrt(float(in_features)))
+    root_s = torch.full((k,), math.sqrt(edge), dtype=torch.float32)
+    b = float(sign) * u[:, :k] * root_s.unsqueeze(0)
+    a = root_s.unsqueeze(1) * v[:, :k].T
+    if k < rank:
+        a = torch.cat([a, torch.zeros((rank - k, in_features), dtype=a.dtype)], dim=0)
+        b = torch.cat([b, torch.zeros((out_features, rank - k), dtype=b.dtype)], dim=1)
+    return a.to(dtype), b.to(dtype)
+
+
 def projection_stats(delta: torch.Tensor, ranks: list[int]) -> list[dict]:
     if delta.ndim != 2:
         raise ValueError("delta must be a matrix")

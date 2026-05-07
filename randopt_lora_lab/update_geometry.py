@@ -15,7 +15,11 @@ from .lora_space import Candidate, lora_noise_tensors
 def matrix_update_for_family(spec: MatrixSpec, candidate: Candidate, family: str) -> torch.Tensor:
     if family == "dense_gaussian":
         return dense_noise_tensor(spec.name, spec.shape, candidate).double()
-    if family in {"factor_gaussian_lora", "randomized_projected_gaussian_rank_r"}:
+    if family in {
+        "factor_gaussian_lora",
+        "randomized_projected_gaussian_rank_r",
+        "spectral_projected_gaussian_rank_r",
+    }:
         lora_candidate = Candidate(family, candidate.seed, candidate.sigma, candidate.sign)
         a, b = lora_noise_tensors(
             spec.name,
@@ -173,7 +177,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument(
         "--families",
-        default="dense_gaussian,factor_gaussian_lora,projected_gaussian_rank_r,randomized_projected_gaussian_rank_r",
+        default=(
+            "dense_gaussian,factor_gaussian_lora,projected_gaussian_rank_r,"
+            "randomized_projected_gaussian_rank_r,spectral_projected_gaussian_rank_r"
+        ),
     )
     parser.add_argument("--shapes", default="128x128,256x128")
     parser.add_argument("--rank", type=int, default=8)

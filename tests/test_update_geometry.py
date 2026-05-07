@@ -48,6 +48,7 @@ class UpdateGeometryTests(unittest.TestCase):
                 "factor_gaussian_lora",
                 "projected_gaussian_rank_r",
                 "randomized_projected_gaussian_rank_r",
+                "spectral_projected_gaussian_rank_r",
             ],
             sparsity_threshold=0.0,
         )
@@ -56,11 +57,13 @@ class UpdateGeometryTests(unittest.TestCase):
         factor = result["factor_gaussian_lora"]["summary"]
         projected = result["projected_gaussian_rank_r"]["summary"]
         randomized = result["randomized_projected_gaussian_rank_r"]["summary"]
+        spectral = result["spectral_projected_gaussian_rank_r"]["summary"]
         self.assertEqual(dense["total_l0_sparsity"], 0.0)
         self.assertGreater(dense["weighted_effective_rank_fraction"], factor["weighted_effective_rank_fraction"])
         self.assertEqual(factor["mean_effective_rank"], 4)
         self.assertEqual(projected["mean_effective_rank"], 4)
         self.assertEqual(randomized["mean_effective_rank"], 4)
+        self.assertEqual(spectral["mean_effective_rank"], 4)
 
 
 if __name__ == "__main__":
