@@ -178,6 +178,13 @@ python -m randopt_lora_lab.backend_rollout_probe \
   --candidate factor_gaussian_lora:seed1019282515:s0.0075:sign1
 ```
 
+Rollout parity ablation matrix:
+
+```bash
+ROOT=results/backend_rollout_ablation_p16 \
+scripts/run_backend_rollout_ablation.sh
+```
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 The current completion checklist is in `docs/parity_completion_audit.md`.
 
