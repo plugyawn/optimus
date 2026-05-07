@@ -53,6 +53,15 @@ exact reward lift
 
 A family should be considered more RLVR-like if it improves search utility while moving toward the paper's sparse/low-rank update profile without increasing malformed, cap-hit, or drift failures.
 
+Run the current standalone geometry audit with:
+
+```bash
+python -m randopt_lora_lab.update_geometry \
+  --out results/report/update_geometry \
+  --rank 8 \
+  --sigma 0.01
+```
+
 ## Cautions
 
 The paper does not prove LoRA RandOpt parity.

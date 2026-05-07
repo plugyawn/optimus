@@ -43,6 +43,15 @@ python -m randopt_lora_lab.gaussian_parity \
   --rank 8
 ```
 
+Perturbation update-geometry audit:
+
+```bash
+python -m randopt_lora_lab.update_geometry \
+  --out results/report/update_geometry \
+  --rank 8 \
+  --sigma 0.01
+```
+
 Slow trusted dense-Gaussian reference search:
 
 ```bash
