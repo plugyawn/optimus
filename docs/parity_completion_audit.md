@@ -207,6 +207,20 @@ vLLM-only selector parity: strict, currently failing.
 vLLM proposal + PEFT confirmation: recall/speed gate, currently passed on one P64 panel.
 ```
 
+The current next entrypoint for a quality-coupled systems test is:
+
+```bash
+scripts/run_spectral_vllm_confirmation.sh
+```
+
+That script runs a dense PEFT reference, a matched factor-LoRA control, a
+calibrated spectral-LoRA PEFT trusted arm, a tokenized multi-prompt vLLM
+proposal arm for the same spectral family, dense-vs-spectral `parity_report`,
+and same-family `confirmation_economics`. Read `docs/spectral_vllm_confirmation.md`
+before interpreting the result. A confirmation pass is systems evidence only;
+the spectral arm still needs PEFT dense-parity and validity evidence before any
+quality claim.
+
 First gate result: `results/backend_parity_gate_p16` failed. The run had
 matching protocol metadata, saved base rows, and `576/576` sampled adapter tensor
 checks passed across four kept adapters, but ranking parity failed:
