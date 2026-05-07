@@ -46,6 +46,19 @@ Prompt robustness was acceptable for this run, but not decisive:
 - Random k=16: default 19.14%, reordered 18.75%.
 - Power-subspace k=16: default 19.92%, reordered 18.36%.
 
+The follow-up proposal audit sharpened the failure mode:
+
+| Diagnostic | Power-subspace | Matched random |
+| --- | ---: | ---: |
+| prompt-variant selection Spearman | 0.206 | 0.236 |
+| prompt-variant exact Spearman | 0.139 | 0.184 |
+| top-16 prompt-variant overlap | 1/16 | 0/16 |
+| screen selection vs holdout exact Spearman on promoted candidates | 0.298 | 0.534 |
+| screen top-16 exact mean | 12.01% | 12.50% |
+| screen valid fraction | 9.18% | 8.20% |
+
+So the issue is not only that final holdout tied. The proposal did not improve the actual screen pool, and the screen ranking remained very prompt-sensitive. Its small holdout edge came from one promoted candidate and is not strong enough to distinguish from random search noise.
+
 The current proposal rule ranks candidates by sign-symmetric `power_energy`. That may be throwing away useful sign and coefficient information. If power iteration remains useful, it should next be tested as a small learned coefficient/sign search inside the subspace, not as a simple top-energy candidate filter.
 
 ## Decision
@@ -58,5 +71,6 @@ Keep power/subspace tools as diagnostics and as a possible basis for a more dire
 
 - A/B summary: `results/subspace_ab_power_promptrobust_gen1200/summary.json`
 - A/B log: `results/subspace_ab_power_promptrobust_gen1200/run.log`
+- Proposal audit: `results/proposal_audit_subspace_power_vs_random_gen1200/`
 - Power-subspace arm: `results/vllm_subspace_power_unit_s0p01_p512_promptrobust_gen1200/`
 - Matched-random arm: `results/vllm_random_iso_s0p01_p512_promptrobust_gen1200/`
