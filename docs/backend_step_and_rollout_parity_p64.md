@@ -110,10 +110,31 @@ This means the vLLM path is useful as a systems accelerator, but not yet as a so
 The highest-leverage backend fixes are:
 
 1. Compare exact prompt token IDs and stop strings before generation for PEFT/HF and vLLM.
-2. Add a greedy deterministic replay mode that feeds the same generated token prefix into both engines and compares logits before sampling the next token.
+2. Run `backend_token_replay_probe`, which feeds the same generated token-ID prefix into both engines and compares logits before sampling the next token.
 3. Audit whether vLLM chat-template, stop-token, EOS, or added-special-token handling differs from the HF path.
 4. Test whether answer-only output with stricter stop handling reduces backend divergence without changing the task semantics.
 
 New backend probes should save `prompt_contract.json` before generation. That file must include exact HF prompt token IDs, best-effort exact vLLM prompt token IDs, tokenizer special-token IDs, answer-stop token IDs, and the requested/actual vLLM sampling stop settings. Without that artifact, a generation-parity failure cannot be cleanly separated from prompt/tokenizer/stop-contract drift.
+
+Token-ID replay command template:
+
+```bash
+python -m randopt_lora_lab.backend_token_replay_probe \
+  --out results/backend_token_replay_probe_p64 \
+  --data data/countdown_generated_1200_seed20260507.json \
+  --prompts 4 \
+  --seed 4242 \
+  --rank 8 \
+  --targets q_proj,v_proj \
+  --top-k 20 \
+  --max-steps 24 \
+  --prefix-modes hf,vllm \
+  --include-zero \
+  --stop-at-answer \
+  --candidate factor_gaussian_lora:seed1411240924:s0.0075:sign1 \
+  --candidate factor_gaussian_lora:seed1632697641:s0.0075:sign-1 \
+  --candidate factor_gaussian_lora:seed326653716:s0.0075:sign1 \
+  --candidate factor_gaussian_lora:seed221822464:s0.0075:sign-1
+```
 
 Until those pass, the search pipeline should be vLLM-screen plus PEFT-confirm, not vLLM-only search.
