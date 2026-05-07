@@ -61,6 +61,36 @@ def candidate_panel(
     return out[:population]
 
 
+def parse_candidate_key(key: str) -> Candidate:
+    parts = key.split(":")
+    if len(parts) != 4:
+        raise ValueError(f"invalid candidate key: {key}")
+    return Candidate(
+        parts[0],
+        int(parts[1].removeprefix("seed")),
+        float(parts[2].removeprefix("s")),
+        int(parts[3].removeprefix("sign")),
+    )
+
+
+def read_candidate_file(path: str) -> list[Candidate]:
+    candidates = []
+    with Path(path).open() as f:
+        for line_no, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                item = line
+            key = item.get("candidate") if isinstance(item, dict) else str(item)
+            if not key:
+                raise ValueError(f"{path}:{line_no} missing candidate")
+            candidates.append(parse_candidate_key(str(key)))
+    return candidates
+
+
 def safe_name(candidate: Candidate) -> str:
     sign = "pos" if candidate.sign > 0 else "neg"
     return f"randopt_seed{candidate.seed}_s{candidate.sigma:g}_{sign}"
@@ -284,7 +314,10 @@ def run_search(args) -> dict:
         exclude_ids={ex.id for ex in screen},
     )
     sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
-    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
+    if args.candidate_file:
+        candidates = read_candidate_file(args.candidate_file)
+    else:
+        candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
 
     adapter_start = time.time()
     specs = make_adapter_specs(args, out, targets, candidates)
@@ -464,6 +497,8 @@ def run_search(args) -> dict:
         "model": args.model,
         "data": args.data,
         "family": args.family,
+        "candidate_file": args.candidate_file,
+        "candidate_families": sorted({candidate.family for candidate in candidates}),
         "population": len(specs),
         "rank": args.rank,
         "sigma": args.sigma,
@@ -602,6 +637,7 @@ def build_parser() -> argparse.ArgumentParser:
             "sparse_low_rank_lora_d0p5",
         ],
     )
+    p.add_argument("--candidate-file", default="", help="Optional JSONL/list of exact candidate keys to evaluate.")
     p.add_argument("--antithetic", action="store_true")
     p.add_argument("--max-new-tokens", type=int, default=32)
     p.add_argument("--stop-at-answer", action="store_true")

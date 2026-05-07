@@ -2,7 +2,7 @@ import unittest
 
 from randopt_lora_lab.countdown import CountdownExample
 from randopt_lora_lab.experiments import candidate_panel, ensemble_ks_from_values, majority_vote_evaluation, parse_k_list
-from randopt_lora_lab.vllm_lora_search import candidate_panel as vllm_candidate_panel
+from randopt_lora_lab.vllm_lora_search import candidate_panel as vllm_candidate_panel, read_candidate_file
 
 
 class ExperimentEnsembleTests(unittest.TestCase):
@@ -46,6 +46,22 @@ class ExperimentEnsembleTests(unittest.TestCase):
             antithetic=False,
             sigma_values=[0.0005, 0.001, 0.002],
         )])
+
+    def test_vllm_candidate_file_reads_jsonl_candidate_keys(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "candidates.jsonl"
+            path.write_text(
+                '{"candidate":"isotropic:seed7:s0.01:sign1"}\n'
+                "isotropic:seed8:s0.02:sign-1\n"
+            )
+            candidates = read_candidate_file(str(path))
+
+        self.assertEqual([c.seed for c in candidates], [7, 8])
+        self.assertEqual([c.sign for c in candidates], [1, -1])
+        self.assertEqual([c.sigma for c in candidates], [0.01, 0.02])
 
     def test_majority_vote_uses_numeric_answers_not_formula_strings(self):
         example = CountdownExample(1, (1, 2, 3), 6)

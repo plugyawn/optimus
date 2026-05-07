@@ -1,0 +1,206 @@
+{
+  "antithetic": true,
+  "candidate_file": "/Users/progyan/rando/randopt-lora-lab/results/subspace_power_unit_proposal_iso_s0p01_pool100k_keep512/candidates.jsonl",
+  "components": 16,
+  "family": "isotropic",
+  "feature_scale": "unit",
+  "keep": 512,
+  "kind": "subspace_proposal",
+  "pool": 100000,
+  "power_iter": 2,
+  "prior_families": [
+    "isotropic"
+  ],
+  "prior_rows": 1862,
+  "prior_runs": [
+    "results/phase8_extra_pod1/search_chunk8_p1024",
+    "results/phase8_sustain_pod1/search_chunk4_p1024",
+    "results/phase8_systems_pod1/search_chunk16_p512",
+    "results/search_iso_s0p01_p512_seed5678",
+    "results/search_iso_s0p0075_p512_seed2468",
+    "results/search_iso_s0p0125_p512_seed2468"
+  ],
+  "score_mode": "power_energy",
+  "sigma_values": [
+    0.01
+  ],
+  "sketch_dim": 512,
+  "top": [
+    {
+      "candidate": "isotropic:seed1623400180:s0.01:sign-1",
+      "family": "isotropic",
+      "mean_direction": 0.043176829953915856,
+      "power_energy": 45.81053661794725,
+      "proposal_score": 45.81053661794725,
+      "rank": 1,
+      "seed": 1623400180,
+      "sigma": 0.01,
+      "sign": -1
+    },
+    {
+      "candidate": "isotropic:seed1623400180:s0.01:sign1",
+      "family": "isotropic",
+      "mean_direction": 0.051363194821480024,
+      "power_energy": 45.791263353515106,
+      "proposal_score": 45.791263353515106,
+      "rank": 2,
+      "seed": 1623400180,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "candidate": "isotropic:seed612596804:s0.01:sign-1",
+      "family": "isotropic",
+      "mean_direction": 0.05471573791864237,
+      "power_energy": 45.44068199633403,
+      "proposal_score": 45.44068199633403,
+      "rank": 3,
+      "seed": 612596804,
+      "sigma": 0.01,
+      "sign": -1
+    },
+    {
+      "candidate": "isotropic:seed99059831:s0.01:sign1",
+      "family": "isotropic",
+      "mean_direction": 0.04085528718040482,
+      "power_energy": 45.08187948420267,
+      "proposal_score": 45.08187948420267,
+      "rank": 4,
+      "seed": 99059831,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "candidate": "isotropic:seed612596804:s0.01:sign1",
+      "family": "isotropic",
+      "mean_direction": 0.0398242868567535,
+      "power_energy": 44.88097553025413,
+      "proposal_score": 44.88097553025413,
+      "rank": 5,
+      "seed": 612596804,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "candidate": "isotropic:seed426184769:s0.01:sign-1",
+      "family": "isotropic",
+      "mean_direction": 0.04160585742960428,
+      "power_energy": 44.76719817161641,
+      "proposal_score": 44.76719817161641,
+      "rank": 6,
+      "seed": 426184769,
+      "sigma": 0.01,
+      "sign": -1
+    },
+    {
+      "candidate": "isotropic:seed99059831:s0.01:sign-1",
+      "family": "isotropic",
+      "mean_direction": 0.05368473759499105,
+      "power_energy": 44.70370620712228,
+      "proposal_score": 44.70370620712228,
+      "rank": 7,
+      "seed": 99059831,
+      "sigma": 0.01,
+      "sign": -1
+    },
+    {
+      "candidate": "isotropic:seed43821631:s0.01:sign1",
+      "family": "isotropic",
+      "mean_direction": 0.034911583145389447,
+      "power_energy": 44.6267278835533,
+      "proposal_score": 44.6267278835533,
+      "rank": 8,
+      "seed": 43821631,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "candidate": "isotropic:seed426184769:s0.01:sign1",
+      "family": "isotropic",
+      "mean_direction": 0.0529341673457916,
+      "power_energy": 44.6001895238875,
+      "proposal_score": 44.6001895238875,
+      "rank": 9,
+      "seed": 426184769,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "candidate": "isotropic:seed1115905262:s0.01:sign-1",
+      "family": "isotropic",
+      "mean_direction": 0.02846239228112335,
+      "power_energy": 43.89892203866758,
+      "proposal_score": 43.89892203866758,
+      "rank": 10,
+      "seed": 1115905262,
+      "sigma": 0.01,
+      "sign": -1
+    },
+    {
+      "candidate": "isotropic:seed43821631:s0.01:sign-1",
+      "family": "isotropic",
+      "mean_direction": 0.059628441630006426,
+      "power_energy": 43.84185543591097,
+      "proposal_score": 43.84185543591097,
+      "rank": 11,
+      "seed": 43821631,
+      "sigma": 0.01,
+      "sign": -1
+    },
+    {
+      "candidate": "isotropic:seed26679714:s0.01:sign-1",
+      "family": "isotropic",
+      "mean_direction": 0.029434870880067354,
+      "power_energy": 43.74616363286105,
+      "proposal_score": 43.74616363286105,
+      "rank": 12,
+      "seed": 26679714,
+      "sigma": 0.01,
+      "sign": -1
+    },
+    {
+      "candidate": "isotropic:seed2138591712:s0.01:sign1",
+      "family": "isotropic",
+      "mean_direction": -0.005007744941119004,
+      "power_energy": 43.70871185894955,
+      "proposal_score": 43.70871185894955,
+      "rank": 13,
+      "seed": 2138591712,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "candidate": "isotropic:seed2138591712:s0.01:sign-1",
+      "family": "isotropic",
+      "mean_direction": 0.09954776971651488,
+      "power_energy": 43.587543503995974,
+      "proposal_score": 43.587543503995974,
+      "rank": 14,
+      "seed": 2138591712,
+      "sigma": 0.01,
+      "sign": -1
+    },
+    {
+      "candidate": "isotropic:seed388764098:s0.01:sign-1",
+      "family": "isotropic",
+      "mean_direction": -0.0007686954478782412,
+      "power_energy": 43.442810915696285,
+      "proposal_score": 43.442810915696285,
+      "rank": 15,
+      "seed": 388764098,
+      "sigma": 0.01,
+      "sign": -1
+    },
+    {
+      "candidate": "isotropic:seed1213251918:s0.01:sign1",
+      "family": "isotropic",
+      "mean_direction": -0.019766195561015422,
+      "power_energy": 43.367967774959716,
+      "proposal_score": 43.367967774959716,
+      "rank": 16,
+      "seed": 1213251918,
+      "sigma": 0.01,
+      "sign": 1
+    }
+  ]
+}
