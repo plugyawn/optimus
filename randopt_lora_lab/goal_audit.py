@@ -29,6 +29,24 @@ def check_present_pass(requirement: str, path: Path | None, payload: dict | None
     return GoalCheck(requirement, bool(payload.get("pass")), evidence_name, payload.get("failed", payload.get("gates", payload)))
 
 
+def check_confirmation(path: Path | None, payload: dict | None) -> GoalCheck:
+    if payload is None:
+        return GoalCheck("two-stage accelerated confirmation", False, str(path) if path else "missing", "missing confirmation evidence")
+    gate = payload.get("gate", payload)
+    return GoalCheck(
+        "two-stage accelerated confirmation",
+        bool(gate.get("pass")),
+        str(path),
+        {
+            "pass": gate.get("pass"),
+            "failed": gate.get("failed", []),
+            "best_recovered_k": payload.get("best_recovered_k"),
+            "zero_regret_k": payload.get("zero_regret_k"),
+            "thresholds": gate.get("thresholds", {}),
+        },
+    )
+
+
 def check_parity_report(path: Path | None, payload: dict | None) -> list[GoalCheck]:
     if payload is None:
         return [
@@ -135,6 +153,7 @@ def run_goal_audit(args) -> dict:
     reproduction = read_json(args.reproduction_audit)
     parity = read_json(args.parity_report)
     backend = read_json(args.backend_gate)
+    confirmation = read_json(args.confirmation_gate)
     prompt = read_json(args.prompt_robustness)
     drift = read_json(args.drift_report)
     eval_validity = read_json(args.eval_validity)
@@ -155,6 +174,7 @@ def run_goal_audit(args) -> dict:
             evidence_name=str(args.backend_gate),
         )
     )
+    checks.append(check_confirmation(args.confirmation_gate, confirmation))
     checks.append(check_prompt_robustness(args.prompt_robustness, prompt))
     checks.append(check_drift(args.drift_report, drift))
     checks.append(check_eval_validity(args.eval_validity, eval_validity))
@@ -190,6 +210,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--reproduction-audit", type=Path)
     parser.add_argument("--parity-report", type=Path)
     parser.add_argument("--backend-gate", type=Path)
+    parser.add_argument("--confirmation-gate", type=Path)
     parser.add_argument("--prompt-robustness", type=Path)
     parser.add_argument("--drift-report", type=Path)
     parser.add_argument("--eval-validity", type=Path)

@@ -3,8 +3,11 @@
     {
       "detail": [
         "model",
+        "official_countdown_data",
         "full_parameter_targets",
         "dense_noise_mode",
+        "candidate_score_metric",
+        "ensemble_vote_metric",
         "train_or_screen_samples",
         "population",
         "max_new_tokens",
@@ -120,6 +123,23 @@
       "evidence": "results/backend_parity_gate_p64_tokenized_vllm/gate/summary.json",
       "passed": false,
       "requirement": "trusted accelerated backend selector"
+    },
+    {
+      "detail": {
+        "best_recovered_k": 1,
+        "failed": [],
+        "pass": true,
+        "thresholds": {
+          "max_confirm_k": 16,
+          "max_regret": 0.0,
+          "min_eval_only_speedup": 1.0,
+          "min_full_without_load_speedup": 1.0
+        },
+        "zero_regret_k": 1
+      },
+      "evidence": "results/confirmation_economics_p64_tokenized_vllm/summary.json",
+      "passed": true,
+      "requirement": "two-stage accelerated confirmation"
     },
     {
       "detail": {
