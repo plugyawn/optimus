@@ -156,6 +156,7 @@ class TransformersDenseGaussianBackend:
         dtype: str = "bf16",
         stop_at_answer: bool = False,
         snapshot_device: str = "model",
+        dense_noise_mode: str = "canonical",
     ):
         self.max_new_tokens = max_new_tokens
         self.batch_size = batch_size
@@ -174,7 +175,12 @@ class TransformersDenseGaussianBackend:
             trust_remote_code=True,
         )
         self.model.eval()
-        self.patcher = DenseGaussianPatcher(self.model, target_suffixes, snapshot_device=snapshot_device)
+        self.patcher = DenseGaussianPatcher(
+            self.model,
+            target_suffixes,
+            snapshot_device=snapshot_device,
+            noise_mode=dense_noise_mode,
+        )
         self.patcher.clear()
 
     def set_candidate(self, candidate: Candidate, family_state: dict | None = None):

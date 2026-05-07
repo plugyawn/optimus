@@ -113,17 +113,22 @@ scripts/run_gaussian_parity_baseline.sh
 Paper-style prompt/template mode for local reproduction checks:
 
 ```bash
-OUT=results/paper_style_local \
-POPULATION=128 \
-PROMPTS=64 \
-HOLDOUT_PROMPTS=256 \
-SIGMA_VALUES=0.0005,0.001,0.002 \
-PROMOTE=32 \
-ENSEMBLE_KS=1,5,6,12,32 \
-PROMPT_VARIANT=paper \
-USE_CHAT_TEMPLATE=1 \
-MAX_NEW_TOKENS=1024 \
-scripts/run_gaussian_parity_baseline.sh
+python -m randopt_lora_lab.experiments search \
+  --out results/paper_style_dense_local \
+  --model Qwen/Qwen2.5-3B-Instruct \
+  --perturbation-backend dense \
+  --family dense_gaussian \
+  --targets all_params \
+  --dense-noise-mode paper \
+  --population 128 \
+  --prompts 64 \
+  --holdout-prompts 256 \
+  --sigma-values 0.0005,0.001,0.002 \
+  --promote 32 \
+  --ensemble-ks 1,5,6,12,32 \
+  --prompt-variant paper \
+  --use-chat-template \
+  --max-new-tokens 1024
 ```
 
 Rank sweep:

@@ -109,6 +109,7 @@ def make_backend(args):
             dtype=args.dtype,
             stop_at_answer=args.stop_at_answer,
             snapshot_device=args.dense_snapshot_device,
+            dense_noise_mode=args.dense_noise_mode,
         )
     return TransformersLoraBackend(
         args.model,
@@ -144,6 +145,8 @@ def run_oracle(args):
         "sigma": args.sigma,
         "targets": args.targets,
         "perturbation_backend": args.perturbation_backend,
+        "dense_snapshot_device": args.dense_snapshot_device,
+        "dense_noise_mode": args.dense_noise_mode,
         "dtype": args.dtype,
         "batch_size": args.batch_size,
         "allow_repeat_data": args.allow_repeat_data,
@@ -606,6 +609,7 @@ def main():
         sp.add_argument("--use-chat-template", action="store_true")
         sp.add_argument("--perturbation-backend", choices=["lora", "dense"], default="lora")
         sp.add_argument("--dense-snapshot-device", choices=["model", "cpu"], default="model")
+        sp.add_argument("--dense-noise-mode", choices=["canonical", "paper"], default="canonical")
         sp.add_argument("--stop-at-answer", action="store_true")
         sp.add_argument(
             "--family",

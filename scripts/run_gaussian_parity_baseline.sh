@@ -19,6 +19,7 @@ USE_CHAT_TEMPLATE=${USE_CHAT_TEMPLATE:-0}
 PROMOTE=${PROMOTE:-4}
 ENSEMBLE_KS=${ENSEMBLE_KS:-}
 DENSE_SNAPSHOT_DEVICE=${DENSE_SNAPSHOT_DEVICE:-model}
+DENSE_NOISE_MODE=${DENSE_NOISE_MODE:-canonical}
 INCLUDE_PROJECTED=${INCLUDE_PROJECTED:-1}
 DENSE_REF_DIR=${DENSE_REF_DIR:-}
 RUN_DENSE=${RUN_DENSE:-1}
@@ -35,6 +36,9 @@ if [[ "$PROMPT_VARIANT" != "default" ]]; then
 fi
 if [[ "$USE_CHAT_TEMPLATE" == "1" ]]; then
   extra_search_args+=(--use-chat-template)
+fi
+if [[ "$DENSE_NOISE_MODE" != "canonical" ]]; then
+  extra_search_args+=(--dense-noise-mode "$DENSE_NOISE_MODE")
 fi
 
 if [[ ! -f "$DATA" ]]; then

@@ -79,6 +79,27 @@ class DenseSpaceTests(unittest.TestCase):
         self.assertTrue(torch.allclose(positive_delta, -negative_delta))
         self.assertIn(name, patcher.module_names)
 
+    def test_all_params_mode_patches_every_floating_parameter(self):
+        model = TinyModel()
+        patcher = DenseGaussianPatcher(model, ("all_params",))
+        original = {name: param.detach().clone() for name, param in model.named_parameters()}
+
+        patcher.set_candidate(Candidate("dense_gaussian", seed=8642, sigma=0.01))
+
+        self.assertEqual(set(patcher.module_names), set(original))
+        for name, param in model.named_parameters():
+            self.assertFalse(torch.equal(param, original[name]))
+
+    def test_paper_noise_mode_uses_same_seed_stream_per_parameter(self):
+        candidate = Candidate("dense_gaussian", seed=123, sigma=0.01)
+
+        first = dense_noise_tensor("a", (2, 2), candidate, noise_mode="paper")
+        second = dense_noise_tensor("b", (2, 2), candidate, noise_mode="paper")
+        canonical = dense_noise_tensor("b", (2, 2), candidate, noise_mode="canonical")
+
+        self.assertTrue(torch.equal(first, second))
+        self.assertFalse(torch.equal(first, canonical))
+
 
 if __name__ == "__main__":
     unittest.main()

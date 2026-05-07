@@ -14,6 +14,8 @@ The upstream Countdown script uses:
 - max tokens: `1024`
 - prompt: Countdown handler's reasoning prompt with the paper system message
 - formatting: apply the tokenizer chat template for instruct/chat models
+- perturbation support: all non-visual model parameters, not only selected
+  attention projection matrices
 - evaluation: select top candidates by train reward, then majority-vote over top-K candidates on test prompts
 - Countdown voting: valid formulas vote by evaluated numeric result, not by raw formula string
 
@@ -41,12 +43,22 @@ RandOpt-style search must use `ensemble_holdout`.
 For an official-style prompt on the local dense/LoRA harness, use:
 
 ```bash
-PROMPT_VARIANT=paper \
-USE_CHAT_TEMPLATE=1 \
-MAX_NEW_TOKENS=1024 \
-SIGMA_VALUES=0.0005,0.001,0.002 \
-ENSEMBLE_KS=1,5,6,12 \
-scripts/run_gaussian_parity_baseline.sh
+python -m randopt_lora_lab.experiments search \
+  --out results/paper_style_dense_local \
+  --model Qwen/Qwen2.5-3B-Instruct \
+  --perturbation-backend dense \
+  --family dense_gaussian \
+  --targets all_params \
+  --dense-noise-mode paper \
+  --population 128 \
+  --prompts 64 \
+  --holdout-prompts 256 \
+  --sigma-values 0.0005,0.001,0.002 \
+  --promote 32 \
+  --ensemble-ks 1,5,6,12 \
+  --prompt-variant paper \
+  --use-chat-template \
+  --max-new-tokens 1024
 ```
 
 ## Required Gates
