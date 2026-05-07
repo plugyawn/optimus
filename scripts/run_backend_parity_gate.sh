@@ -17,6 +17,7 @@ TARGETS=${TARGETS:-q_proj,v_proj}
 HF_BATCH_SIZE=${HF_BATCH_SIZE:-16}
 VLLM_MAX_LORAS=${VLLM_MAX_LORAS:-16}
 VLLM_CHUNK_ADAPTERS=${VLLM_CHUNK_ADAPTERS:-16}
+VLLM_PROMPT_INPUT=${VLLM_PROMPT_INPUT:-text}
 ADAPTER_SAMPLE=${ADAPTER_SAMPLE:-16}
 
 export PYTHONUNBUFFERED=1
@@ -62,6 +63,7 @@ python -m randopt_lora_lab.vllm_lora_search \
   --max-loras "$VLLM_MAX_LORAS" \
   --chunk-adapters "$VLLM_CHUNK_ADAPTERS" \
   --max-cpu-loras 4096 \
+  --prompt-input "$VLLM_PROMPT_INPUT" \
   --max-new-tokens "$MAX_NEW_TOKENS" \
   --stop-at-answer \
   --antithetic \
