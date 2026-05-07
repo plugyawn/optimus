@@ -34,6 +34,21 @@ The audit must pass for an official-style reproduction claim. A failed audit can
 still describe a useful local parity panel, but it must not be presented as a
 paper reproduction.
 
+For the actual upstream/vLLM path, run:
+
+```bash
+CUDA_DEVICES=0 \
+POPULATION_SIZE=5000 \
+TRAIN_SAMPLES=200 \
+TOP_K_RATIOS=0.04,0.01,0.05,0.1 \
+SIGMA_VALUES=0.0005,0.001,0.002 \
+MAX_TOKENS=1024 \
+scripts/run_upstream_randopt_countdown.sh
+```
+
+Use smaller `POPULATION_SIZE`/`TEST_SAMPLES` only for smoke tests, and label the
+result as a smoke rather than a paper reproduction.
+
 ## Corrected Local Parity Panel
 
 The local dense-vs-LoRA panel is a systems and geometry parity test, not an

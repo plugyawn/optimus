@@ -131,6 +131,18 @@ python -m randopt_lora_lab.experiments search \
   --max-new-tokens 1024
 ```
 
+Official upstream/vLLM Countdown baseline launcher:
+
+```bash
+CUDA_DEVICES=0 \
+POPULATION_SIZE=5000 \
+TRAIN_SAMPLES=200 \
+TOP_K_RATIOS=0.04,0.01,0.05,0.1 \
+SIGMA_VALUES=0.0005,0.001,0.002 \
+MAX_TOKENS=1024 \
+scripts/run_upstream_randopt_countdown.sh
+```
+
 Rank sweep:
 
 ```bash
