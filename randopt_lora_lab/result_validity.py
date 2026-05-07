@@ -48,6 +48,13 @@ def mode_rows(rows: list[dict], mode: str) -> list[dict]:
     return [row for row in rows if row.get("mode") == mode]
 
 
+def rows_by_prompt_variant(rows: list[dict]) -> dict[str, list[dict]]:
+    out: dict[str, list[dict]] = {}
+    for row in rows:
+        out.setdefault(str(row.get("prompt_variant", "default")), []).append(row)
+    return out
+
+
 def prompt_signature(row: dict) -> tuple[tuple[int, ...], int] | None:
     ex = row_example(row)
     if ex is None:
@@ -101,22 +108,24 @@ def base_prompt_checks(per_prompt: list[dict], holdout: list[dict]) -> list[Vali
     checks.append(bool_check("base_screen_rows_present", bool(base_screen), {"rows": len(base_screen)}))
     checks.append(bool_check("base_holdout_rows_present", bool(base_holdout), {"rows": len(base_holdout)}))
     for label, rows in [("screen", base_screen), ("holdout", base_holdout)]:
-        ids = [int(row["example_id"]) for row in rows if "example_id" in row]
-        semantics = [sig for row in rows if (sig := prompt_signature(row)) is not None]
-        checks.append(
-            bool_check(
-                f"{label}_base_ids_unique",
-                len(ids) == unique_count(ids),
-                {"rows": len(ids), "unique": unique_count(ids)},
+        for variant, variant_rows in sorted(rows_by_prompt_variant(rows).items()):
+            ids = [int(row["example_id"]) for row in variant_rows if "example_id" in row]
+            semantics = [sig for row in variant_rows if (sig := prompt_signature(row)) is not None]
+            suffix = variant.replace("|", "_")
+            checks.append(
+                bool_check(
+                    f"{label}_base_ids_unique[{suffix}]",
+                    len(ids) == unique_count(ids),
+                    {"prompt_variant": variant, "rows": len(ids), "unique": unique_count(ids)},
+                )
             )
-        )
-        checks.append(
-            bool_check(
-                f"{label}_base_semantics_unique",
-                len(semantics) == unique_count(semantics),
-                {"rows": len(semantics), "unique": unique_count(semantics)},
+            checks.append(
+                bool_check(
+                    f"{label}_base_semantics_unique[{suffix}]",
+                    len(semantics) == unique_count(semantics),
+                    {"prompt_variant": variant, "rows": len(semantics), "unique": unique_count(semantics)},
+                )
             )
-        )
     if base_screen and base_holdout:
         screen_ids = {int(row["example_id"]) for row in base_screen if "example_id" in row}
         holdout_ids = {int(row["example_id"]) for row in base_holdout if "example_id" in row}

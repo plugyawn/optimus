@@ -111,7 +111,7 @@ class ResultValidityTests(unittest.TestCase):
             summary = run_validity_audit(run)
 
         self.assertFalse(summary["pass"])
-        self.assertIn("holdout_base_semantics_unique", summary["failed"])
+        self.assertIn("holdout_base_semantics_unique[default]", summary["failed"])
 
     def test_fails_stale_parser_rows(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -150,6 +150,52 @@ class ResultValidityTests(unittest.TestCase):
 
         self.assertFalse(summary["pass"])
         self.assertIn("selected_candidate_cap_hit_below_threshold", summary["failed"])
+
+    def test_allows_same_examples_across_prompt_variants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self.make_valid_run(Path(tmp))
+            screen_rows = []
+            holdout_rows = []
+            for variant in ["default", "reordered"]:
+                screen_rows.append(
+                    row(
+                        "base_screen",
+                        "base",
+                        1,
+                        [1, 2, 3],
+                        6,
+                        "<answer>1+2+3</answer>",
+                        prompt_variant=variant,
+                    )
+                )
+                holdout_rows.extend(
+                    [
+                        row(
+                            "base_holdout",
+                            "base",
+                            2,
+                            [2, 3, 4],
+                            9,
+                            "<answer>2+3+4</answer>",
+                            prompt_variant=variant,
+                        ),
+                        row(
+                            "holdout",
+                            "isotropic:seed1:s0.01:sign1",
+                            2,
+                            [2, 3, 4],
+                            9,
+                            "<answer>2+3+4</answer>",
+                            prompt_variant=variant,
+                        ),
+                    ]
+                )
+            write_jsonl(run / "per_prompt.jsonl", screen_rows)
+            write_jsonl(run / "holdout_per_prompt.jsonl", holdout_rows)
+
+            summary = run_validity_audit(run)
+
+        self.assertTrue(summary["pass"], summary["failed"])
 
 
 if __name__ == "__main__":
