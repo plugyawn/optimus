@@ -57,6 +57,17 @@ python -m randopt_lora_lab.experiments search \
   --stop-at-answer
 ```
 
+Dense vs LoRA parity baseline:
+
+```bash
+OUT=results/gaussian_parity_baseline \
+POPULATION=64 \
+PROMPTS=64 \
+HOLDOUT_PROMPTS=256 \
+SIGMA=0.01 \
+scripts/run_gaussian_parity_baseline.sh
+```
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 
 ## Evidence Rules
