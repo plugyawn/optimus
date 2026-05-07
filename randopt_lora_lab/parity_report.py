@@ -82,6 +82,8 @@ def compare_runs(
     lora_pick_key = lora_ranked[0] if lora_ranked else None
     dense_best_score = float(dense_by_key[dense_best_key]["exact_mean"]) if dense_best_key else None
     dense_score_at_lora_pick = float(dense_by_key[lora_pick_key]["exact_mean"]) if lora_pick_key else None
+    lora_pick_score = float(lora_by_key[lora_pick_key]["exact_mean"]) if lora_pick_key else None
+    dense_best_lora_score = float(lora_by_key[dense_best_key]["exact_mean"]) if dense_best_key else None
     selected_regret = None
     if dense_best_score is not None and dense_score_at_lora_pick is not None:
         selected_regret = dense_best_score - dense_score_at_lora_pick
@@ -109,8 +111,16 @@ def compare_runs(
         "dense_best_key": dense_best_key,
         "lora_pick_key": lora_pick_key,
         "dense_best_score": dense_best_score,
+        "dense_best_lora_score": dense_best_lora_score,
+        "lora_pick_score": lora_pick_score,
         "dense_score_at_lora_pick": dense_score_at_lora_pick,
         "selected_regret": selected_regret,
+        "dense_best_cap_hit_mean": dense_by_key[dense_best_key].get("cap_hit_mean") if dense_best_key else None,
+        "dense_best_malformed_mean": dense_by_key[dense_best_key].get("malformed_mean") if dense_best_key else None,
+        "dense_best_output_tokens": dense_by_key[dense_best_key].get("output_tokens") if dense_best_key else None,
+        "lora_pick_cap_hit_mean": lora_by_key[lora_pick_key].get("cap_hit_mean") if lora_pick_key else None,
+        "lora_pick_malformed_mean": lora_by_key[lora_pick_key].get("malformed_mean") if lora_pick_key else None,
+        "lora_pick_output_tokens": lora_by_key[lora_pick_key].get("output_tokens") if lora_pick_key else None,
         "dense_candidate_sec": dense_candidate_sec,
         "lora_candidate_sec": lora_candidate_sec,
         "speed_ratio_lora_over_dense": speed_ratio,
@@ -164,6 +174,10 @@ def render_markdown(summary: dict) -> str:
                 f"| Spearman | {comparison['spearman'] if comparison['spearman'] is not None else 'null'} |",
                 f"| top-{comparison['top_k']} overlap | {comparison['topk_overlap']} |",
                 f"| selected regret | {comparison['selected_regret'] if comparison['selected_regret'] is not None else 'null'} |",
+                f"| dense best cap-hit | {comparison['dense_best_cap_hit_mean'] if comparison['dense_best_cap_hit_mean'] is not None else 'null'} |",
+                f"| dense best malformed | {comparison['dense_best_malformed_mean'] if comparison['dense_best_malformed_mean'] is not None else 'null'} |",
+                f"| selected candidate cap-hit | {comparison['lora_pick_cap_hit_mean'] if comparison['lora_pick_cap_hit_mean'] is not None else 'null'} |",
+                f"| selected candidate malformed | {comparison['lora_pick_malformed_mean'] if comparison['lora_pick_malformed_mean'] is not None else 'null'} |",
                 f"| dense candidate/sec | {comparison['dense_candidate_sec']} |",
                 f"| candidate/sec | {comparison['lora_candidate_sec']} |",
                 f"| speed ratio candidate/dense | {comparison['speed_ratio_lora_over_dense'] if comparison['speed_ratio_lora_over_dense'] is not None else 'null'} |",
@@ -187,6 +201,10 @@ def render_markdown(summary: dict) -> str:
         f"| Spearman | {summary['spearman'] if summary['spearman'] is not None else 'null'} |",
         f"| top-{summary['top_k']} overlap | {summary['topk_overlap']} |",
         f"| selected regret | {summary['selected_regret'] if summary['selected_regret'] is not None else 'null'} |",
+        f"| dense best cap-hit | {summary['dense_best_cap_hit_mean'] if summary['dense_best_cap_hit_mean'] is not None else 'null'} |",
+        f"| dense best malformed | {summary['dense_best_malformed_mean'] if summary['dense_best_malformed_mean'] is not None else 'null'} |",
+        f"| selected LoRA cap-hit | {summary['lora_pick_cap_hit_mean'] if summary['lora_pick_cap_hit_mean'] is not None else 'null'} |",
+        f"| selected LoRA malformed | {summary['lora_pick_malformed_mean'] if summary['lora_pick_malformed_mean'] is not None else 'null'} |",
         f"| dense candidate/sec | {summary['dense_candidate_sec']} |",
         f"| LoRA candidate/sec | {summary['lora_candidate_sec']} |",
         f"| speed ratio LoRA/dense | {summary['speed_ratio_lora_over_dense'] if summary['speed_ratio_lora_over_dense'] is not None else 'null'} |",
