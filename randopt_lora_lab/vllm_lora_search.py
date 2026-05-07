@@ -153,6 +153,9 @@ def mixed_eval(
                     "adapter": spec.name,
                     "mode": mode,
                     "prompt_variant": prompt_variant,
+                    "seed": spec.seed,
+                    "sigma": spec.sigma,
+                    "sign": spec.sign,
                     "elapsed_s": elapsed / max(len(chunk), 1),
                     "prompts": len(prompt_texts),
                 }

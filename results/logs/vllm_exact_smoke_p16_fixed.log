@@ -1,0 +1,360 @@
+INFO 05-07 08:34:07 [utils.py:233] non-default args: {'trust_remote_code': True, 'dtype': 'bfloat16', 'max_model_len': 1024, 'gpu_memory_utilization': 0.78, 'max_num_batched_tokens': 4096, 'disable_log_stats': True, 'enable_lora': True, 'max_loras': 8, 'max_lora_rank': 8, 'max_cpu_loras': 64, 'model': 'Qwen/Qwen2.5-3B-Instruct'}
+INFO 05-07 08:34:07 [model.py:555] Resolved architecture: Qwen2ForCausalLM
+INFO 05-07 08:34:07 [model.py:1680] Using max model len 1024
+INFO 05-07 08:34:07 [scheduler.py:239] Chunked prefill is enabled with max_num_batched_tokens=4096.
+INFO 05-07 08:34:07 [vllm.py:840] Asynchronous scheduling is enabled.
+INFO 05-07 08:34:07 [kernel.py:205] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'])
+(EngineCore pid=5437) INFO 05-07 08:34:09 [core.py:109] Initializing a V1 LLM engine (v0.20.1) with config: model='Qwen/Qwen2.5-3B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-3B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=True, dtype=torch.bfloat16, max_seq_len=1024, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False), seed=0, served_model_name=Qwen/Qwen2.5-3B-Instruct, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::linear_attention', 'vllm::plamo2_mamba_mixer', 'vllm::gdn_attention_core', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::kda_attention', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': [], 'compile_ranges_endpoints': [4096], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'size_asserts': False, 'alignment_asserts': False, 'scalar_asserts': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native']), enable_flashinfer_autotune=True, moe_backend='auto')
+(EngineCore pid=5437) INFO 05-07 08:34:10 [nixl_utils.py:20] Setting UCX_RCACHE_MAX_UNRELEASED to '1024' to avoid a rare memory leak in UCX when using NIXL.
+(EngineCore pid=5437) WARNING 05-07 08:34:10 [nixl_utils.py:34] NIXL is not available
+(EngineCore pid=5437) WARNING 05-07 08:34:10 [nixl_utils.py:44] NIXL agent config is not available
+(EngineCore pid=5437) INFO 05-07 08:34:10 [parallel_state.py:1402] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://154.54.100.248:42701 backend=nccl
+(EngineCore pid=5437) INFO 05-07 08:34:10 [parallel_state.py:1715] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank N/A, EPLB rank N/A
+(EngineCore pid=5437) INFO 05-07 08:34:11 [gpu_model_runner.py:4777] Starting to load model Qwen/Qwen2.5-3B-Instruct...
+(EngineCore pid=5437) INFO 05-07 08:34:12 [cuda.py:368] Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+(EngineCore pid=5437) INFO 05-07 08:34:12 [flash_attn.py:646] Using FlashAttention version 2
+(EngineCore pid=5437) Exception in thread Thread-1 (_report_usage_worker):
+(EngineCore pid=5437) Traceback (most recent call last):
+(EngineCore pid=5437)   File "/usr/lib/python3.10/threading.py", line 1016, in _bootstrap_inner
+(EngineCore pid=5437)     self.run()
+(EngineCore pid=5437)   File "/usr/lib/python3.10/threading.py", line 953, in run
+(EngineCore pid=5437)     self._target(*self._args, **self._kwargs)
+(EngineCore pid=5437)   File "/home/ubuntu/.local/lib/python3.10/site-packages/vllm/usage/usage_lib.py", line 173, in _report_usage_worker
+(EngineCore pid=5437)     self._report_usage_once(model_architecture, usage_context, extra_kvs)
+(EngineCore pid=5437)   File "/home/ubuntu/.local/lib/python3.10/site-packages/vllm/usage/usage_lib.py", line 246, in _report_usage_once
+(EngineCore pid=5437)     self._write_to_file(data)
+(EngineCore pid=5437)   File "/home/ubuntu/.local/lib/python3.10/site-packages/vllm/usage/usage_lib.py", line 275, in _write_to_file
+(EngineCore pid=5437)     os.makedirs(os.path.dirname(_USAGE_STATS_JSON_PATH), exist_ok=True)
+(EngineCore pid=5437)   File "/usr/lib/python3.10/os.py", line 225, in makedirs
+(EngineCore pid=5437)     mkdir(name, mode)
+(EngineCore pid=5437) PermissionError: [Errno 13] Permission denied: '/home/ubuntu/.config/vllm'
+(EngineCore pid=5437) INFO 05-07 08:34:12 [weight_utils.py:904] Filesystem type for checkpoints: EXT4. Checkpoint size: 5.75 GiB. Available RAM: 113.90 GiB.
+(EngineCore pid=5437) INFO 05-07 08:34:12 [weight_utils.py:927] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+(EngineCore pid=5437) Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+(EngineCore pid=5437) Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:00<00:00,  1.73it/s]
+(EngineCore pid=5437) Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:00<00:00,  2.14it/s]
+(EngineCore pid=5437) Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:00<00:00,  2.07it/s]
+(EngineCore pid=5437)
+(EngineCore pid=5437) INFO 05-07 08:34:13 [default_loader.py:384] Loading weights took 1.01 seconds
+(EngineCore pid=5437) INFO 05-07 08:34:13 [punica_selector.py:20] Using PunicaWrapperGPU.
+(EngineCore pid=5437) INFO 05-07 08:34:14 [gpu_model_runner.py:4879] Model loading took 6.04 GiB memory and 1.946808 seconds
+(EngineCore pid=5437) INFO 05-07 08:34:20 [backends.py:1069] Using cache directory: /home/ubuntu/.cache/vllm/torch_compile_cache/c54b9c5ba3/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=5437) INFO 05-07 08:34:20 [backends.py:1128] Dynamo bytecode transform time: 4.89 s
+(EngineCore pid=5437) INFO 05-07 08:34:22 [backends.py:290] Directly load the compiled graph(s) for compile range (1, 4096) from the cache, took 1.794 s
+(EngineCore pid=5437) INFO 05-07 08:34:22 [decorators.py:305] Directly load AOT compilation from path /home/ubuntu/.cache/vllm/torch_compile_cache/torch_aot_compile/7d4563cac38b3bf2f073cd23a9309995136ff70b254795b80ffddf50fe0a7f32/rank_0_0/model
+(EngineCore pid=5437) INFO 05-07 08:34:22 [monitor.py:53] torch.compile took 7.37 s in total
+(EngineCore pid=5437) INFO 05-07 08:34:22 [monitor.py:81] Initial profiling/warmup run took 0.13 s
+(EngineCore pid=5437) INFO 05-07 08:34:23 [gpu_model_runner.py:5963] Profiling CUDA graph memory: PIECEWISE=102 (largest=512), FULL=70 (largest=256)
+(EngineCore pid=5437) WARNING 05-07 08:34:23 [utils.py:267] Using default LoRA kernel configs
+(EngineCore pid=5437) INFO 05-07 08:34:25 [gpu_model_runner.py:6042] Estimated CUDA graph memory: 0.95 GiB total
+(EngineCore pid=5437) INFO 05-07 08:34:25 [gpu_worker.py:440] Available KV cache memory: 54.09 GiB
+(EngineCore pid=5437) INFO 05-07 08:34:25 [gpu_worker.py:455] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7800 is equivalent to --gpu-memory-utilization=0.7681 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.7919. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=5437) INFO 05-07 08:34:25 [kv_cache_utils.py:1708] GPU KV cache size: 1,575,616 tokens
+(EngineCore pid=5437) INFO 05-07 08:34:25 [kv_cache_utils.py:1709] Maximum concurrency for 1,024 tokens per request: 1538.69x
+(EngineCore pid=5437) Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):   0%|          | 0/102 [00:00<?, ?it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):   1%|          | 1/102 [00:00<00:24,  4.13it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):   3%|▎         | 3/102 [00:00<00:11,  8.32it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):   5%|▍         | 5/102 [00:00<00:09, 10.05it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):   7%|▋         | 7/102 [00:00<00:08, 11.02it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):   9%|▉         | 9/102 [00:00<00:07, 11.63it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  11%|█         | 11/102 [00:01<00:07, 11.97it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  13%|█▎        | 13/102 [00:01<00:07, 12.21it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  15%|█▍        | 15/102 [00:01<00:07, 12.28it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  17%|█▋        | 17/102 [00:01<00:06, 12.47it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  19%|█▊        | 19/102 [00:01<00:06, 12.58it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  21%|██        | 21/102 [00:01<00:06, 12.68it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  23%|██▎       | 23/102 [00:01<00:06, 12.65it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  25%|██▍       | 25/102 [00:02<00:06, 12.70it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  26%|██▋       | 27/102 [00:02<00:05, 12.68it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  28%|██▊       | 29/102 [00:02<00:05, 12.65it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  30%|███       | 31/102 [00:02<00:05, 12.65it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  32%|███▏      | 33/102 [00:02<00:05, 12.67it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  34%|███▍      | 35/102 [00:02<00:05, 12.44it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  36%|███▋      | 37/102 [00:03<00:05, 12.50it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  38%|███▊      | 39/102 [00:03<00:05, 12.40it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  40%|████      | 41/102 [00:03<00:04, 12.43it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  42%|████▏     | 43/102 [00:03<00:04, 12.46it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  44%|████▍     | 45/102 [00:03<00:04, 12.49it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  46%|████▌     | 47/102 [00:03<00:04, 12.52it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  48%|████▊     | 49/102 [00:04<00:04, 12.52it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  50%|█████     | 51/102 [00:04<00:04, 12.54it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  52%|█████▏    | 53/102 [00:04<00:03, 12.51it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  54%|█████▍    | 55/102 [00:04<00:03, 12.52it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  56%|█████▌    | 57/102 [00:04<00:03, 12.45it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  58%|█████▊    | 59/102 [00:04<00:03, 12.49it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  60%|█████▉    | 61/102 [00:05<00:03, 12.54it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  62%|██████▏   | 63/102 [00:05<00:03, 12.57it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  64%|██████▎   | 65/102 [00:05<00:02, 12.56it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  66%|██████▌   | 67/102 [00:05<00:02, 12.32it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  68%|██████▊   | 69/102 [00:05<00:02, 12.24it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  70%|██████▉   | 71/102 [00:05<00:02, 12.29it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  72%|███████▏  | 73/102 [00:05<00:02, 12.38it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  74%|███████▎  | 75/102 [00:06<00:02, 12.20it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  75%|███████▌  | 77/102 [00:06<00:02, 12.29it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  77%|███████▋  | 79/102 [00:06<00:01, 12.38it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  79%|███████▉  | 81/102 [00:06<00:01, 12.36it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  81%|████████▏ | 83/102 [00:06<00:01, 12.40it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  83%|████████▎ | 85/102 [00:06<00:01, 12.36it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  85%|████████▌ | 87/102 [00:07<00:01, 12.35it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  87%|████████▋ | 89/102 [00:07<00:01, 12.39it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  89%|████████▉ | 91/102 [00:07<00:00, 12.32it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  91%|█████████ | 93/102 [00:07<00:00, 12.29it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  93%|█████████▎| 95/102 [00:07<00:00, 11.93it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  95%|█████████▌| 97/102 [00:07<00:00, 12.06it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  97%|█████████▋| 99/102 [00:08<00:00, 12.14it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE):  99%|█████████▉| 101/102 [00:08<00:00, 11.36it/s]Capturing CUDA graphs (mixed prefill-decode, PIECEWISE): 100%|██████████| 102/102 [00:08<00:00, 12.19it/s]
+(EngineCore pid=5437) Capturing CUDA graphs (decode, FULL):   0%|          | 0/70 [00:00<?, ?it/s]Capturing CUDA graphs (decode, FULL):   1%|▏         | 1/70 [00:00<00:16,  4.08it/s]Capturing CUDA graphs (decode, FULL):   4%|▍         | 3/70 [00:00<00:08,  8.05it/s]Capturing CUDA graphs (decode, FULL):   7%|▋         | 5/70 [00:00<00:06,  9.79it/s]Capturing CUDA graphs (decode, FULL):  10%|█         | 7/70 [00:00<00:05, 10.70it/s]Capturing CUDA graphs (decode, FULL):  13%|█▎        | 9/70 [00:00<00:05, 11.27it/s]Capturing CUDA graphs (decode, FULL):  16%|█▌        | 11/70 [00:01<00:05, 11.62it/s]Capturing CUDA graphs (decode, FULL):  19%|█▊        | 13/70 [00:01<00:04, 11.79it/s]Capturing CUDA graphs (decode, FULL):  21%|██▏       | 15/70 [00:01<00:04, 11.92it/s]Capturing CUDA graphs (decode, FULL):  24%|██▍       | 17/70 [00:01<00:04, 12.09it/s]Capturing CUDA graphs (decode, FULL):  27%|██▋       | 19/70 [00:01<00:04, 12.22it/s]Capturing CUDA graphs (decode, FULL):  30%|███       | 21/70 [00:01<00:03, 12.26it/s]Capturing CUDA graphs (decode, FULL):  33%|███▎      | 23/70 [00:02<00:03, 12.31it/s]Capturing CUDA graphs (decode, FULL):  36%|███▌      | 25/70 [00:02<00:03, 12.30it/s]Capturing CUDA graphs (decode, FULL):  39%|███▊      | 27/70 [00:02<00:03, 12.34it/s]Capturing CUDA graphs (decode, FULL):  41%|████▏     | 29/70 [00:02<00:03, 12.41it/s]Capturing CUDA graphs (decode, FULL):  44%|████▍     | 31/70 [00:02<00:03, 12.46it/s]Capturing CUDA graphs (decode, FULL):  47%|████▋     | 33/70 [00:02<00:02, 12.45it/s]Capturing CUDA graphs (decode, FULL):  50%|█████     | 35/70 [00:02<00:02, 12.49it/s]Capturing CUDA graphs (decode, FULL):  53%|█████▎    | 37/70 [00:03<00:02, 12.41it/s]Capturing CUDA graphs (decode, FULL):  56%|█████▌    | 39/70 [00:03<00:02, 12.46it/s]Capturing CUDA graphs (decode, FULL):  59%|█████▊    | 41/70 [00:03<00:02, 12.50it/s]Capturing CUDA graphs (decode, FULL):  61%|██████▏   | 43/70 [00:03<00:02, 12.51it/s]Capturing CUDA graphs (decode, FULL):  64%|██████▍   | 45/70 [00:03<00:01, 12.52it/s]Capturing CUDA graphs (decode, FULL):  67%|██████▋   | 47/70 [00:03<00:01, 12.41it/s]Capturing CUDA graphs (decode, FULL):  70%|███████   | 49/70 [00:04<00:01, 12.37it/s]Capturing CUDA graphs (decode, FULL):  73%|███████▎  | 51/70 [00:04<00:01, 12.43it/s]Capturing CUDA graphs (decode, FULL):  76%|███████▌  | 53/70 [00:04<00:01, 12.50it/s]Capturing CUDA graphs (decode, FULL):  79%|███████▊  | 55/70 [00:04<00:01, 12.53it/s]Capturing CUDA graphs (decode, FULL):  81%|████████▏ | 57/70 [00:04<00:01, 12.46it/s]Capturing CUDA graphs (decode, FULL):  84%|████████▍ | 59/70 [00:04<00:00, 12.38it/s]Capturing CUDA graphs (decode, FULL):  87%|████████▋ | 61/70 [00:05<00:00, 12.32it/s]Capturing CUDA graphs (decode, FULL):  90%|█████████ | 63/70 [00:05<00:00, 12.37it/s]Capturing CUDA graphs (decode, FULL):  93%|█████████▎| 65/70 [00:05<00:00, 12.44it/s]Capturing CUDA graphs (decode, FULL):  96%|█████████▌| 67/70 [00:05<00:00, 12.46it/s]Capturing CUDA graphs (decode, FULL):  99%|█████████▊| 69/70 [00:05<00:00, 12.47it/s]Capturing CUDA graphs (decode, FULL): 100%|██████████| 70/70 [00:05<00:00, 12.12it/s]
+(EngineCore pid=5437) INFO 05-07 08:34:40 [gpu_model_runner.py:6133] Graph capturing finished in 15 secs, took 1.24 GiB
+(EngineCore pid=5437) INFO 05-07 08:34:40 [gpu_worker.py:599] CUDA graph pool memory: 1.24 GiB (actual), 0.95 GiB (estimated), difference: 0.3 GiB (23.9%).
+(EngineCore pid=5437) INFO 05-07 08:34:40 [core.py:299] init engine (profile, create kv cache, warmup model) took 25.92 s (compilation: 7.37 s)
+(EngineCore pid=5437) INFO 05-07 08:34:41 [kernel.py:205] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'])
+WARNING 05-07 08:34:41 [input_processor.py:149] vLLM has deprecated support for supporting different tokenizers for different LoRAs. By default, vLLM uses base model's tokenizer. If you are using a LoRA with its own tokenizer, consider specifying `--tokenizer [lora_path]` to use the LoRA tokenizer.
+{
+  "adapter_build_s": 1.7849376201629639,
+  "adapters_kept": false,
+  "antithetic": false,
+  "base_holdout_by_prompt": {
+    "default": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.19597220420837402,
+      "exact_mean": 0.03125,
+      "malformed_mean": 0.0,
+      "output_tokens": 526,
+      "prompt_variant": "default",
+      "prompts_per_sec": 163.28846291882763,
+      "tokens_per_sec": 2684.054109228229
+    },
+    "reordered": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.18321704864501953,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 497,
+      "prompt_variant": "reordered",
+      "prompts_per_sec": 174.65623552314474,
+      "tokens_per_sec": 2712.629657968842
+    }
+  },
+  "base_holdout_exact": 0.015625,
+  "base_screen_by_prompt": {
+    "default": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.17770719528198242,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 260,
+      "prompt_variant": "default",
+      "prompts_per_sec": 90.03574658083767,
+      "tokens_per_sec": 1463.080881938612
+    },
+    "reordered": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.15732669830322266,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.0,
+      "output_tokens": 257,
+      "prompt_variant": "reordered",
+      "prompts_per_sec": 101.69920409289018,
+      "tokens_per_sec": 1633.5434657420485
+    }
+  },
+  "base_screen_exact": 0.0,
+  "best_prompts_per_sec": 115.5353014816446,
+  "best_tokens_per_sec": 2747.348233474654,
+  "candidate_sec": 2.5157899890481996,
+  "cap_hit_penalty": 1.0,
+  "chunk_adapters": 8,
+  "enforce_eager": false,
+  "eval_elapsed_s": 6.3598313331604,
+  "family": "sparse_low_rank_lora_d0p25",
+  "holdout_prompts": 32,
+  "holdout_tokens_per_sec": 3075.789570359856,
+  "holdout_unique_prompts": 32,
+  "holdout_unique_semantic_prompts": 32,
+  "kind": "vllm_lora_search",
+  "load_s": 33.46652126312256,
+  "malformed_penalty": 1.0,
+  "max_loras": 8,
+  "max_new_tokens": 64,
+  "max_num_batched_tokens": 4096,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "population": 16,
+  "promote": 4,
+  "prompt_variants": [
+    "default",
+    "reordered"
+  ],
+  "rank": 8,
+  "score_mode": "exact",
+  "screen_candidate_sec": 3.6104781713013936,
+  "screen_holdout_overlap": 0,
+  "screen_prompts": 16,
+  "screen_prompts_per_sec": 115.5353014816446,
+  "screen_tokens_per_sec": 2747.348233474654,
+  "screen_unique_prompts": 16,
+  "screen_unique_semantic_prompts": 16,
+  "sigma": 0.01,
+  "stop_at_answer": true,
+  "targets": [
+    "q_proj",
+    "v_proj"
+  ],
+  "top_holdout": [
+    {
+      "adapter": "randopt_seed2121586239_s0.01_pos",
+      "adapter_index": 2,
+      "answer_closed_mean": 0.984375,
+      "candidate": "sparse_low_rank_lora_d0p25:seed2121586239:s0.01:sign1",
+      "cap_hit_mean": 0.015625,
+      "condition_count": 2,
+      "exact_mean": 0.03125,
+      "malformed_mean": 0.171875,
+      "max_cap_hit_regression_vs_base": 0.03125,
+      "max_malformed_regression_vs_base": 0.28125,
+      "mean_condition_selection_score": -0.171875,
+      "mean_exact_lift_vs_base": 0.015625,
+      "min_condition_selection_score": -0.28125,
+      "min_exact_lift_vs_base": 0.0,
+      "prompt_variants": [
+        "default",
+        "reordered"
+      ],
+      "score_mode": "exact",
+      "seed": 2121586239,
+      "selection_score": 0.03125,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "adapter": "randopt_seed1151155068_s0.01_pos",
+      "adapter_index": 10,
+      "answer_closed_mean": 1.0,
+      "candidate": "sparse_low_rank_lora_d0p25:seed1151155068:s0.01:sign1",
+      "cap_hit_mean": 0.0,
+      "condition_count": 2,
+      "exact_mean": 0.0,
+      "malformed_mean": 0.09375,
+      "max_cap_hit_regression_vs_base": 0.0,
+      "max_malformed_regression_vs_base": 0.15625,
+      "mean_condition_selection_score": -0.109375,
+      "mean_exact_lift_vs_base": -0.015625,
+      "min_condition_selection_score": -0.1875,
+      "min_exact_lift_vs_base": -0.03125,
+      "prompt_variants": [
+        "default",
+        "reordered"
+      ],
+      "score_mode": "exact",
+      "seed": 1151155068,
+      "selection_score": 0.0,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "adapter": "randopt_seed1688041804_s0.01_pos",
+      "adapter_index": 14,
+      "answer_closed_mean": 0.671875,
+      "candidate": "sparse_low_rank_lora_d0p25:seed1688041804:s0.01:sign1",
+      "cap_hit_mean": 0.3125,
+      "condition_count": 2,
+      "exact_mean": 0.046875,
+      "malformed_mean": 0.484375,
+      "max_cap_hit_regression_vs_base": 0.59375,
+      "max_malformed_regression_vs_base": 0.75,
+      "mean_condition_selection_score": -0.765625,
+      "mean_exact_lift_vs_base": 0.03125,
+      "min_condition_selection_score": -1.375,
+      "min_exact_lift_vs_base": -0.03125,
+      "prompt_variants": [
+        "default",
+        "reordered"
+      ],
+      "score_mode": "exact",
+      "seed": 1688041804,
+      "selection_score": 0.046875,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "adapter": "randopt_seed1982656189_s0.01_pos",
+      "adapter_index": 5,
+      "answer_closed_mean": 0.96875,
+      "candidate": "sparse_low_rank_lora_d0p25:seed1982656189:s0.01:sign1",
+      "cap_hit_mean": 0.03125,
+      "condition_count": 2,
+      "exact_mean": 0.046875,
+      "malformed_mean": 0.296875,
+      "max_cap_hit_regression_vs_base": 0.0625,
+      "max_malformed_regression_vs_base": 0.53125,
+      "mean_condition_selection_score": -0.296875,
+      "mean_exact_lift_vs_base": 0.03125,
+      "min_condition_selection_score": -0.625,
+      "min_exact_lift_vs_base": -0.03125,
+      "prompt_variants": [
+        "default",
+        "reordered"
+      ],
+      "score_mode": "exact",
+      "seed": 1982656189,
+      "selection_score": 0.046875,
+      "sigma": 0.01,
+      "sign": 1
+    }
+  ],
+  "top_screen": [
+    {
+      "adapter": "randopt_seed2121586239_s0.01_pos",
+      "adapter_index": 2,
+      "answer_closed_mean": 1.0,
+      "candidate": "sparse_low_rank_lora_d0p25:seed2121586239:s0.01:sign1",
+      "cap_hit_mean": 0.0,
+      "condition_count": 2,
+      "exact_mean": 0.0625,
+      "malformed_mean": 0.15625,
+      "max_cap_hit_regression_vs_base": 0.0,
+      "max_malformed_regression_vs_base": 0.3125,
+      "mean_condition_selection_score": -0.09375,
+      "mean_exact_lift_vs_base": 0.0625,
+      "min_condition_selection_score": -0.1875,
+      "min_exact_lift_vs_base": 0.0,
+      "prompt_variants": [
+        "default",
+        "reordered"
+      ],
+      "score_mode": "exact",
+      "seed": 2121586239,
+      "selection_score": 0.0625,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "adapter": "randopt_seed1151155068_s0.01_pos",
+      "adapter_index": 10,
+      "answer_closed_mean": 1.0,
+      "candidate": "sparse_low_rank_lora_d0p25:seed1151155068:s0.01:sign1",
+      "cap_hit_mean": 0.0,
+      "condition_count": 2,
+      "exact_mean": 0.03125,
+      "malformed_mean": 0.1875,
+      "max_cap_hit_regression_vs_base": 0.0,
+      "max_malformed_regression_vs_base": 0.1875,
+      "mean_condition_selection_score": -0.15625,
+      "mean_exact_lift_vs_base": 0.03125,
+      "min_condition_selection_score": -0.1875,
+      "min_exact_lift_vs_base": 0.0,
+      "prompt_variants": [
+        "default",
+        "reordered"
+      ],
+      "score_mode": "exact",
+      "seed": 1151155068,
+      "selection_score": 0.03125,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "adapter": "randopt_seed1688041804_s0.01_pos",
+      "adapter_index": 14,
+      "answer_closed_mean": 0.65625,
+      "candidate": "sparse_low_rank_lora_d0p25:seed1688041804:s0.01:sign1",
+      "cap_hit_mean": 0.28125,
+      "condition_count": 2,
+      "exact_mean": 0.03125,
+      "malformed_mean": 0.53125,
+      "max_cap_hit_regression_vs_base": 0.5625,
+      "max_malformed_regression_vs_base": 0.75,
+      "mean_condition_selection_score": -0.78125,
+      "mean_exact_lift_vs_base": 0.03125,
+      "min_condition_selection_score": -1.3125,
+      "min_exact_lift_vs_base": 0.0,
+      "prompt_variants": [
+        "default",
+        "reordered"
+      ],
+      "score_mode": "exact",
+      "seed": 1688041804,
+      "selection_score": 0.03125,
+      "sigma": 0.01,
+      "sign": 1
+    },
+    {
+      "adapter": "randopt_seed1982656189_s0.01_pos",
+      "adapter_index": 5,
+      "answer_closed_mean": 1.0,
+      "candidate": "sparse_low_rank_lora_d0p25:seed1982656189:s0.01:sign1",
+      "cap_hit_mean": 0.0,
+      "condition_count": 2,
+      "exact_mean": 0.03125,
+      "malformed_mean": 0.3125,
+      "max_cap_hit_regression_vs_base": 0.0,
+      "max_malformed_regression_vs_base": 0.375,
+      "mean_condition_selection_score": -0.28125,
+      "mean_exact_lift_vs_base": 0.03125,
+      "min_condition_selection_score": -0.375,
+      "min_exact_lift_vs_base": 0.0,
+      "prompt_variants": [
+        "default",
+        "reordered"
+      ],
+      "score_mode": "exact",
+      "seed": 1982656189,
+      "selection_score": 0.03125,
+      "sigma": 0.01,
+      "sign": 1
+    }
+  ]
+}(EngineCore pid=5437) INFO 05-07 08:34:48 [core.py:1238] Shutdown initiated (timeout=0)
+(EngineCore pid=5437) INFO 05-07 08:34:48 [core.py:1261] Shutdown complete
