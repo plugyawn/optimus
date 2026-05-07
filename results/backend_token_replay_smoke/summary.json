@@ -1,0 +1,72 @@
+{
+  "candidate_conditions": [],
+  "conditions": {
+    "base|hf": {
+      "condition": "base",
+      "examples": 1,
+      "first_mismatch_rate": 0.0,
+      "max_common_abs_logprob_delta": 0.4999866485595703,
+      "mean_first_mismatch_step": null,
+      "mean_generated_token_id_equal": 1,
+      "mean_topk_overlap": 5,
+      "prefix_mode": "hf",
+      "rows": 2,
+      "top1_equal_rate": 1
+    },
+    "base|vllm": {
+      "condition": "base",
+      "examples": 1,
+      "first_mismatch_rate": 0.0,
+      "max_common_abs_logprob_delta": 0.49999523162841797,
+      "mean_first_mismatch_step": null,
+      "mean_generated_token_id_equal": 1,
+      "mean_topk_overlap": 5,
+      "prefix_mode": "vllm",
+      "rows": 2,
+      "top1_equal_rate": 1
+    },
+    "zero|hf": {
+      "condition": "zero",
+      "examples": 1,
+      "first_mismatch_rate": 0.0,
+      "max_common_abs_logprob_delta": 0.4999866485595703,
+      "mean_first_mismatch_step": null,
+      "mean_generated_token_id_equal": 1,
+      "mean_topk_overlap": 5,
+      "prefix_mode": "hf",
+      "rows": 2,
+      "top1_equal_rate": 1
+    },
+    "zero|vllm": {
+      "condition": "zero",
+      "examples": 1,
+      "first_mismatch_rate": 0.0,
+      "max_common_abs_logprob_delta": 0.49999523162841797,
+      "mean_first_mismatch_step": null,
+      "mean_generated_token_id_equal": 1,
+      "mean_topk_overlap": 5,
+      "prefix_mode": "vllm",
+      "rows": 2,
+      "top1_equal_rate": 1
+    }
+  },
+  "include_zero": true,
+  "kind": "backend_token_replay_probe",
+  "load_s": 32.31803584098816,
+  "max_steps": 2,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "overall_top1_equal_rate": 1,
+  "prefix_input": "token_ids",
+  "prefix_modes": [
+    "hf",
+    "vllm"
+  ],
+  "prompts": 1,
+  "rank": 8,
+  "rows": 8,
+  "targets": [
+    "q_proj",
+    "v_proj"
+  ],
+  "top_k": 5
+}

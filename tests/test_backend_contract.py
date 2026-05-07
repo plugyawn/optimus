@@ -1,7 +1,7 @@
 import types
 import unittest
 
-from randopt_lora_lab.backend_contract import backend_contract, sampling_params_contract, tokenizer_contract, vllm_tokenizer_contract
+from randopt_lora_lab.backend_contract import backend_contract, contract_max_tokens, sampling_params_contract, tokenizer_contract, vllm_tokenizer_contract
 
 
 class FakeTokenizer:
@@ -98,6 +98,15 @@ class BackendContractTests(unittest.TestCase):
         self.assertEqual(contract["model"], "fake-model")
         self.assertEqual(contract["tokenizer"]["prompts"][0]["token_ids"], [98, ord("x") % 251, ord("y") % 251])
         self.assertEqual(contract["vllm_sampling"]["actual_attrs"]["max_tokens"], 7)
+
+    def test_backend_contract_defaults_one_token_for_next_token_probes(self):
+        args = types.SimpleNamespace(model="fake-model", stop_at_answer=False)
+
+        contract = backend_contract(FakeTokenizer(), ["xy"], args, FakeSamplingParams)
+
+        self.assertEqual(contract_max_tokens(args), 1)
+        self.assertEqual(contract["max_new_tokens"], 1)
+        self.assertEqual(contract["vllm_sampling"]["actual_attrs"]["max_tokens"], 1)
 
     def test_vllm_tokenizer_contract_records_available_tokenizer(self):
         contract = vllm_tokenizer_contract(FakeLLM(), ["zz"])

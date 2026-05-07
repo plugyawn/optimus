@@ -148,11 +148,19 @@ def sampling_params_contract(SamplingParams, max_new_tokens: int, stop_at_answer
     }
 
 
+def contract_max_tokens(args) -> int:
+    value = getattr(args, "max_new_tokens", None)
+    if value is None:
+        return 1
+    return max(int(value), 1)
+
+
 def backend_contract(tokenizer, prompts: Sequence[str], args, SamplingParams=None) -> dict:
+    max_tokens = contract_max_tokens(args)
     contract = {
         "kind": "backend_prompt_decode_contract",
         "model": getattr(args, "model", None),
-        "max_new_tokens": int(getattr(args, "max_new_tokens", 0)),
+        "max_new_tokens": max_tokens,
         "stop_at_answer": bool(getattr(args, "stop_at_answer", False)),
         "hf_batch_size": getattr(args, "hf_batch_size", None),
         "hf_dtype": getattr(args, "hf_dtype", None),
@@ -162,14 +170,14 @@ def backend_contract(tokenizer, prompts: Sequence[str], args, SamplingParams=Non
     if SamplingParams is not None:
         contract["vllm_sampling"] = sampling_params_contract(
             SamplingParams,
-            int(getattr(args, "max_new_tokens", 0)),
+            max_tokens,
             bool(getattr(args, "stop_at_answer", False)),
         )
     else:
         contract["vllm_sampling"] = {
             "requested_kwargs": _jsonable(
                 sampling_kwargs(
-                    int(getattr(args, "max_new_tokens", 0)),
+                    max_tokens,
                     bool(getattr(args, "stop_at_answer", False)),
                 )
             )
