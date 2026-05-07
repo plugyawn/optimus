@@ -1,0 +1,31 @@
+{
+  "adapter_dtype": "bfloat16",
+  "allow_repeat_data": false,
+  "candidate": [
+    "factor_gaussian_lora:seed1411240924:s0.0075:sign1",
+    "factor_gaussian_lora:seed1632697641:s0.0075:sign-1",
+    "factor_gaussian_lora:seed326653716:s0.0075:sign1",
+    "factor_gaussian_lora:seed221822464:s0.0075:sign-1"
+  ],
+  "data": "data/countdown_generated_1200_seed20260507.json",
+  "enforce_eager": false,
+  "gpu_memory_utilization": 0.72,
+  "hf_dtype": "bf16",
+  "include_zero": true,
+  "keep_adapters": false,
+  "local_files_only": false,
+  "max_model_len": 1024,
+  "max_steps": 18,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "out": "results/backend_token_replay_p64_candidates",
+  "prefix_modes": "hf,vllm",
+  "prefix_tail_tokens": 32,
+  "prompts": 4,
+  "rank": 8,
+  "seed": 4242,
+  "stop_at_answer": true,
+  "targets": "q_proj,v_proj",
+  "top_k": 20,
+  "vllm_dtype": "bfloat16",
+  "zero_family": "factor_gaussian_lora"
+}
