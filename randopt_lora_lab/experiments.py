@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .backends import TransformersLoraBackend
+from .backends import TransformersDenseGaussianBackend, TransformersLoraBackend
 from .countdown import (
     load_examples,
     prompts as make_prompts,
@@ -88,6 +88,16 @@ def evaluate_candidate(backend, candidate: Candidate | None, examples, family_st
 
 
 def make_backend(args):
+    if args.perturbation_backend == "dense":
+        return TransformersDenseGaussianBackend(
+            args.model,
+            target_suffixes=tuple(args.targets.split(",")),
+            max_new_tokens=args.max_new_tokens,
+            batch_size=args.batch_size,
+            dtype=args.dtype,
+            stop_at_answer=args.stop_at_answer,
+            snapshot_device=args.dense_snapshot_device,
+        )
     return TransformersLoraBackend(
         args.model,
         rank=args.rank,
@@ -189,7 +199,7 @@ def anzo_random_target_prompts(seed: int, n: int) -> list[str]:
 
 
 def maybe_build_family_state(args, backend, screen):
-    if args.family == "isotropic":
+    if args.family in {"isotropic", "dense_gaussian", "factor_gaussian_lora"}:
         return None
     if args.family == "random_ortho":
         return backend.build_random_orthonormal_state(args.seed)
@@ -443,11 +453,21 @@ def main():
         sp.add_argument("--max-new-tokens", type=int, default=32)
         sp.add_argument("--batch-size", type=int, default=16)
         sp.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
+        sp.add_argument("--perturbation-backend", choices=["lora", "dense"], default="lora")
+        sp.add_argument("--dense-snapshot-device", choices=["model", "cpu"], default="model")
         sp.add_argument("--stop-at-answer", action="store_true")
         sp.add_argument(
             "--family",
             default="isotropic",
-            choices=["isotropic", "anzo", "target_svd", "random_ortho", "anzo_random_target"],
+            choices=[
+                "isotropic",
+                "factor_gaussian_lora",
+                "dense_gaussian",
+                "anzo",
+                "target_svd",
+                "random_ortho",
+                "anzo_random_target",
+            ],
         )
         sp.add_argument("--population", type=int, default=32)
         sp.add_argument("--promote", type=int, default=4)
@@ -459,6 +479,10 @@ def main():
         sp.add_argument("--antithetic", action="store_true")
         sp.add_argument("--allow-repeat-data", action="store_true")
     args = p.parse_args()
+    if args.perturbation_backend == "dense" and args.cmd != "oracle" and args.family != "dense_gaussian":
+        raise ValueError("--perturbation-backend dense requires --family dense_gaussian")
+    if args.perturbation_backend == "lora" and args.family == "dense_gaussian":
+        raise ValueError("--family dense_gaussian requires --perturbation-backend dense")
     if args.cmd == "oracle":
         run_oracle(args)
     elif args.cmd == "search":

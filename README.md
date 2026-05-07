@@ -43,6 +43,20 @@ python -m randopt_lora_lab.gaussian_parity \
   --rank 8
 ```
 
+Slow trusted dense-Gaussian reference search:
+
+```bash
+python -m randopt_lora_lab.experiments search \
+  --out results/dense_gaussian_ref \
+  --data "$DATA" \
+  --perturbation-backend dense \
+  --family dense_gaussian \
+  --population 64 \
+  --prompts 64 \
+  --holdout-prompts 256 \
+  --stop-at-answer
+```
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 
 ## Evidence Rules
