@@ -15,6 +15,7 @@ from typing import Iterable
 
 from .countdown import CountdownExample, load_examples, prompts as make_prompts, score_completion
 from .lora_space import Candidate, lora_noise_tensors
+from .vllm_prompting import make_vllm_prompt_inputs
 
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-3B-Instruct"
@@ -409,6 +410,7 @@ def run_benchmark(args) -> dict:
         **({"max_num_batched_tokens": args.max_num_batched_tokens} if args.max_num_batched_tokens else {}),
     )
     load_s = time.time() - load_start
+    prompt_inputs = make_vllm_prompt_inputs(prompt_texts, llm.get_tokenizer(), args.prompt_input)
 
     requests = [
         LoRARequest(spec.name, spec.lora_int_id, spec.path)
@@ -419,7 +421,7 @@ def run_benchmark(args) -> dict:
         preload_sampling = SamplingParams(max_tokens=1, temperature=0.0)
         for spec, req in zip(specs, requests):
             start = time.time()
-            llm.generate([prompt_texts[0]], preload_sampling, lora_request=req, use_tqdm=False)
+            llm.generate([prompt_inputs[0]], preload_sampling, lora_request=req, use_tqdm=False)
             preload_rows.append(
                 {
                     "mode": "preload",
@@ -433,7 +435,7 @@ def run_benchmark(args) -> dict:
     per_prompt_rows = []
     adapter_rows = []
     if args.include_base:
-        outputs, elapsed_s = timed_generate(llm, prompt_texts, sampling)
+        outputs, elapsed_s = timed_generate(llm, prompt_inputs, sampling)
         rows, metrics = score_rows(
             mode="base",
             candidate="base",
@@ -459,7 +461,7 @@ def run_benchmark(args) -> dict:
     if not args.skip_sequential:
         for repeat in range(args.repeats):
             for spec, req in zip(specs, requests):
-                outputs, elapsed_s = timed_generate(llm, prompt_texts, sampling, lora_request=req)
+                outputs, elapsed_s = timed_generate(llm, prompt_inputs, sampling, lora_request=req)
                 rows, metrics = score_rows(
                     mode="sequential",
                     candidate=spec.candidate,
@@ -487,7 +489,7 @@ def run_benchmark(args) -> dict:
         mixed_prompts = []
         mixed_requests = []
         for req in requests:
-            mixed_prompts.extend(prompt_texts)
+            mixed_prompts.extend(prompt_inputs)
             mixed_requests.extend([req] * len(prompt_texts))
         outputs, elapsed_s = timed_generate(llm, mixed_prompts, sampling, lora_request=mixed_requests)
         rows, metrics = score_mixed_rows(
@@ -536,6 +538,7 @@ def run_benchmark(args) -> dict:
         "family": args.family,
         "targets": targets,
         "prompts": len(prompt_texts),
+        "prompt_input": args.prompt_input,
         "repeats": args.repeats,
         "max_new_tokens": args.max_new_tokens,
         "stop_at_answer": args.stop_at_answer,
@@ -616,6 +619,7 @@ def build_parser() -> argparse.ArgumentParser:
         ],
     )
     p.add_argument("--max-new-tokens", type=int, default=32)
+    p.add_argument("--prompt-input", default="text", choices=["text", "token_ids"])
     p.add_argument("--stop-at-answer", action="store_true")
     p.add_argument("--dtype", default="bfloat16")
     p.add_argument("--adapter-dtype", default="bfloat16", choices=["float16", "bfloat16", "float32"])

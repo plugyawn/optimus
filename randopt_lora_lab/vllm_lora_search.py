@@ -37,6 +37,7 @@ from .vllm_lora_bench import (
     write_json,
     write_jsonl,
 )
+from .vllm_prompting import make_vllm_prompt_inputs
 
 
 def candidate_panel(
@@ -157,6 +158,7 @@ def mixed_eval(
         tokenizer=llm.get_tokenizer(),
         use_chat_template=args.use_chat_template,
     )
+    prompt_inputs = make_vllm_prompt_inputs(prompt_texts, llm.get_tokenizer(), args.prompt_input)
     per_prompt_rows = []
     candidate_rows = []
     total_elapsed = 0.0
@@ -168,7 +170,7 @@ def mixed_eval(
         requests = []
         for spec in chunk:
             req = LoRARequest(spec.name, spec.lora_int_id, spec.path)
-            prompts.extend(prompt_texts)
+            prompts.extend(prompt_inputs)
             requests.extend([req] * len(prompt_texts))
         start = time.time()
         outputs = llm.generate(prompts, sampling, lora_request=requests, use_tqdm=False)
@@ -218,8 +220,9 @@ def base_eval(llm, sampling, examples, args, *, mode: str, prompt_variant: str =
         tokenizer=llm.get_tokenizer(),
         use_chat_template=args.use_chat_template,
     )
+    prompt_inputs = make_vllm_prompt_inputs(prompt_texts, llm.get_tokenizer(), args.prompt_input)
     start = time.time()
-    outputs = llm.generate(prompt_texts, sampling, use_tqdm=False)
+    outputs = llm.generate(prompt_inputs, sampling, use_tqdm=False)
     elapsed = time.time() - start
     rows, metrics = score_rows(
         mode=mode,
@@ -440,6 +443,7 @@ def run_search(args) -> dict:
         "targets": targets,
         "antithetic": args.antithetic,
         "prompt_variants": prompt_variants,
+        "prompt_input": args.prompt_input,
         "use_chat_template": args.use_chat_template,
         "screen_selection_prompt_variants": screen_selection_variants,
         "screen_stress_prompt_variants": screen_stress_variants,
@@ -541,6 +545,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ensemble-ks", default="")
     p.add_argument("--ensemble-ratios", default="")
     p.add_argument("--prompt-variants", default="default")
+    p.add_argument("--prompt-input", default="text", choices=["text", "token_ids"])
     p.add_argument("--use-chat-template", action="store_true")
     p.add_argument("--score-mode", default="exact", choices=["exact", "robust_mean", "robust_min"])
     p.add_argument("--malformed-penalty", type=float, default=1.0)
