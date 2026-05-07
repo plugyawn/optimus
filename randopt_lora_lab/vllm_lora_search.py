@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from .countdown import load_examples, unique_example_count, unique_semantic_example_count
+from .experiments import majority_vote_evaluation, parse_float_list, parse_k_list
 from .prompt_variants import make_variant_prompts
 from .selection_score import (
     combine_candidate_conditions,
@@ -38,14 +39,23 @@ from .vllm_lora_bench import (
 )
 
 
-def candidate_panel(family: str, population: int, sigma: float, seed: int, antithetic: bool) -> list[Candidate]:
+def candidate_panel(
+    family: str,
+    population: int,
+    sigma: float,
+    seed: int,
+    antithetic: bool,
+    sigma_values: list[float] | None = None,
+) -> list[Candidate]:
     rng = np.random.default_rng(seed)
+    sigmas = sigma_values or [sigma]
     seeds = [int(x) for x in rng.integers(1, 2**31 - 1, size=population if not antithetic else population // 2)]
+    sampled_sigmas = [float(x) for x in rng.choice(sigmas, size=len(seeds), replace=True)]
     out = []
-    for candidate_seed in seeds:
-        out.append(Candidate(family, candidate_seed, sigma, 1))
+    for candidate_seed, sampled_sigma in zip(seeds, sampled_sigmas):
+        out.append(Candidate(family, candidate_seed, sampled_sigma, 1))
         if antithetic:
-            out.append(Candidate(family, candidate_seed, sigma, -1))
+            out.append(Candidate(family, candidate_seed, sampled_sigma, -1))
     return out[:population]
 
 
@@ -107,6 +117,7 @@ def reset_outputs(out: Path) -> None:
         "holdout_candidate_condition_summary.jsonl",
         "per_prompt.jsonl",
         "holdout_per_prompt.jsonl",
+        "ensemble_per_prompt.jsonl",
     ]:
         path = out / name
         if path.exists():
@@ -231,7 +242,8 @@ def run_search(args) -> dict:
         allow_repeat=args.allow_repeat_data,
         exclude_ids={ex.id for ex in screen},
     )
-    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic)
+    sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
+    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
 
     adapter_start = time.time()
     specs = make_adapter_specs(args, out, targets, candidates)
@@ -319,7 +331,9 @@ def run_search(args) -> dict:
     write_jsonl(out / "candidate_condition_summary.jsonl", screen_condition_rows)
     write_jsonl(out / "candidate_summary.jsonl", candidate_rows)
 
-    top = sorted(candidate_rows, key=lambda r: r["selection_score"], reverse=True)[: min(args.promote, len(candidate_rows))]
+    ensemble_ks = parse_k_list(args.ensemble_ks) if args.ensemble_ks else []
+    promote_n = max(args.promote, max(ensemble_ks, default=0))
+    top = sorted(candidate_rows, key=lambda r: r["selection_score"], reverse=True)[: min(promote_n, len(candidate_rows))]
     top_specs = {spec.candidate: spec for spec in specs}
     holdout_specs = [top_specs[row["candidate"]] for row in top]
     holdout_rows = []
@@ -369,6 +383,32 @@ def run_search(args) -> dict:
 
     by_candidate_holdout = {row["candidate"]: row for row in holdout_candidate_rows}
     top_holdout = [by_candidate_holdout[row["candidate"]] for row in top if row["candidate"] in by_candidate_holdout]
+    ensemble_holdout = []
+    if ensemble_ks:
+        by_k: dict[int, list[dict]] = {k: [] for k in ensemble_ks}
+        ensemble_per_prompt = []
+        candidate_order = [str(row["candidate"]) for row in top]
+        for variant in holdout_selection_variants:
+            variant_rows = [row for row in holdout_rows if str(row.get("prompt_variant", "default")) == variant]
+            variant_summary, variant_per_prompt = majority_vote_evaluation(candidate_order, variant_rows, holdout, ensemble_ks)
+            for row in variant_summary:
+                by_k[int(row["k"])].append(dict(row, prompt_variant=variant))
+            ensemble_per_prompt.extend(dict(row, prompt_variant=variant) for row in variant_per_prompt)
+        for k in ensemble_ks:
+            rows = by_k[k]
+            ensemble_holdout.append(
+                {
+                    "k": k,
+                    "prompt_variants": sorted(str(row["prompt_variant"]) for row in rows),
+                    "condition_count": len(rows),
+                    "exact_mean": float(np.mean([float(row["exact_mean"]) for row in rows])) if rows else 0.0,
+                    "min_exact_mean": min((float(row["exact_mean"]) for row in rows), default=0.0),
+                    "coverage_mean": float(np.mean([float(row["coverage_mean"]) for row in rows])) if rows else 0.0,
+                    "valid_votes_per_prompt": float(np.mean([float(row["valid_votes_per_prompt"]) for row in rows])) if rows else 0.0,
+                    "conditions": rows,
+                }
+            )
+        write_jsonl(out / "ensemble_per_prompt.jsonl", ensemble_per_prompt)
     total_eval_s = screen_aggregate["elapsed_s"] + holdout_aggregate["elapsed_s"]
     screen_tokens_per_sec = screen_aggregate["output_tokens"] / max(screen_aggregate["elapsed_s"], 1e-9)
     screen_prompts_per_sec = (len(specs) * len(screen) * len(prompt_variants)) / max(screen_aggregate["elapsed_s"], 1e-9)
@@ -385,6 +425,7 @@ def run_search(args) -> dict:
         "population": len(specs),
         "rank": args.rank,
         "sigma": args.sigma,
+        "sigma_values": sigma_values,
         "seed": args.seed,
         "targets": targets,
         "antithetic": args.antithetic,
@@ -407,6 +448,7 @@ def run_search(args) -> dict:
         "holdout_unique_semantic_prompts": unique_semantic_example_count(holdout),
         "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "promote": args.promote,
+        "ensemble_ks": ensemble_ks,
         "max_loras": args.max_loras,
         "chunk_adapters": args.chunk_adapters,
         "enforce_eager": args.enforce_eager,
@@ -433,6 +475,8 @@ def run_search(args) -> dict:
         "best_prompts_per_sec": screen_prompts_per_sec,
         "top_screen": top,
         "top_holdout": top_holdout,
+        "ensemble_holdout": ensemble_holdout,
+        "best_ensemble_holdout_exact": max((row["exact_mean"] for row in ensemble_holdout), default=None),
     }
     write_json(out / "summary.json", summary)
     print(json.dumps(summary, indent=2, sort_keys=True))
@@ -478,7 +522,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--promote", type=int, default=8)
     p.add_argument("--rank", type=int, default=8)
     p.add_argument("--sigma", type=float, default=0.01)
+    p.add_argument("--sigma-values", default="")
     p.add_argument("--targets", default="q_proj,v_proj")
+    p.add_argument("--ensemble-ks", default="")
     p.add_argument("--prompt-variants", default="default")
     p.add_argument("--score-mode", default="exact", choices=["exact", "robust_mean", "robust_min"])
     p.add_argument("--malformed-penalty", type=float, default=1.0)

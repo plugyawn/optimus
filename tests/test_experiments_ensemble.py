@@ -2,6 +2,7 @@ import unittest
 
 from randopt_lora_lab.countdown import CountdownExample
 from randopt_lora_lab.experiments import candidate_panel, majority_vote_evaluation, parse_k_list
+from randopt_lora_lab.vllm_lora_search import candidate_panel as vllm_candidate_panel
 
 
 class ExperimentEnsembleTests(unittest.TestCase):
@@ -21,6 +22,26 @@ class ExperimentEnsembleTests(unittest.TestCase):
         self.assertEqual(len(candidates), 16)
         self.assertTrue({c.sigma for c in candidates}.issubset({0.0005, 0.001, 0.002}))
         self.assertGreater(len({c.sigma for c in candidates}), 1)
+
+    def test_vllm_candidate_panel_uses_same_multi_sigma_semantics(self):
+        candidates = vllm_candidate_panel(
+            "isotropic",
+            population=16,
+            sigma=0.01,
+            seed=123,
+            antithetic=False,
+            sigma_values=[0.0005, 0.001, 0.002],
+        )
+
+        self.assertEqual(len(candidates), 16)
+        self.assertEqual([c.sigma for c in candidates], [c.sigma for c in candidate_panel(
+            "isotropic",
+            population=16,
+            sigma=0.01,
+            seed=123,
+            antithetic=False,
+            sigma_values=[0.0005, 0.001, 0.002],
+        )])
 
     def test_majority_vote_uses_numeric_answers_not_formula_strings(self):
         example = CountdownExample(1, (1, 2, 3), 6)
