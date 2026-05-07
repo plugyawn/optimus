@@ -101,6 +101,26 @@ The sparse exact reward makes a few row-level disagreements enough to invert a
 P=16 ranking. That strengthens the case for a lower-level next-token/logit
 parity probe before any more vLLM selection work.
 
+The next probe command is:
+
+```bash
+python -m randopt_lora_lab.backend_next_token_probe \
+  --out results/backend_next_token_probe_p16 \
+  --data data/countdown_generated_1200_seed20260507.json \
+  --prompts 8 \
+  --seed 4242 \
+  --rank 8 \
+  --include-zero \
+  --candidate factor_gaussian_lora:seed509771609:s0.0075:sign-1 \
+  --candidate factor_gaussian_lora:seed1019282515:s0.0075:sign1
+```
+
+Expected gate: base and zero adapter should have near-identical next-token top-1
+and top-k sets across PEFT and vLLM before candidate-level differences are
+interpreted. If base/zero fails, the issue is backend decoding/logprob
+semantics. If base/zero passes and candidates fail, the issue is LoRA adapter
+application/scaling semantics.
+
 Then run a rank sweep before any broader LoRA-vs-dense claim:
 
 ```bash

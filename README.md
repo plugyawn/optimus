@@ -142,6 +142,20 @@ python -m randopt_lora_lab.backend_output_diff \
   --out results/backend_parity_gate_p16/output_diff
 ```
 
+Next-token parity probe for a failed gate:
+
+```bash
+python -m randopt_lora_lab.backend_next_token_probe \
+  --out results/backend_next_token_probe_p16 \
+  --data "$DATA" \
+  --prompts 8 \
+  --seed 4242 \
+  --rank 8 \
+  --include-zero \
+  --candidate factor_gaussian_lora:seed509771609:s0.0075:sign-1 \
+  --candidate factor_gaussian_lora:seed1019282515:s0.0075:sign1
+```
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 The current completion checklist is in `docs/parity_completion_audit.md`.
 
