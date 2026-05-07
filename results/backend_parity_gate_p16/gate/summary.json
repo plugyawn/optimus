@@ -1,15 +1,34 @@
 {
   "adapter_tensor_summary": {
     "checked": 576,
-    "pass": true,
+    "pass": false,
     "reason": "",
     "sampled_adapters": 4
   },
   "candidate": "results/backend_parity_gate_p16/vllm",
   "kind": "backend_parity_gate",
+  "output_diff_summary": {
+    "metrics": {
+      "answer_equal_rate": 0.67578125,
+      "exact_disagreement_rate": 0.0234375,
+      "max_abs_cap_hit_delta_by_candidate": 1.0,
+      "max_abs_exact_delta_by_candidate": 0.125,
+      "max_abs_malformed_delta_by_candidate": 0.5
+    },
+    "pass": false,
+    "summary": "results/backend_parity_gate_p16/output_diff/summary.json",
+    "thresholds": {
+      "max_abs_cap_hit_delta": 0.0,
+      "max_abs_exact_delta": 0.0,
+      "max_abs_malformed_delta": 0.0,
+      "max_exact_disagreement_rate": 0.0,
+      "min_answer_equal_rate": 0.99
+    }
+  },
   "pass": false,
-  "pass_adapter_tensors": true,
+  "pass_adapter_tensors": false,
   "pass_base_rows": true,
+  "pass_output_diff": false,
   "pass_protocol": true,
   "pass_ranking": false,
   "ranking": {

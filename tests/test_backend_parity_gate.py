@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from randopt_lora_lab.backend_parity_gate import main
+from randopt_lora_lab.backend_parity_gate import main, resolve_adapter_model_path
 
 
 SUMMARY = {
@@ -46,6 +46,21 @@ def make_run(root: Path, name: str, scores: list[float], *, summary_extra: dict 
 
 
 class BackendParityGateTests(unittest.TestCase):
+    def test_resolve_adapter_model_path_falls_back_to_local_run_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            candidate = root / "vllm"
+            adapter = candidate / "adapters" / "00000_remote_name"
+            adapter.mkdir(parents=True)
+            (adapter / "adapter_model.safetensors").write_text("placeholder")
+
+            resolved = resolve_adapter_model_path(
+                candidate,
+                {"path": "/root/randopt-lora-lab/results/run/vllm/adapters/00000_remote_name"},
+            )
+
+            self.assertEqual(resolved, adapter / "adapter_model.safetensors")
+
     def test_gate_can_pass_with_missing_adapters_explicitly_allowed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -61,6 +76,7 @@ class BackendParityGateTests(unittest.TestCase):
                     "--out",
                     str(out),
                     "--allow-missing-adapters",
+                    "--allow-missing-output-diff",
                     "--top8-gate",
                     "3",
                 ]
@@ -91,11 +107,47 @@ class BackendParityGateTests(unittest.TestCase):
                     "--out",
                     str(root / "gate"),
                     "--allow-missing-adapters",
+                    "--allow-missing-output-diff",
                     "--top8-gate",
                     "3",
                 ]
             )
             self.assertEqual(rc, 2)
+
+    def test_gate_fails_bad_output_diff_even_when_ranking_matches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            trusted = make_run(root, "trusted", [0.3, 0.2, 0.1])
+            candidate = make_run(root, "candidate", [0.3, 0.2, 0.1])
+            output_diff = root / "output_diff.json"
+            write_json(
+                output_diff,
+                {
+                    "exact_disagreement_rate": 0.25,
+                    "max_abs_exact_delta_by_candidate": 0.25,
+                    "max_abs_cap_hit_delta_by_candidate": 0.0,
+                    "max_abs_malformed_delta_by_candidate": 0.0,
+                    "answer_equal_rate": 1.0,
+                },
+            )
+            rc = main(
+                [
+                    "--trusted",
+                    str(trusted),
+                    "--candidate",
+                    str(candidate),
+                    "--out",
+                    str(root / "gate"),
+                    "--allow-missing-adapters",
+                    "--output-diff-summary",
+                    str(output_diff),
+                    "--top8-gate",
+                    "3",
+                ]
+            )
+            self.assertEqual(rc, 2)
+            summary = json.loads((root / "gate" / "summary.json").read_text())
+            self.assertFalse(summary["pass_output_diff"])
 
 
 if __name__ == "__main__":

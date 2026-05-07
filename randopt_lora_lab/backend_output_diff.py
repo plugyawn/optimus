@@ -93,6 +93,10 @@ def compare_rows(trusted_dir: Path, candidate_dir: Path, *, mode: str, trusted_n
         "text_equal_rate": mean([row["text_equal"] for row in detail_rows]) if detail_rows else None,
         "mean_abs_exact_delta_by_candidate": mean([abs(row["exact_delta"]) for row in candidate_rows]) if candidate_rows else None,
         "max_abs_exact_delta_by_candidate": max([abs(row["exact_delta"]) for row in candidate_rows]) if candidate_rows else None,
+        "mean_abs_malformed_delta_by_candidate": mean([abs(row["malformed_delta"]) for row in candidate_rows]) if candidate_rows else None,
+        "max_abs_malformed_delta_by_candidate": max([abs(row["malformed_delta"]) for row in candidate_rows]) if candidate_rows else None,
+        "mean_abs_cap_hit_delta_by_candidate": mean([abs(row["cap_hit_delta"]) for row in candidate_rows]) if candidate_rows else None,
+        "max_abs_cap_hit_delta_by_candidate": max([abs(row["cap_hit_delta"]) for row in candidate_rows]) if candidate_rows else None,
         "worst_candidates": candidate_rows[:8],
     }
     return detail_rows, candidate_rows, summary

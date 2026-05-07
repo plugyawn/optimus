@@ -192,7 +192,8 @@ scripts/run_backend_parity_gate.sh
 This is the required gate before treating vLLM as the selector of record. It
 runs the same candidate panel through the trusted HF/PEFT path and the vLLM
 adapter path, keeps adapter files, checks sampled adapter tensors against the
-canonical materializer, and then requires ranking correlation/top-k overlap.
+canonical materializer, compares saved per-prompt outputs, and then requires
+ranking correlation/top-k overlap plus output-diff parity.
 Use `python -m randopt_lora_lab.backend_parity_gate` directly when comparing
 two already-existing matched run directories.
 

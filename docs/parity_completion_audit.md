@@ -135,8 +135,10 @@ Pass criteria:
 1. HF/PEFT and vLLM use the same candidate panel and protocol metadata.
 2. Base screen and base holdout rows are saved for both backends.
 3. Kept vLLM adapter tensors match the canonical materializer sample.
-4. Spearman >= 0.85 and top-8 overlap >= 6 on the same screen split.
-5. Selected-candidate regret versus the trusted HF/PEFT ranking is negligible.
+4. Saved PEFT/vLLM screen rows have zero exact disagreement, zero max
+   candidate exact delta, no cap/malformed deltas, and high answer equality.
+5. Spearman >= 0.85 and top-8 overlap >= 6 on the same screen split.
+6. Selected-candidate regret versus the trusted HF/PEFT ranking is negligible.
 ```
 
 Only after that gate passes should vLLM results be used as quality-selection

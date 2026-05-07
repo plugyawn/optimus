@@ -67,10 +67,18 @@ python -m randopt_lora_lab.vllm_lora_search \
   --antithetic \
   --keep-adapters
 
+python -m randopt_lora_lab.backend_output_diff \
+  --trusted "$OUT_ROOT/peft" \
+  --candidate "$OUT_ROOT/vllm" \
+  --trusted-name peft \
+  --candidate-name vllm \
+  --out "$OUT_ROOT/output_diff"
+
 python -m randopt_lora_lab.backend_parity_gate \
   --trusted "$OUT_ROOT/peft" \
   --candidate "$OUT_ROOT/vllm" \
   --trusted-name peft \
   --candidate-name vllm \
   --out "$OUT_ROOT/gate" \
-  --adapter-sample "$ADAPTER_SAMPLE"
+  --adapter-sample "$ADAPTER_SAMPLE" \
+  --output-diff-summary "$OUT_ROOT/output_diff/summary.json"

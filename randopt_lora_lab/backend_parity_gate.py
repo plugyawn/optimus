@@ -104,8 +104,19 @@ def base_row_checks(run_dir: Path, label: str) -> tuple[list[dict], bool]:
 def tensor_digest(tensor: torch.Tensor) -> str:
     import torch
 
-    data = tensor.detach().cpu().contiguous().view(torch.uint8).numpy().tobytes()
+    data = bytes(tensor.detach().cpu().contiguous().view(torch.uint8).untyped_storage())
     return hashlib.sha256(data).hexdigest()
+
+
+def resolve_adapter_model_path(candidate_dir: Path, spec: dict) -> Path:
+    recorded_dir = Path(spec["path"])
+    recorded_path = recorded_dir / "adapter_model.safetensors"
+    if recorded_path.exists():
+        return recorded_path
+    fallback_path = candidate_dir / "adapters" / recorded_dir.name / "adapter_model.safetensors"
+    if fallback_path.exists():
+        return fallback_path
+    return recorded_path
 
 
 def check_adapter_tensors(
@@ -131,7 +142,7 @@ def check_adapter_tensors(
     checked = 0
     existing_specs = []
     for spec in specs:
-        adapter_path = Path(spec["path"]) / "adapter_model.safetensors"
+        adapter_path = resolve_adapter_model_path(candidate_dir, spec)
         if not adapter_path.exists():
             rows.append(
                 {
@@ -197,6 +208,72 @@ def check_adapter_tensors(
     return rows, {"pass": ok and checked > 0, "checked": checked, "sampled_adapters": len(specs), "reason": reason}
 
 
+def check_output_diff(
+    path: Path | None,
+    *,
+    allow_missing: bool,
+    max_exact_disagreement_rate: float,
+    max_abs_exact_delta: float,
+    max_abs_cap_hit_delta: float,
+    max_abs_malformed_delta: float,
+    min_answer_equal_rate: float,
+) -> tuple[list[dict], dict]:
+    if path is None or not path.exists():
+        passed = bool(allow_missing)
+        return [
+            {
+                "check": "output_diff_present",
+                "trusted": str(path) if path else "",
+                "candidate": "",
+                "pass": passed,
+                "note": "missing output diff summary",
+            }
+        ], {"pass": passed, "reason": "missing output diff summary"}
+    payload = read_json(path)
+    metric_specs = [
+        ("exact_disagreement_rate", "<=", max_exact_disagreement_rate),
+        ("max_abs_exact_delta_by_candidate", "<=", max_abs_exact_delta),
+        ("max_abs_cap_hit_delta_by_candidate", "<=", max_abs_cap_hit_delta),
+        ("max_abs_malformed_delta_by_candidate", "<=", max_abs_malformed_delta),
+        ("answer_equal_rate", ">=", min_answer_equal_rate),
+    ]
+    rows = []
+    ok = True
+    for metric, op, threshold in metric_specs:
+        value = payload.get(metric)
+        if value is None:
+            passed = False
+            note = "missing metric"
+        elif op == "<=":
+            passed = float(value) <= threshold
+            note = ""
+        else:
+            passed = float(value) >= threshold
+            note = ""
+        rows.append(
+            {
+                "check": f"output_diff.{metric}",
+                "trusted": value,
+                "candidate": threshold,
+                "pass": passed,
+                "note": note,
+            }
+        )
+        ok = ok and passed
+    return rows, {
+        "pass": ok,
+        "summary": str(path),
+        "thresholds": {
+            "max_exact_disagreement_rate": max_exact_disagreement_rate,
+            "max_abs_exact_delta": max_abs_exact_delta,
+            "max_abs_cap_hit_delta": max_abs_cap_hit_delta,
+            "max_abs_malformed_delta": max_abs_malformed_delta,
+            "min_answer_equal_rate": min_answer_equal_rate,
+        },
+        "metrics": {metric: payload.get(metric) for metric, _, _ in metric_specs},
+    }
+
+
 def write_markdown(path: Path, summary: dict, checks: list[dict]) -> None:
     status = "PASS" if summary["pass"] else "FAIL"
     lines = [
@@ -210,6 +287,7 @@ def write_markdown(path: Path, summary: dict, checks: list[dict]) -> None:
         f"| base rows present | {summary['pass_base_rows']} |",
         f"| ranking correlation | {summary['pass_ranking']} |",
         f"| adapter tensor parity | {summary['pass_adapter_tensors']} |",
+        f"| output diff parity | {summary['pass_output_diff']} |",
         "",
         "## Ranking",
         "",
@@ -244,8 +322,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--spearman-gate", type=float, default=0.85)
     p.add_argument("--top8-gate", type=int, default=6)
     p.add_argument("--adapter-sample", type=int, default=16)
+    p.add_argument("--output-diff-summary", type=Path)
+    p.add_argument("--max-exact-disagreement-rate", type=float, default=0.0)
+    p.add_argument("--max-abs-exact-delta", type=float, default=0.0)
+    p.add_argument("--max-abs-cap-hit-delta", type=float, default=0.0)
+    p.add_argument("--max-abs-malformed-delta", type=float, default=0.0)
+    p.add_argument("--min-answer-equal-rate", type=float, default=0.99)
     p.add_argument("--allow-missing-metadata", action="store_true")
     p.add_argument("--allow-missing-adapters", action="store_true")
+    p.add_argument("--allow-missing-output-diff", action="store_true")
     p.add_argument("--local-files-only", action="store_true")
     args = p.parse_args(argv)
 
@@ -276,6 +361,16 @@ def main(argv: list[str] | None = None) -> int:
         local_files_only=args.local_files_only,
     )
     pass_adapters = bool(adapter_summary["pass"] or args.allow_missing_adapters)
+    output_diff_rows, output_diff_summary = check_output_diff(
+        args.output_diff_summary,
+        allow_missing=args.allow_missing_output_diff,
+        max_exact_disagreement_rate=args.max_exact_disagreement_rate,
+        max_abs_exact_delta=args.max_abs_exact_delta,
+        max_abs_cap_hit_delta=args.max_abs_cap_hit_delta,
+        max_abs_malformed_delta=args.max_abs_malformed_delta,
+        min_answer_equal_rate=args.min_answer_equal_rate,
+    )
+    pass_output_diff = bool(output_diff_summary["pass"])
     pass_base = bool(pass_trusted_base and pass_candidate_base)
     pass_ranking = bool(ranking["pass"])
     checks = protocol_rows + trusted_base_rows + candidate_base_rows
@@ -291,6 +386,7 @@ def main(argv: list[str] | None = None) -> int:
                 "note": adapter_summary.get("reason", ""),
             }
         )
+    checks.extend(output_diff_rows)
     summary = {
         "kind": "backend_parity_gate",
         "trusted": str(args.trusted),
@@ -299,10 +395,12 @@ def main(argv: list[str] | None = None) -> int:
         "pass_base_rows": pass_base,
         "pass_ranking": pass_ranking,
         "pass_adapter_tensors": pass_adapters,
+        "pass_output_diff": pass_output_diff,
         "adapter_tensor_summary": adapter_summary,
+        "output_diff_summary": output_diff_summary,
         "ranking": ranking,
     }
-    summary["pass"] = bool(pass_protocol and pass_base and pass_ranking and pass_adapters)
+    summary["pass"] = bool(pass_protocol and pass_base and pass_ranking and pass_adapters and pass_output_diff)
     (args.out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     write_csv(args.out / "joined.csv", joined)
     write_csv(args.out / "checks.csv", checks)

@@ -32,16 +32,22 @@ for this perturbation family.
 | --- | ---: |
 | Protocol metadata | pass |
 | Base rows present | pass |
-| Adapter tensor parity | pass |
+| Adapter tensor parity | historical pass; current-code re-audit fail |
 | Ranking parity | fail |
+| Output diff parity | fail |
 
 The important split is:
 
 ```text
-adapter tensor checks: 576/576 passed on 4 sampled adapters
+historical adapter tensor checks: 576/576 passed on 4 sampled adapters
+current-code adapter tensor checks: fail on the tracked stale adapters
 Spearman(PEFT score, vLLM score): -0.181164
 top-8 overlap: 7/8
 selected regret vs PEFT: 0.125
+exact disagreement rate: 0.0234375
+max abs candidate exact delta: 0.125
+max abs cap-hit delta: 1.0
+max abs malformed delta: 0.5
 ```
 
 PEFT selected:
@@ -74,11 +80,17 @@ Cold vLLM load was `37.895s`; adapter build was `1.385s`.
 
 ## Interpretation
 
-This is no longer a candidate-key or adapter-file materialization bug: sampled
-vLLM adapter tensors match the canonical materializer. The remaining mismatch is
-downstream of tensor materialization, likely backend generation semantics,
-adapter application/scaling semantics, or score sparsity/tie instability on a
-tiny screen.
+Under the original run code, sampled vLLM adapter tensors matched that run's
+canonical materializer. After the materializer was tightened, the tracked
+adapter files are no longer a current-code tensor-parity artifact. Treat this
+directory as historical failed evidence only; rerun `scripts/run_backend_parity_gate.sh`
+to regenerate adapters and re-test tensor parity under the current code.
+
+Regardless of tensor-staleness, the saved PEFT/vLLM outputs disagree enough to
+block vLLM as selector-of-record. The remaining mismatch is downstream of the
+candidate panel and can include backend generation semantics, adapter
+application/scaling semantics, or score sparsity/tie instability on a tiny
+screen.
 
 Next diagnosis should compare PEFT and vLLM logits or deterministic next-token
 distributions for base, zero adapter, and the two disagreeing candidates before
