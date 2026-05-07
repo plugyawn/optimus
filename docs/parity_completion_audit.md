@@ -23,6 +23,23 @@ LoRA-family search, vLLM LoRA serving probes, geometry audits, and parity
 reports. It does not yet show a LoRA-style family with full dense-Gaussian
 search-utility parity.
 
+Use the machine-readable goal audit to prevent partial evidence from being
+treated as completion:
+
+```bash
+python -m randopt_lora_lab.goal_audit \
+  --reproduction-audit results/PAPER_DENSE/reproduction_audit/summary.json \
+  --parity-report results/PARITY/report/summary.json \
+  --backend-gate results/BACKEND_GATE/summary.json \
+  --prompt-robustness results/PROMPT_ROBUSTNESS/summary.json \
+  --drift-report results/DRIFT_AUDIT/summary.json \
+  --adapter-run results/VLLM_LORA_SEARCH \
+  --out results/goal_audit
+```
+
+Missing evidence is a failure. The audit only passes when every objective axis
+has a concrete artifact.
+
 ## Requirement Checklist
 
 | requirement | current evidence | status |
