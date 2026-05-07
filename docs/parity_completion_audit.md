@@ -45,7 +45,18 @@ Drift evidence should be task-conditioned, not only a parameter-norm proxy:
 
 ```bash
 python -m randopt_lora_lab.logit_drift \
-  --out results/logit_drift \
+  --out results/logit_drift_dense \
+  --data data/countdown_generated_1200_seed20260507.json \
+  --perturbation-backend dense \
+  --family dense_gaussian \
+  --population 64 \
+  --prompts 32 \
+  --sigma-values 0.0005,0.001,0.002 \
+  --max-mean-kl 0.05 \
+  --min-top1-equal 0.95
+
+python -m randopt_lora_lab.logit_drift \
+  --out results/logit_drift_lora \
   --data data/countdown_generated_1200_seed20260507.json \
   --perturbation-backend lora \
   --family factor_gaussian_lora \
@@ -55,7 +66,19 @@ python -m randopt_lora_lab.logit_drift \
   --sigma-values 0.0005,0.001,0.002 \
   --max-mean-kl 0.05 \
   --min-top1-equal 0.95
+
+python -m randopt_lora_lab.drift_parity \
+  --reference results/logit_drift_dense \
+  --candidate results/logit_drift_lora \
+  --out results/drift_parity_dense_vs_lora \
+  --max-kl-ratio 1.1 \
+  --max-logit-l2-ratio 1.1 \
+  --min-top1-delta -0.01
 ```
+
+The drift parity gate must use true nonnegative full-vocab next-token KL from
+`logit_drift.py`; signed NLL deltas or anchor likelihood proxies are not valid
+KL evidence.
 
 ## Requirement Checklist
 
@@ -66,7 +89,7 @@ python -m randopt_lora_lab.logit_drift \
 | Rank-r dense bridge exists | `projected_gaussian_rank_r` factors best rank-r dense projection | implemented, not yet run at scale |
 | Quality parity | P=64 rank sweep failed at rank 8 and rank 32 | missing |
 | Stability parity | parity report measures Spearman/top-k/regret for one panel; rank 8 Spearman -0.071, rank 32 Spearman -0.018 | missing multi-seed |
-| Drift parity | update geometry audit reports update norm/effective rank/sparsity | missing logit drift / token KL matching |
+| Drift parity | `logit_drift.py` computes true full-vocab next-token KL and `drift_parity.py` compares candidate-vs-dense drift | implemented, missing live dense-vs-candidate run |
 | Eval speed parity | P=64 HF reference path has LoRA slower than dense at rank 8 and rank 32; vLLM LoRA probes exist | partial, quality-coupled speed not proven |
 | Convenience | LoRA adapters are materialized as portable safetensors | partial |
 | Robustness | generated non-overlap data, cap-hit/malformed logging, paired holdout rows | partial |

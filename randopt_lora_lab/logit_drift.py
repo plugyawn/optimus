@@ -148,6 +148,9 @@ def main(argv: list[str] | None = None) -> int:
     backend.clear_candidate()
     summary = {
         "kind": "logit_drift",
+        "drift_metric": "full_vocab_next_token_kl",
+        "kl_direction": "base_to_candidate_and_candidate_to_base",
+        "kl_nonnegative_by_construction": True,
         "model": args.model,
         "data": args.data,
         "family": args.family,
