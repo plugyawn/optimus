@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 from dataclasses import dataclass
 
 import torch
@@ -32,6 +33,18 @@ def canonical_module_name(name: str) -> str:
     marker = "model.layers."
     idx = name.find(marker)
     return name[idx:] if idx >= 0 else name
+
+
+def sparse_lora_density(family: str) -> float:
+    if family == "sparse_low_rank_lora":
+        return 0.25
+    match = re.fullmatch(r"sparse_low_rank_lora_d([0-9]+(?:p[0-9]+)?)", family)
+    if not match:
+        raise ValueError(f"not a sparse low-rank LoRA family: {family}")
+    density = float(match.group(1).replace("p", "."))
+    if not 0.0 < density <= 1.0:
+        raise ValueError(f"sparse low-rank LoRA density must be in (0, 1], got {density}")
+    return density
 
 
 def lora_noise_tensors(
@@ -68,6 +81,14 @@ def lora_noise_tensors(
     gen.manual_seed((candidate.seed + stable_int(canonical_name)) % (2**63 - 1))
     a_noise = torch.randn(tuple(a_shape), generator=gen, dtype=torch.float32)
     b_noise = torch.randn(tuple(b_shape), generator=gen, dtype=torch.float32)
+    sparse_density = None
+    if candidate.family.startswith("sparse_low_rank_lora"):
+        sparse_density = sparse_lora_density(candidate.family)
+        a_mask = (torch.rand(tuple(a_shape), generator=gen, dtype=torch.float32) < sparse_density).float()
+        b_mask = (torch.rand(tuple(b_shape), generator=gen, dtype=torch.float32) < sparse_density).float()
+        scale = math.sqrt(sparse_density)
+        a_noise = a_noise * a_mask / scale
+        b_noise = b_noise * b_mask / scale
     if candidate.family in {"anzo", "target_svd", "random_ortho", "anzo_random_target"} and lookup_key in family_state:
         basis = family_state[lookup_key].cpu().float()
         rows = min(a_noise.shape[0], basis.shape[0])

@@ -8,7 +8,7 @@ from safetensors.torch import load_file
 
 from randopt_lora_lab.dense_space import dense_noise_tensor
 from randopt_lora_lab.gaussian_parity import best_rank_projection, lora_update
-from randopt_lora_lab.lora_space import Candidate, canonical_module_name, lora_noise_tensors
+from randopt_lora_lab.lora_space import Candidate, canonical_module_name, lora_noise_tensors, sparse_lora_density
 from randopt_lora_lab.vllm_lora_bench import save_seed_adapter
 
 
@@ -58,6 +58,18 @@ class LoraMaterializerTests(unittest.TestCase):
         self.assertEqual(tuple(a.shape), (rank, 8))
         self.assertEqual(tuple(b.shape), (7, rank))
         self.assertTrue(torch.allclose(lora_update(a, b), projected.to(a.dtype), atol=1e-6, rtol=1e-6))
+
+    def test_sparse_low_rank_lora_materializes_sparse_scaled_factors(self):
+        candidate = Candidate("sparse_low_rank_lora_d0p25", seed=789, sigma=0.01, sign=1)
+        rank = 8
+        module = "model.layers.0.self_attn.q_proj"
+
+        a, b = lora_noise_tensors(module, (rank, 512), (512, rank), candidate, rank)
+
+        self.assertEqual(sparse_lora_density(candidate.family), 0.25)
+        self.assertGreater(float((a == 0).float().mean()), 0.65)
+        self.assertGreater(float((b == 0).float().mean()), 0.65)
+        self.assertTrue(torch.isfinite(lora_update(a, b)).all())
 
 
 if __name__ == "__main__":

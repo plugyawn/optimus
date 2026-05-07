@@ -328,7 +328,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rank", type=int, default=8)
     p.add_argument("--sigma", type=float, default=0.01)
     p.add_argument("--targets", default="q_proj,v_proj")
-    p.add_argument("--family", default="isotropic", choices=["isotropic", "factor_gaussian_lora", "projected_gaussian_rank_r"])
+    p.add_argument(
+        "--family",
+        default="isotropic",
+        choices=[
+            "isotropic",
+            "factor_gaussian_lora",
+            "projected_gaussian_rank_r",
+            "sparse_low_rank_lora",
+            "sparse_low_rank_lora_d0p125",
+            "sparse_low_rank_lora_d0p25",
+            "sparse_low_rank_lora_d0p5",
+        ],
+    )
     p.add_argument("--antithetic", action="store_true")
     p.add_argument("--max-new-tokens", type=int, default=32)
     p.add_argument("--stop-at-answer", action="store_true")
