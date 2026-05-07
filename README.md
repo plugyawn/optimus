@@ -83,6 +83,7 @@ Rank sweep:
 ```bash
 BASE_OUT=results/gaussian_parity_rank_sweep \
 RANKS=8,32 \
+REUSE_DENSE=1 \
 POPULATION=64 \
 PROMPTS=64 \
 HOLDOUT_PROMPTS=256 \
@@ -95,6 +96,8 @@ The baseline script runs `dense_gaussian`, `factor_gaussian_lora`, and
 dense panel. The projected arm is an SVD bridge baseline, not the fast path; it
 is useful for separating "rank-r cannot carry the dense direction" from "our
 factor-Gaussian sampling is the wrong low-rank distribution."
+Rank sweeps default to reusing the first dense panel because dense Gaussian does
+not depend on LoRA rank.
 
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 The current completion checklist is in `docs/parity_completion_audit.md`.

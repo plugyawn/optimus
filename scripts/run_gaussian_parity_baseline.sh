@@ -15,6 +15,8 @@ MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-32}
 BATCH_SIZE=${BATCH_SIZE:-16}
 DENSE_SNAPSHOT_DEVICE=${DENSE_SNAPSHOT_DEVICE:-model}
 INCLUDE_PROJECTED=${INCLUDE_PROJECTED:-1}
+DENSE_REF_DIR=${DENSE_REF_DIR:-}
+RUN_DENSE=${RUN_DENSE:-1}
 
 if [[ ! -f "$DATA" ]]; then
   python -m randopt_lora_lab.make_countdown_data \
@@ -23,23 +25,32 @@ if [[ ! -f "$DATA" ]]; then
     --seed 20260507
 fi
 
-python -m randopt_lora_lab.experiments search \
-  --out "$OUT/dense" \
-  --model "$MODEL" \
-  --data "$DATA" \
-  --perturbation-backend dense \
-  --family dense_gaussian \
-  --population "$POPULATION" \
-  --prompts "$PROMPTS" \
-  --holdout-prompts "$HOLDOUT_PROMPTS" \
-  --rank "$RANK" \
-  --sigma "$SIGMA" \
-  --targets "$TARGETS" \
-  --max-new-tokens "$MAX_NEW_TOKENS" \
-  --batch-size "$BATCH_SIZE" \
-  --dense-snapshot-device "$DENSE_SNAPSHOT_DEVICE" \
-  --seed "$SEED" \
-  --stop-at-answer
+if [[ -n "$DENSE_REF_DIR" ]]; then
+  rm -rf "$OUT/dense"
+  mkdir -p "$OUT"
+  cp -a "$DENSE_REF_DIR" "$OUT/dense"
+elif [[ "$RUN_DENSE" == "1" ]]; then
+  python -m randopt_lora_lab.experiments search \
+    --out "$OUT/dense" \
+    --model "$MODEL" \
+    --data "$DATA" \
+    --perturbation-backend dense \
+    --family dense_gaussian \
+    --population "$POPULATION" \
+    --prompts "$PROMPTS" \
+    --holdout-prompts "$HOLDOUT_PROMPTS" \
+    --rank "$RANK" \
+    --sigma "$SIGMA" \
+    --targets "$TARGETS" \
+    --max-new-tokens "$MAX_NEW_TOKENS" \
+    --batch-size "$BATCH_SIZE" \
+    --dense-snapshot-device "$DENSE_SNAPSHOT_DEVICE" \
+    --seed "$SEED" \
+    --stop-at-answer
+elif [[ ! -f "$OUT/dense/summary.json" ]]; then
+  echo "RUN_DENSE=0 requires an existing $OUT/dense/summary.json or DENSE_REF_DIR" >&2
+  exit 1
+fi
 
 python -m randopt_lora_lab.experiments search \
   --out "$OUT/lora" \

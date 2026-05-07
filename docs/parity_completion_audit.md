@@ -45,6 +45,7 @@ Run a rank sweep before any broader claim:
 ```bash
 BASE_OUT=results/gaussian_parity_rank_sweep \
 RANKS=8,32 \
+REUSE_DENSE=1 \
 POPULATION=64 \
 PROMPTS=64 \
 HOLDOUT_PROMPTS=256 \
@@ -71,4 +72,3 @@ wrong even though the rank budget can carry useful directions.
 
 If both projected and factor-Gaussian fail, low-rank serveable search is not yet
 competitive with dense Gaussian on this task and model.
-
