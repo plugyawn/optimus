@@ -14,6 +14,8 @@ RANK=${RANK:-8}
 TARGETS=${TARGETS:-q_proj,v_proj}
 MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-32}
 BATCH_SIZE=${BATCH_SIZE:-16}
+PROMPT_VARIANT=${PROMPT_VARIANT:-default}
+USE_CHAT_TEMPLATE=${USE_CHAT_TEMPLATE:-0}
 PROMOTE=${PROMOTE:-4}
 ENSEMBLE_KS=${ENSEMBLE_KS:-}
 DENSE_SNAPSHOT_DEVICE=${DENSE_SNAPSHOT_DEVICE:-model}
@@ -27,6 +29,12 @@ if [[ -n "$SIGMA_VALUES" ]]; then
 fi
 if [[ -n "$ENSEMBLE_KS" ]]; then
   extra_search_args+=(--ensemble-ks "$ENSEMBLE_KS")
+fi
+if [[ "$PROMPT_VARIANT" != "default" ]]; then
+  extra_search_args+=(--prompt-variant "$PROMPT_VARIANT")
+fi
+if [[ "$USE_CHAT_TEMPLATE" == "1" ]]; then
+  extra_search_args+=(--use-chat-template)
 fi
 
 if [[ ! -f "$DATA" ]]; then

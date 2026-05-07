@@ -13,13 +13,13 @@ from .backends import TransformersDenseGaussianBackend, TransformersLoraBackend
 from .countdown import (
     extract_numeric_vote,
     load_examples,
-    prompts as make_prompts,
     score_completion,
     unique_example_count,
     unique_semantic_example_count,
     voted_answer_exact,
 )
 from .lora_space import Candidate
+from .prompt_variants import make_variant_prompts
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
@@ -40,8 +40,17 @@ def tag_rows(rows: list[dict], **extra) -> list[dict]:
     return [dict(row, **extra) for row in rows]
 
 
-def evaluate_candidate(backend, candidate: Candidate | None, examples, family_state=None) -> dict:
-    ps = make_prompts(examples)
+def make_prompts_for_backend(backend, args, examples) -> list[str]:
+    return make_variant_prompts(
+        examples,
+        args.prompt_variant,
+        tokenizer=getattr(backend, "tokenizer", None),
+        use_chat_template=args.use_chat_template,
+    )
+
+
+def evaluate_candidate(backend, candidate: Candidate | None, examples, args, family_state=None) -> dict:
+    ps = make_prompts_for_backend(backend, args, examples)
     mutation_start = time.time()
     if candidate is None:
         backend.clear_candidate()
@@ -118,13 +127,13 @@ def run_oracle(args):
     reset_outputs(out, ["probes.jsonl"])
     backend = make_backend(args)
     examples = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
-    sig0 = backend.logits_signature(make_prompts(examples[:4]))
-    base = evaluate_candidate(backend, None, examples)
-    zero = evaluate_candidate(backend, Candidate("isotropic", 0, 0.0), examples)
+    sig0 = backend.logits_signature(make_prompts_for_backend(backend, args, examples[:4]))
+    base = evaluate_candidate(backend, None, examples, args)
+    zero = evaluate_candidate(backend, Candidate("isotropic", 0, 0.0), examples, args)
     random_candidate = Candidate("isotropic", args.seed + 1, args.sigma)
-    rand = evaluate_candidate(backend, random_candidate, examples)
+    rand = evaluate_candidate(backend, random_candidate, examples, args)
     backend.clear_candidate()
-    sig1 = backend.logits_signature(make_prompts(examples[:4]))
+    sig1 = backend.logits_signature(make_prompts_for_backend(backend, args, examples[:4]))
     restore_max_abs = float((sig0 - sig1).abs().max().item())
     summary = {
         "kind": "oracle",
@@ -297,7 +306,7 @@ def maybe_build_family_state(args, backend, screen):
         return backend.build_random_orthonormal_state(args.seed)
     if args.family == "target_svd":
         return backend.build_anzo_state(
-            make_prompts(screen[: min(16, len(screen))]),
+            make_prompts_for_backend(backend, args, screen[: min(16, len(screen))]),
             anzo_anchor_prompts(),
             subtract_anchor=False,
         )
@@ -307,7 +316,7 @@ def maybe_build_family_state(args, backend, screen):
             anzo_anchor_prompts(),
         )
     if args.family == "anzo":
-        return backend.build_anzo_state(make_prompts(screen[: min(16, len(screen))]), anzo_anchor_prompts())
+        return backend.build_anzo_state(make_prompts_for_backend(backend, args, screen[: min(16, len(screen))]), anzo_anchor_prompts())
     raise ValueError(f"unsupported family: {args.family}")
 
 
@@ -324,8 +333,8 @@ def run_search(args):
         allow_repeat=args.allow_repeat_data,
         exclude_ids={ex.id for ex in screen},
     )
-    base_screen = evaluate_candidate(backend, None, screen)
-    base_holdout = evaluate_candidate(backend, None, holdout)
+    base_screen = evaluate_candidate(backend, None, screen, args)
+    base_holdout = evaluate_candidate(backend, None, holdout, args)
     write_jsonl(out / "per_prompt.jsonl", tag_rows(base_screen["rows"], mode="base_screen"))
     write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
     family_state = maybe_build_family_state(args, backend, screen)
@@ -334,7 +343,7 @@ def run_search(args):
     summaries = []
     start = time.time()
     for i, cand in enumerate(candidates):
-        ev = evaluate_candidate(backend, cand, screen, family_state)
+        ev = evaluate_candidate(backend, cand, screen, args, family_state)
         summaries.append({k: v for k, v in ev.items() if k != "rows"})
         write_jsonl(out / "per_prompt.jsonl", tag_rows(ev["rows"], mode="screen"))
         print(f"{i+1}/{len(candidates)} {cand.key} exact={ev['exact_mean']:.4f} elapsed={ev['elapsed_s']:.2f}", flush=True)
@@ -344,7 +353,7 @@ def run_search(args):
     holdout_rows = []
     holdout_per_candidate_rows = []
     for row in top:
-        ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, family_state)
+        ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, args, family_state)
         holdout_rows.append({k: v for k, v in ev.items() if k != "rows"})
         tagged = tag_rows(ev["rows"], mode="holdout")
         holdout_per_candidate_rows.extend(tagged)
@@ -368,6 +377,8 @@ def run_search(args):
         "rank": args.rank,
         "sigma": args.sigma,
         "sigma_values": sigma_values,
+        "prompt_variant": args.prompt_variant,
+        "use_chat_template": args.use_chat_template,
         "seed": args.seed,
         "targets": args.targets,
         "perturbation_backend": args.perturbation_backend,
@@ -423,9 +434,9 @@ def run_halving(args):
         exclude_ids={ex.id for ex in screen},
     )
     stage = screen[: min(args.stage_prompts, len(screen))]
-    base_stage = evaluate_candidate(backend, None, stage)
-    base_screen = evaluate_candidate(backend, None, screen)
-    base_holdout = evaluate_candidate(backend, None, holdout)
+    base_stage = evaluate_candidate(backend, None, stage, args)
+    base_screen = evaluate_candidate(backend, None, screen, args)
+    base_holdout = evaluate_candidate(backend, None, holdout, args)
     write_jsonl(out / "stage_per_prompt.jsonl", tag_rows(base_stage["rows"], mode="base_stage"))
     write_jsonl(out / "full_per_prompt.jsonl", tag_rows(base_screen["rows"], mode="base_screen"))
     write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
@@ -435,7 +446,7 @@ def run_halving(args):
     stage_rows = []
     start = time.time()
     for i, cand in enumerate(candidates):
-        ev = evaluate_candidate(backend, cand, stage, family_state)
+        ev = evaluate_candidate(backend, cand, stage, args, family_state)
         row = {k: v for k, v in ev.items() if k != "rows"}
         stage_rows.append(row)
         write_jsonl(out / "stage_per_prompt.jsonl", tag_rows(ev["rows"], mode="stage"))
@@ -445,7 +456,7 @@ def run_halving(args):
     full_rows = []
     for i, row in enumerate(survivors):
         cand = parse_candidate_key(row["candidate"])
-        ev = evaluate_candidate(backend, cand, screen, family_state)
+        ev = evaluate_candidate(backend, cand, screen, args, family_state)
         full = {k: v for k, v in ev.items() if k != "rows"}
         full["stage_exact_mean"] = row["exact_mean"]
         full_rows.append(full)
@@ -454,7 +465,7 @@ def run_halving(args):
     top = sorted(full_rows, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(full_rows))]
     holdout_rows = []
     for row in top:
-        ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, family_state)
+        ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, args, family_state)
         holdout_rows.append({k: v for k, v in ev.items() if k != "rows"})
         write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(ev["rows"], mode="holdout"))
     total_s = time.time() - start
@@ -531,7 +542,7 @@ def run_sysbench(args):
             subset = examples[:prompt_count]
             for mode, cand in [("base", None), ("candidate", candidate)]:
                 for rep in range(args.repeats):
-                    ev = evaluate_candidate(backend, cand, subset)
+                    ev = evaluate_candidate(backend, cand, subset, args)
                     row = {k: v for k, v in ev.items() if k != "rows"}
                     row.update(
                         {
@@ -591,6 +602,8 @@ def main():
         sp.add_argument("--max-new-tokens", type=int, default=32)
         sp.add_argument("--batch-size", type=int, default=16)
         sp.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
+        sp.add_argument("--prompt-variant", default="default")
+        sp.add_argument("--use-chat-template", action="store_true")
         sp.add_argument("--perturbation-backend", choices=["lora", "dense"], default="lora")
         sp.add_argument("--dense-snapshot-device", choices=["model", "cpu"], default="model")
         sp.add_argument("--stop-at-answer", action="store_true")

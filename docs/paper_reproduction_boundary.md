@@ -12,6 +12,8 @@ The upstream Countdown script uses:
 - sigma values: `0.0005,0.001,0.002`
 - top-K ratios: `0.04,0.01,0.05,0.1`
 - max tokens: `1024`
+- prompt: Countdown handler's reasoning prompt with the paper system message
+- formatting: apply the tokenizer chat template for instruct/chat models
 - evaluation: select top candidates by train reward, then majority-vote over top-K candidates on test prompts
 - Countdown voting: valid formulas vote by evaluated numeric result, not by raw formula string
 
@@ -35,6 +37,17 @@ answer-only prompt, but it must preserve the core selection semantics:
 
 `top_holdout` is only a single-candidate diagnostic. A quality claim based on
 RandOpt-style search must use `ensemble_holdout`.
+
+For an official-style prompt on the local dense/LoRA harness, use:
+
+```bash
+PROMPT_VARIANT=paper \
+USE_CHAT_TEMPLATE=1 \
+MAX_NEW_TOKENS=1024 \
+SIGMA_VALUES=0.0005,0.001,0.002 \
+ENSEMBLE_KS=1,5,6,12 \
+scripts/run_gaussian_parity_baseline.sh
+```
 
 ## Required Gates
 

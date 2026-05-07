@@ -151,7 +151,12 @@ def mixed_eval(
     mode: str,
     prompt_variant: str = "default",
 ) -> tuple[list[dict], list[dict], dict]:
-    prompt_texts = make_variant_prompts(examples, prompt_variant)
+    prompt_texts = make_variant_prompts(
+        examples,
+        prompt_variant,
+        tokenizer=llm.get_tokenizer(),
+        use_chat_template=args.use_chat_template,
+    )
     per_prompt_rows = []
     candidate_rows = []
     total_elapsed = 0.0
@@ -207,7 +212,12 @@ def mixed_eval(
 
 
 def base_eval(llm, sampling, examples, args, *, mode: str, prompt_variant: str = "default") -> tuple[list[dict], dict]:
-    prompt_texts = make_variant_prompts(examples, prompt_variant)
+    prompt_texts = make_variant_prompts(
+        examples,
+        prompt_variant,
+        tokenizer=llm.get_tokenizer(),
+        use_chat_template=args.use_chat_template,
+    )
     start = time.time()
     outputs = llm.generate(prompt_texts, sampling, use_tqdm=False)
     elapsed = time.time() - start
@@ -430,6 +440,7 @@ def run_search(args) -> dict:
         "targets": targets,
         "antithetic": args.antithetic,
         "prompt_variants": prompt_variants,
+        "use_chat_template": args.use_chat_template,
         "screen_selection_prompt_variants": screen_selection_variants,
         "screen_stress_prompt_variants": screen_stress_variants,
         "holdout_selection_prompt_variants": holdout_selection_variants,
@@ -526,6 +537,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--targets", default="q_proj,v_proj")
     p.add_argument("--ensemble-ks", default="")
     p.add_argument("--prompt-variants", default="default")
+    p.add_argument("--use-chat-template", action="store_true")
     p.add_argument("--score-mode", default="exact", choices=["exact", "robust_mean", "robust_min"])
     p.add_argument("--malformed-penalty", type=float, default=1.0)
     p.add_argument("--cap-hit-penalty", type=float, default=1.0)

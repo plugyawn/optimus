@@ -7,6 +7,21 @@ from .countdown import CountdownExample, prompt as default_prompt
 
 PromptFn = Callable[[CountdownExample], str]
 
+PAPER_SYSTEM_MESSAGE = (
+    "You are a helpful assistant. You first think about the reasoning process "
+    "in your mind and then provide the user with the answer."
+)
+
+
+def paper_reasoning_prompt(example: CountdownExample) -> str:
+    nums = list(example.numbers)
+    return (
+        f"Using the numbers {nums}, create an equation that equals {example.target}. "
+        "You can use basic arithmetic operations (+, -, *, /) and each number can only be used once. "
+        "Show your work in <think> </think> tags. "
+        "And return the final answer in <answer> </answer> tags, for example <answer> (1 + 2) / 3 </answer>."
+    )
+
 
 def tight_tagged_prompt(example: CountdownExample) -> str:
     nums = ", ".join(str(x) for x in example.numbers)
@@ -58,6 +73,8 @@ def xml_tagged_prompt(example: CountdownExample) -> str:
 def prompt_fn(name: str) -> PromptFn:
     if name == "default":
         return default_prompt
+    if name == "paper":
+        return paper_reasoning_prompt
     if name == "reordered":
         return reordered_tagged_prompt
     if name == "xml":
@@ -71,6 +88,46 @@ def prompt_fn(name: str) -> PromptFn:
     raise ValueError(f"unknown prompt variant: {name}")
 
 
-def make_variant_prompts(examples: list[CountdownExample], variant: str) -> list[str]:
+def system_message_for_variant(name: str) -> str | None:
+    if name == "paper":
+        return PAPER_SYSTEM_MESSAGE
+    return None
+
+
+def render_prompt_text(
+    user_content: str,
+    *,
+    variant: str,
+    tokenizer=None,
+    use_chat_template: bool = False,
+) -> str:
+    system_content = system_message_for_variant(variant)
+    messages = []
+    if system_content:
+        messages.append({"role": "system", "content": system_content})
+    messages.append({"role": "user", "content": user_content})
+    if use_chat_template:
+        if tokenizer is None:
+            raise ValueError("use_chat_template=True requires a tokenizer")
+        if getattr(tokenizer, "chat_template", None):
+            return tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    return "\n".join(message["content"] for message in messages) + ("\n" if system_content else "")
+
+
+def make_variant_prompts(
+    examples: list[CountdownExample],
+    variant: str,
+    *,
+    tokenizer=None,
+    use_chat_template: bool = False,
+) -> list[str]:
     make_prompt = prompt_fn(variant)
-    return [make_prompt(ex) for ex in examples]
+    return [
+        render_prompt_text(
+            make_prompt(ex),
+            variant=variant,
+            tokenizer=tokenizer,
+            use_chat_template=use_chat_template,
+        )
+        for ex in examples
+    ]

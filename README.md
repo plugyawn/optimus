@@ -110,6 +110,22 @@ SIGMA=0.01 \
 scripts/run_gaussian_parity_baseline.sh
 ```
 
+Paper-style prompt/template mode for local reproduction checks:
+
+```bash
+OUT=results/paper_style_local \
+POPULATION=128 \
+PROMPTS=64 \
+HOLDOUT_PROMPTS=256 \
+SIGMA_VALUES=0.0005,0.001,0.002 \
+PROMOTE=32 \
+ENSEMBLE_KS=1,5,6,12,32 \
+PROMPT_VARIANT=paper \
+USE_CHAT_TEMPLATE=1 \
+MAX_NEW_TOKENS=1024 \
+scripts/run_gaussian_parity_baseline.sh
+```
+
 Rank sweep:
 
 ```bash
