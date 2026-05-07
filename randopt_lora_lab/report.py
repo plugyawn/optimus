@@ -140,10 +140,13 @@ def main():
     for row in summaries:
         top_holdout = row.get("top_holdout") or []
         top_screen = row.get("top_screen") or []
+        ensemble_holdout = row.get("ensemble_holdout") or []
         best_holdout = max((x.get("exact_mean", 0.0) for x in top_holdout), default=None)
         best_screen = max((x.get("exact_mean", 0.0) for x in top_screen), default=None)
+        best_ensemble = max((x.get("exact_mean", 0.0) for x in ensemble_holdout), default=None)
         holdout_n = row.get("holdout_unique_prompts") or row.get("holdout_prompts")
         best_ci_low, best_ci_high = wilson_interval(best_holdout, holdout_n)
+        ensemble_ci_low, ensemble_ci_high = wilson_interval(best_ensemble, holdout_n)
         base_holdout = row.get("base_holdout_exact")
         base_ci_low, base_ci_high = wilson_interval(base_holdout, holdout_n)
         tokens_per_sec = (
@@ -190,13 +193,19 @@ def main():
                 "base_screen_exact": row.get("base_screen_exact", row.get("base_exact")),
                 "base_holdout_exact": row.get("base_holdout_exact"),
                 "best_holdout_exact": best_holdout,
+                "best_ensemble_holdout_exact": best_ensemble,
                 "base_holdout_ci_low": base_ci_low,
                 "base_holdout_ci_high": base_ci_high,
                 "best_holdout_ci_low": best_ci_low,
                 "best_holdout_ci_high": best_ci_high,
+                "best_ensemble_holdout_ci_low": ensemble_ci_low,
+                "best_ensemble_holdout_ci_high": ensemble_ci_high,
                 "holdout_lift": None
                 if best_holdout is None or row.get("base_holdout_exact") is None
                 else best_holdout - row.get("base_holdout_exact"),
+                "ensemble_holdout_lift": None
+                if best_ensemble is None or row.get("base_holdout_exact") is None
+                else best_ensemble - row.get("base_holdout_exact"),
                 "screen_unique_prompts": row.get("screen_unique_prompts"),
                 "holdout_unique_prompts": row.get("holdout_unique_prompts"),
                 "screen_unique_semantic_prompts": row.get("screen_unique_semantic_prompts"),
@@ -360,6 +369,15 @@ def main():
             f"- Best holdout run: `{best_quality['run']}` at "
             f"{best_quality['best_holdout_exact']:.4f}{lift_text}."
         )
+        ensemble_quality = quality[quality["best_ensemble_holdout_exact"].notna()]
+        if not ensemble_quality.empty:
+            best_ensemble_quality = ensemble_quality.sort_values("best_ensemble_holdout_exact", ascending=False).iloc[0]
+            ensemble_lift = best_ensemble_quality["ensemble_holdout_lift"]
+            ensemble_lift_text = "" if pd.isna(ensemble_lift) else f" ({ensemble_lift:+.4f} lift vs base)"
+            notes.append(
+                f"- Best ensemble holdout run: `{best_ensemble_quality['run']}` at "
+                f"{best_ensemble_quality['best_ensemble_holdout_exact']:.4f}{ensemble_lift_text}."
+            )
     if "prompt_eval_savings" in df and df["prompt_eval_savings"].notna().any():
         best_savings = df.dropna(subset=["prompt_eval_savings"]).sort_values("prompt_eval_savings", ascending=False).iloc[0]
         notes.append(
@@ -408,7 +426,9 @@ def main():
                 "population",
                 "base_holdout_exact",
                 "best_holdout_exact",
+                "best_ensemble_holdout_exact",
                 "holdout_lift",
+                "ensemble_holdout_lift",
                 "paired_lift",
                 "paired_gain_count",
                 "paired_loss_count",
