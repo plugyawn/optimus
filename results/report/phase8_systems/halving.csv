@@ -1,0 +1,5 @@
+suite,run,screen_prompts,stage_prompts,survivors,candidate_sec,prompt_eval_savings,top8_survivor_recall,top8_possible,full_best_survived,halving_selected_regret_vs_full,eval_elapsed_s
+phase8_extra_pod1,halving_stage4_surv32_vs_full_chunk8,64,4,32,12.31726918436166,0.875,3,8,False,0.03125,41.56765532493591
+phase8_extra_pod1,halving_stage8_surv64_vs_full_chunk8,64,8,64,9.714955243143137,0.75,4,8,True,0.0,52.7022500038147
+phase8_extra_pod2,halving_stage4_surv32_vs_full_chunk8,128,4,32,10.524941355413395,0.90625,0,8,False,0.015625,48.64635181427002
+phase8_extra_pod2,halving_stage8_surv64_vs_full_chunk8,128,8,64,7.710609553873086,0.8125,2,8,True,0.0,66.40201354026794
