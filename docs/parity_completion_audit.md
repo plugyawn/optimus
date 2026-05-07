@@ -39,6 +39,7 @@ search-utility parity.
 | Paper-aligned geometry | sparse SGD RLVR note added after arXiv 2602.07729 | hypothesis only |
 | Sample-size aggregation | rank-32 top-4 score-weighted aggregate improved holdout, but with high cap-hit | promising, invalid until cap audit |
 | Sparse-low-rank family | `sparse_low_rank_lora` implemented with density variants and variance matching | implemented, not run |
+| Prompt robustness | prompt-relative report gate added; method claims require multiple valid prompt templates | implemented, not passed |
 
 ## Next Gate
 
@@ -88,4 +89,11 @@ is not dense-Gaussian parity; it tests a separate "large sample unlock" idea.
 
 The rank-32 aggregate is the first positive evidence for combining sampled
 perturbations after search. The high cap-hit rate means it cannot support a
-quality claim until a token-cap and answer-only prompt audit confirms the lift.
+quality claim until a token-cap and prompt-robustness audit confirms the lift.
+
+Prompt robustness is now a required gate. A method is not allowed to claim
+quality if it only works under one prompt template. Evaluation must report
+candidate lift relative to the base model for each prompt template. Prompt
+templates that collapse the base model's malformed/cap-hit rate are marked
+protocol-invalid stress conditions, not used as evidence for or against the
+method.

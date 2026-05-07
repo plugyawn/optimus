@@ -27,9 +27,30 @@ def tight_tagged_prompt(example: CountdownExample) -> str:
     )
 
 
+def compact_tagged_prompt(example: CountdownExample) -> str:
+    nums = ", ".join(str(x) for x in example.numbers)
+    return (
+        f"Numbers: {nums}. Target: {example.target}. "
+        "Reply only with <answer>one arithmetic expression</answer>. "
+        "Use each number exactly once."
+    )
+
+
+def direct_tagged_prompt(example: CountdownExample) -> str:
+    nums = ", ".join(str(x) for x in example.numbers)
+    return (
+        f"Make {example.target} from these numbers: {nums}. "
+        "Use every number once. Put only the expression inside <answer></answer>."
+    )
+
+
 def prompt_fn(name: str) -> PromptFn:
     if name == "default":
         return default_prompt
+    if name == "compact":
+        return compact_tagged_prompt
+    if name == "direct":
+        return direct_tagged_prompt
     if name == "tight":
         return tight_tagged_prompt
     raise ValueError(f"unknown prompt variant: {name}")
@@ -279,7 +300,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--weight-mode", choices=["uniform", "score", "centered"], default="score")
     parser.add_argument("--targets", default="q_proj,v_proj")
     parser.add_argument("--max-new-tokens-grid", default="32,64,128,256")
-    parser.add_argument("--prompt-variants", default="default,tight")
+    parser.add_argument("--prompt-variants", default="default,compact,direct")
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
     parser.add_argument("--stop-at-answer", action="store_true")

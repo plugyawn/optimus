@@ -1,6 +1,6 @@
 import unittest
 
-from randopt_lora_lab.cap_stability import metric_row, prompt_fn, tight_tagged_prompt
+from randopt_lora_lab.cap_stability import compact_tagged_prompt, direct_tagged_prompt, metric_row, prompt_fn, tight_tagged_prompt
 from randopt_lora_lab.countdown import CountdownExample
 
 
@@ -12,6 +12,15 @@ class CapStabilityTests(unittest.TestCase):
         self.assertIn("<answer>EXPRESSION</answer>", text)
         self.assertIn("No reasoning", text)
         self.assertIn("Target: 24", text)
+
+    def test_compact_and_direct_prompts_keep_numbers_and_tags(self):
+        ex = CountdownExample(1, (3, 7, 8, 8), 24)
+
+        for text in [compact_tagged_prompt(ex), direct_tagged_prompt(ex)]:
+            self.assertIn("<answer>", text)
+            self.assertIn("</answer>", text)
+            self.assertIn("24", text)
+            self.assertIn("3", text)
 
     def test_prompt_fn_rejects_unknown_variant(self):
         with self.assertRaises(ValueError):
