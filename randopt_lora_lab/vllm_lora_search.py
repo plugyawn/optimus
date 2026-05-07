@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .backend_contract import backend_contract, vllm_tokenizer_contract
 from .countdown import load_examples, unique_example_count, unique_semantic_example_count
 from .experiments import ensemble_ks_from_values, majority_vote_evaluation, parse_float_list, parse_ratio_list
 from .prompt_variants import make_variant_prompts
@@ -239,6 +240,33 @@ def base_eval(llm, sampling, examples, args, *, mode: str, prompt_variant: str =
     return rows, metrics
 
 
+def write_prompt_contracts(out: Path, llm, SamplingParams, args, screen, holdout, prompt_variants: list[str]) -> None:
+    tokenizer = llm.get_tokenizer()
+    contracts = {}
+    for split, examples in [("screen", screen), ("holdout", holdout)]:
+        for variant in prompt_variants:
+            prompt_texts = make_variant_prompts(
+                examples,
+                variant,
+                tokenizer=tokenizer,
+                use_chat_template=args.use_chat_template,
+            )
+            contract = backend_contract(tokenizer, prompt_texts, args, SamplingParams)
+            contract["vllm_tokenizer"] = vllm_tokenizer_contract(llm, prompt_texts)
+            contracts[f"{split}:{variant}"] = contract
+    write_json(
+        out / "prompt_contract.json",
+        {
+            "kind": "vllm_lora_search_prompt_contracts",
+            "model": args.model,
+            "dtype": args.dtype,
+            "prompt_input": args.prompt_input,
+            "prompt_variants": prompt_variants,
+            "contracts": contracts,
+        },
+    )
+
+
 def run_search(args) -> dict:
     targets = parse_targets(args.targets)
     prompt_variants = parse_prompt_variants(args.prompt_variants)
@@ -280,6 +308,7 @@ def run_search(args) -> dict:
         **({"max_num_batched_tokens": args.max_num_batched_tokens} if args.max_num_batched_tokens else {}),
     )
     load_s = time.time() - load_start
+    write_prompt_contracts(out, llm, SamplingParams, args, screen, holdout, prompt_variants)
 
     base_screen_rows = []
     base_holdout_rows = []
