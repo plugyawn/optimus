@@ -47,6 +47,13 @@ def spearman(xs: list[float], ys: list[float]) -> float | None:
     return float(np.corrcoef(rx, ry)[0, 1])
 
 
+def mean_numeric(rows: list[dict], key: str) -> float | None:
+    values = [float(row[key]) for row in rows if row.get(key) is not None]
+    if not values:
+        return None
+    return float(np.mean(values))
+
+
 def load_run(run_dir: Path) -> dict:
     summary_path = run_dir / "summary.json"
     candidates_path = run_dir / "candidate_summary.jsonl"
@@ -92,6 +99,11 @@ def compare_runs(
     speed_ratio = None
     if dense_candidate_sec and lora_candidate_sec:
         speed_ratio = float(lora_candidate_sec) / float(dense_candidate_sec)
+    dense_mutation_s = mean_numeric(dense_run["candidates"], "mutation_s")
+    lora_mutation_s = mean_numeric(lora_run["candidates"], "mutation_s")
+    mutation_ratio = None
+    if dense_mutation_s is not None and lora_mutation_s is not None and dense_mutation_s > 0:
+        mutation_ratio = lora_mutation_s / dense_mutation_s
     dense_ensemble = dense_run["summary"].get("best_ensemble_holdout_exact")
     lora_ensemble = lora_run["summary"].get("best_ensemble_holdout_exact")
     ensemble_delta = None
@@ -133,6 +145,9 @@ def compare_runs(
         "dense_candidate_sec": dense_candidate_sec,
         "lora_candidate_sec": lora_candidate_sec,
         "speed_ratio_lora_over_dense": speed_ratio,
+        "dense_mutation_s_mean": dense_mutation_s,
+        "lora_mutation_s_mean": lora_mutation_s,
+        "mutation_s_ratio_lora_over_dense": mutation_ratio,
         "dense_best_ensemble_holdout_exact": dense_ensemble,
         "lora_best_ensemble_holdout_exact": lora_ensemble,
         "ensemble_holdout_delta_lora_minus_dense": ensemble_delta,
@@ -193,6 +208,9 @@ def render_markdown(summary: dict) -> str:
                 f"| dense candidate/sec | {comparison['dense_candidate_sec']} |",
                 f"| candidate/sec | {comparison['lora_candidate_sec']} |",
                 f"| speed ratio candidate/dense | {comparison['speed_ratio_lora_over_dense'] if comparison['speed_ratio_lora_over_dense'] is not None else 'null'} |",
+                f"| dense mean mutation s | {comparison['dense_mutation_s_mean'] if comparison['dense_mutation_s_mean'] is not None else 'null'} |",
+                f"| candidate mean mutation s | {comparison['lora_mutation_s_mean'] if comparison['lora_mutation_s_mean'] is not None else 'null'} |",
+                f"| mutation ratio candidate/dense | {comparison['mutation_s_ratio_lora_over_dense'] if comparison['mutation_s_ratio_lora_over_dense'] is not None else 'null'} |",
                 f"| dense best ensemble holdout | {comparison['dense_best_ensemble_holdout_exact'] if comparison['dense_best_ensemble_holdout_exact'] is not None else 'null'} |",
                 f"| candidate best ensemble holdout | {comparison['lora_best_ensemble_holdout_exact'] if comparison['lora_best_ensemble_holdout_exact'] is not None else 'null'} |",
                 f"| ensemble holdout delta | {comparison['ensemble_holdout_delta_lora_minus_dense'] if comparison['ensemble_holdout_delta_lora_minus_dense'] is not None else 'null'} |",
@@ -223,6 +241,9 @@ def render_markdown(summary: dict) -> str:
         f"| dense candidate/sec | {summary['dense_candidate_sec']} |",
         f"| LoRA candidate/sec | {summary['lora_candidate_sec']} |",
         f"| speed ratio LoRA/dense | {summary['speed_ratio_lora_over_dense'] if summary['speed_ratio_lora_over_dense'] is not None else 'null'} |",
+        f"| dense mean mutation s | {summary['dense_mutation_s_mean'] if summary['dense_mutation_s_mean'] is not None else 'null'} |",
+        f"| LoRA mean mutation s | {summary['lora_mutation_s_mean'] if summary['lora_mutation_s_mean'] is not None else 'null'} |",
+        f"| mutation ratio LoRA/dense | {summary['mutation_s_ratio_lora_over_dense'] if summary['mutation_s_ratio_lora_over_dense'] is not None else 'null'} |",
         f"| dense best ensemble holdout | {summary['dense_best_ensemble_holdout_exact'] if summary['dense_best_ensemble_holdout_exact'] is not None else 'null'} |",
         f"| LoRA best ensemble holdout | {summary['lora_best_ensemble_holdout_exact'] if summary['lora_best_ensemble_holdout_exact'] is not None else 'null'} |",
         f"| ensemble holdout delta LoRA-dense | {summary['ensemble_holdout_delta_lora_minus_dense'] if summary['ensemble_holdout_delta_lora_minus_dense'] is not None else 'null'} |",

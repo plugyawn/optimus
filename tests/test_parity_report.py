@@ -6,7 +6,14 @@ from pathlib import Path
 from randopt_lora_lab.parity_report import candidate_spec_key, compare_candidate_runs, compare_runs, load_run
 
 
-def write_run(path: Path, family: str, scores: list[float], candidate_sec: float, ensemble: float | None = None):
+def write_run(
+    path: Path,
+    family: str,
+    scores: list[float],
+    candidate_sec: float,
+    ensemble: float | None = None,
+    mutation_s: float | None = None,
+):
     path.mkdir(parents=True)
     summary = {"candidate_sec": candidate_sec}
     if ensemble is not None:
@@ -18,6 +25,8 @@ def write_run(path: Path, family: str, scores: list[float], candidate_sec: float
                 "candidate": f"{family}:seed{idx + 1}:s0.01:sign1",
                 "exact_mean": score,
             }
+            if mutation_s is not None:
+                row["mutation_s"] = mutation_s
             f.write(json.dumps(row) + "\n")
 
 
@@ -38,6 +47,18 @@ class ParityReportTests(unittest.TestCase):
             self.assertEqual(summary["topk_overlap"], 2)
             self.assertEqual(summary["selected_regret"], 0.0)
             self.assertEqual(summary["speed_ratio_lora_over_dense"], 4.0)
+
+    def test_compare_runs_reports_mean_mutation_ratio(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_run(root / "dense", "dense_gaussian", [0.4, 0.3], candidate_sec=1.0, mutation_s=0.2)
+            write_run(root / "lora", "factor_gaussian_lora", [0.4, 0.3], candidate_sec=4.0, mutation_s=0.05)
+
+            summary = compare_runs(load_run(root / "dense"), load_run(root / "lora"), top_k=1, min_topk_overlap=1)
+
+            self.assertEqual(summary["dense_mutation_s_mean"], 0.2)
+            self.assertEqual(summary["lora_mutation_s_mean"], 0.05)
+            self.assertAlmostEqual(summary["mutation_s_ratio_lora_over_dense"], 0.25)
 
     def test_compare_runs_fails_when_lora_picks_dense_loser(self):
         with tempfile.TemporaryDirectory() as tmp:

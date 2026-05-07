@@ -45,6 +45,8 @@ def collect_rows(root: Path) -> list[dict[str, Any]]:
                     "topk_overlap": comparison.get("topk_overlap"),
                     "selected_regret": comparison.get("selected_regret"),
                     "speed_ratio_over_dense": comparison.get("speed_ratio_lora_over_dense"),
+                    "mutation_s_mean": comparison.get("lora_mutation_s_mean"),
+                    "mutation_s_ratio_over_dense": comparison.get("mutation_s_ratio_lora_over_dense"),
                     "dense_ensemble": comparison.get("dense_best_ensemble_holdout_exact"),
                     "arm_ensemble": comparison.get("lora_best_ensemble_holdout_exact"),
                     "ensemble_delta": comparison.get("ensemble_holdout_delta_lora_minus_dense"),
@@ -62,8 +64,8 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     lines = [
         "# Rank Sweep Summary",
         "",
-        "| rank | arm | pass | Spearman | top-k overlap | regret | speed/dense | dense ensemble | arm ensemble | ensemble delta | cap-hit | malformed |",
-        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| rank | arm | pass | Spearman | top-k overlap | regret | speed/dense | mean mutation s | mutation/dense | dense ensemble | arm ensemble | ensemble delta | cap-hit | malformed |",
+        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in rows:
         lines.append(
@@ -77,6 +79,8 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
                     _fmt(row["topk_overlap"]),
                     _fmt(row["selected_regret"]),
                     _fmt(row["speed_ratio_over_dense"]),
+                    _fmt(row["mutation_s_mean"]),
+                    _fmt(row["mutation_s_ratio_over_dense"]),
                     _fmt(row["dense_ensemble"]),
                     _fmt(row["arm_ensemble"]),
                     _fmt(row["ensemble_delta"]),
@@ -106,6 +110,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "topk_overlap",
         "selected_regret",
         "speed_ratio_over_dense",
+        "mutation_s_mean",
+        "mutation_s_ratio_over_dense",
         "dense_ensemble",
         "arm_ensemble",
         "ensemble_delta",
