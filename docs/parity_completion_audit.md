@@ -87,9 +87,22 @@ is not dense-Gaussian parity; it tests a separate "large sample unlock" idea.
 | 8 | 32 | 8.984% | 1.172% | -7.812 pp | 1.562% | fail |
 | 32 | 128 | 8.984% | 14.062% | +5.078 pp | 25.781% | promising but not valid yet |
 
-The rank-32 aggregate is the first positive evidence for combining sampled
-perturbations after search. The high cap-hit rate means it cannot support a
-quality claim until a token-cap and prompt-robustness audit confirms the lift.
+The rank-32 aggregate was the first positive evidence for combining sampled
+perturbations after search, but the follow-up token-cap and prompt-robustness
+audit failed. Under the default prompt the aggregate kept the same apparent
+lift at caps 32/64/128, but cap-hit stayed around 25%. Under the reordered
+semantically equivalent prompt, the base model remained protocol-valid while
+the aggregate collapsed.
+
+| prompt | protocol-valid caps | aggregate exact | base exact | lift | aggregate cap-hit | aggregate malformed | verdict |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| default | 3 | 14.062% | 8.984% | +5.078 pp | 25.4-25.8% | 1.953% | invalid: cap-hit regression |
+| reordered | 3 | 0.391% | 5.859% | -5.469 pp | 53.1-82.0% | 98.047% | invalid: prompt collapse |
+| xml | 0 | 6.250% | 5.469% | +0.781 pp | 76.9-85.5% | 20.3-21.1% | stress only: base malformed |
+
+Prompt robustness report: `results/prompt_robustness_rank32_top4/report.md`.
+Gate result: `pass=false`, `valid_prompt_variants=2`,
+`passing_prompt_variants=0`, `min_lift_observed=-5.469 pp`.
 
 Prompt robustness is now a required gate. A method is not allowed to claim
 quality if it only works under one prompt template. Evaluation must report
