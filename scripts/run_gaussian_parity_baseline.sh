@@ -9,6 +9,12 @@ PROMPTS=${PROMPTS:-64}
 HOLDOUT_PROMPTS=${HOLDOUT_PROMPTS:-256}
 SIGMA=${SIGMA:-0.01}
 SEED=${SEED:-20260507}
+RANK=${RANK:-8}
+TARGETS=${TARGETS:-q_proj,v_proj}
+MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-32}
+BATCH_SIZE=${BATCH_SIZE:-16}
+DENSE_SNAPSHOT_DEVICE=${DENSE_SNAPSHOT_DEVICE:-model}
+INCLUDE_PROJECTED=${INCLUDE_PROJECTED:-1}
 
 if [[ ! -f "$DATA" ]]; then
   python -m randopt_lora_lab.make_countdown_data \
@@ -26,7 +32,12 @@ python -m randopt_lora_lab.experiments search \
   --population "$POPULATION" \
   --prompts "$PROMPTS" \
   --holdout-prompts "$HOLDOUT_PROMPTS" \
+  --rank "$RANK" \
   --sigma "$SIGMA" \
+  --targets "$TARGETS" \
+  --max-new-tokens "$MAX_NEW_TOKENS" \
+  --batch-size "$BATCH_SIZE" \
+  --dense-snapshot-device "$DENSE_SNAPSHOT_DEVICE" \
   --seed "$SEED" \
   --stop-at-answer
 
@@ -39,25 +50,37 @@ python -m randopt_lora_lab.experiments search \
   --population "$POPULATION" \
   --prompts "$PROMPTS" \
   --holdout-prompts "$HOLDOUT_PROMPTS" \
+  --rank "$RANK" \
   --sigma "$SIGMA" \
+  --targets "$TARGETS" \
+  --max-new-tokens "$MAX_NEW_TOKENS" \
+  --batch-size "$BATCH_SIZE" \
   --seed "$SEED" \
   --stop-at-answer
 
-python -m randopt_lora_lab.experiments search \
-  --out "$OUT/projected" \
-  --model "$MODEL" \
-  --data "$DATA" \
-  --perturbation-backend lora \
-  --family projected_gaussian_rank_r \
-  --population "$POPULATION" \
-  --prompts "$PROMPTS" \
-  --holdout-prompts "$HOLDOUT_PROMPTS" \
-  --sigma "$SIGMA" \
-  --seed "$SEED" \
-  --stop-at-answer
+extra_candidates=()
+if [[ "$INCLUDE_PROJECTED" == "1" ]]; then
+  python -m randopt_lora_lab.experiments search \
+    --out "$OUT/projected" \
+    --model "$MODEL" \
+    --data "$DATA" \
+    --perturbation-backend lora \
+    --family projected_gaussian_rank_r \
+    --population "$POPULATION" \
+    --prompts "$PROMPTS" \
+    --holdout-prompts "$HOLDOUT_PROMPTS" \
+    --rank "$RANK" \
+    --sigma "$SIGMA" \
+    --targets "$TARGETS" \
+    --max-new-tokens "$MAX_NEW_TOKENS" \
+    --batch-size "$BATCH_SIZE" \
+    --seed "$SEED" \
+    --stop-at-answer
+  extra_candidates+=(--candidate "projected=$OUT/projected")
+fi
 
 python -m randopt_lora_lab.parity_report \
   --dense "$OUT/dense" \
   --lora "$OUT/lora" \
-  --candidate "projected=$OUT/projected" \
+  "${extra_candidates[@]}" \
   --out "$OUT/report"

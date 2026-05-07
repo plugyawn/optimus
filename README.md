@@ -73,8 +73,21 @@ OUT=results/gaussian_parity_baseline \
 POPULATION=64 \
 PROMPTS=64 \
 HOLDOUT_PROMPTS=256 \
+RANK=8 \
 SIGMA=0.01 \
 scripts/run_gaussian_parity_baseline.sh
+```
+
+Rank sweep:
+
+```bash
+BASE_OUT=results/gaussian_parity_rank_sweep \
+RANKS=8,32 \
+POPULATION=64 \
+PROMPTS=64 \
+HOLDOUT_PROMPTS=256 \
+SIGMA=0.01 \
+scripts/run_gaussian_parity_rank_sweep.sh
 ```
 
 The baseline script runs `dense_gaussian`, `factor_gaussian_lora`, and
@@ -84,6 +97,7 @@ is useful for separating "rank-r cannot carry the dense direction" from "our
 factor-Gaussian sampling is the wrong low-rank distribution."
 
 The first run is a correctness oracle. It must pass before any throughput or research claim.
+The current completion checklist is in `docs/parity_completion_audit.md`.
 
 ## Evidence Rules
 
