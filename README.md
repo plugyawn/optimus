@@ -45,6 +45,9 @@ python -m randopt_lora_lab.vllm_lora_search \
   --population 512 \
   --prompts 64 \
   --holdout-prompts 256 \
+  --sigma-values 0.0005,0.001,0.002 \
+  --promote 64 \
+  --ensemble-ks 8,16,32,64 \
   --prompt-variants default,reordered \
   --score-mode robust_min \
   --min-selection-prompt-variants 2 \
