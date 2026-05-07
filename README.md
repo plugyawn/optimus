@@ -35,6 +35,14 @@ vLLM LoRA serving probe:
 python -m randopt_lora_lab.vllm_lora_bench --out results/vllm_lora_bench --data "$DATA" --adapters 8 --prompts 64 --preload
 ```
 
+Dense Gaussian vs LoRA capacity audit:
+
+```bash
+python -m randopt_lora_lab.gaussian_parity \
+  --out results/report/full_gaussian_parity \
+  --rank 8
+```
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 
 ## Evidence Rules
@@ -47,3 +55,4 @@ The first run is a correctness oracle. It must pass before any throughput or res
 - Built-in 32-example data is smoke-test only; use `--allow-repeat-data` only when repetition is intentional.
 - Search and holdout splits must report zero overlap before a method ranking is treated as evidence.
 - vLLM candidate selection is allowed only after adapter tensor parity and rank-correlation checks pass.
+- Rank-`r` LoRA must not be described as full dense-Gaussian parity. Use `dense_gaussian`, `projected_gaussian_rank_r`, or `factor_gaussian_lora` as defined in `docs/full_gaussian_parity.md`.

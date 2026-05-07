@@ -1,0 +1,975 @@
+{
+  "rank": 8,
+  "qwen25_3b_qv": {
+    "matrices": [
+      {
+        "name": "model.layers.0.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.0.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.1.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.1.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.2.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.2.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.3.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.3.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.4.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.4.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.5.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.5.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.6.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.6.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.7.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.7.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.8.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.8.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.9.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.9.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.10.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.10.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.11.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.11.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.12.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.12.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.13.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.13.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.14.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.14.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.15.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.15.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.16.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.16.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.17.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.17.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.18.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.18.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.19.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.19.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.20.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.20.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.21.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.21.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.22.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.22.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.23.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.23.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.24.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.24.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.25.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.25.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.26.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.26.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.27.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.27.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.28.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.28.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.29.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.29.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.30.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.30.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.31.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.31.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.32.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.32.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.33.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.33.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.34.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.34.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      },
+      {
+        "name": "model.layers.35.self_attn.q_proj",
+        "out_features": 2048,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 4194304,
+        "lora_params": 32768,
+        "dense_rank_almost_sure": 2048,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.0078125,
+        "rank_fraction": 0.00390625
+      },
+      {
+        "name": "model.layers.35.self_attn.v_proj",
+        "out_features": 256,
+        "in_features": 2048,
+        "rank": 8,
+        "dense_params": 524288,
+        "lora_params": 18432,
+        "dense_rank_almost_sure": 256,
+        "lora_rank_cap": 8,
+        "param_fraction": 0.03515625,
+        "rank_fraction": 0.03125
+      }
+    ],
+    "total_dense_params": 169869312,
+    "total_lora_params": 1843200,
+    "total_param_fraction": 0.010850694444444444,
+    "summed_dense_rank_almost_sure": 82944,
+    "summed_lora_rank_cap": 576,
+    "summed_rank_fraction": 0.006944444444444444
+  },
+  "projection_samples": [
+    {
+      "shape": [
+        128,
+        128
+      ],
+      "projection_stats": [
+        {
+          "rank": 1,
+          "captured_frob_fraction": 0.030733307435043156,
+          "relative_frob_error": 0.9845134293471861
+        },
+        {
+          "rank": 2,
+          "captured_frob_fraction": 0.059593040031319974,
+          "relative_frob_error": 0.9697458223517542
+        },
+        {
+          "rank": 4,
+          "captured_frob_fraction": 0.11296300066685049,
+          "relative_frob_error": 0.9418264167738923
+        },
+        {
+          "rank": 8,
+          "captured_frob_fraction": 0.21058797096593354,
+          "relative_frob_error": 0.8884886206553613
+        },
+        {
+          "rank": 16,
+          "captured_frob_fraction": 0.3761325346526517,
+          "relative_frob_error": 0.7898528124577062
+        },
+        {
+          "rank": 32,
+          "captured_frob_fraction": 0.6253745183558094,
+          "relative_frob_error": 0.6120665663505813
+        },
+        {
+          "rank": 64,
+          "captured_frob_fraction": 0.8952926015430492,
+          "relative_frob_error": 0.32358522595593076
+        }
+      ],
+      "required_rank_for_energy": {
+        "0.5": 24,
+        "0.9": 65,
+        "0.99": 99
+      }
+    },
+    {
+      "shape": [
+        256,
+        128
+      ],
+      "projection_stats": [
+        {
+          "rank": 1,
+          "captured_frob_fraction": 0.022640131152468372,
+          "relative_frob_error": 0.9886151267543561
+        },
+        {
+          "rank": 2,
+          "captured_frob_fraction": 0.044216395176282154,
+          "relative_frob_error": 0.9776418591814273
+        },
+        {
+          "rank": 4,
+          "captured_frob_fraction": 0.08528321931455635,
+          "relative_frob_error": 0.9564082709206585
+        },
+        {
+          "rank": 8,
+          "captured_frob_fraction": 0.16052464248179693,
+          "relative_frob_error": 0.9162288783476555
+        },
+        {
+          "rank": 16,
+          "captured_frob_fraction": 0.2939185776949452,
+          "relative_frob_error": 0.8402865120332795
+        },
+        {
+          "rank": 32,
+          "captured_frob_fraction": 0.5086423523318834,
+          "relative_frob_error": 0.7009690775405978
+        },
+        {
+          "rank": 64,
+          "captured_frob_fraction": 0.7923151621708414,
+          "relative_frob_error": 0.455724519670775
+        }
+      ],
+      "required_rank_for_energy": {
+        "0.5": 32,
+        "0.9": 85,
+        "0.99": 119
+      }
+    }
+  ]
+}
