@@ -92,6 +92,14 @@ def compare_runs(
     speed_ratio = None
     if dense_candidate_sec and lora_candidate_sec:
         speed_ratio = float(lora_candidate_sec) / float(dense_candidate_sec)
+    dense_ensemble = dense_run["summary"].get("best_ensemble_holdout_exact")
+    lora_ensemble = lora_run["summary"].get("best_ensemble_holdout_exact")
+    ensemble_delta = None
+    ensemble_present = dense_ensemble is not None or lora_ensemble is not None
+    if dense_ensemble is not None and lora_ensemble is not None:
+        dense_ensemble = float(dense_ensemble)
+        lora_ensemble = float(lora_ensemble)
+        ensemble_delta = lora_ensemble - dense_ensemble
     rho = spearman(dense_scores, lora_scores)
     topk_overlap = len(dense_top & lora_top)
     gates = {
@@ -100,6 +108,7 @@ def compare_runs(
         "topk_overlap": topk_overlap >= min_topk_overlap,
         "selected_regret": selected_regret is not None and selected_regret <= max_selected_regret,
         "speed": speed_ratio is not None and speed_ratio >= 1.0,
+        "ensemble_quality": (not ensemble_present) or (ensemble_delta is not None and ensemble_delta >= 0.0),
     }
     return {
         "shared_candidates": len(shared_keys),
@@ -124,6 +133,9 @@ def compare_runs(
         "dense_candidate_sec": dense_candidate_sec,
         "lora_candidate_sec": lora_candidate_sec,
         "speed_ratio_lora_over_dense": speed_ratio,
+        "dense_best_ensemble_holdout_exact": dense_ensemble,
+        "lora_best_ensemble_holdout_exact": lora_ensemble,
+        "ensemble_holdout_delta_lora_minus_dense": ensemble_delta,
         "thresholds": {
             "min_spearman": min_spearman,
             "min_topk_overlap": min_topk_overlap,
@@ -181,6 +193,9 @@ def render_markdown(summary: dict) -> str:
                 f"| dense candidate/sec | {comparison['dense_candidate_sec']} |",
                 f"| candidate/sec | {comparison['lora_candidate_sec']} |",
                 f"| speed ratio candidate/dense | {comparison['speed_ratio_lora_over_dense'] if comparison['speed_ratio_lora_over_dense'] is not None else 'null'} |",
+                f"| dense best ensemble holdout | {comparison['dense_best_ensemble_holdout_exact'] if comparison['dense_best_ensemble_holdout_exact'] is not None else 'null'} |",
+                f"| candidate best ensemble holdout | {comparison['lora_best_ensemble_holdout_exact'] if comparison['lora_best_ensemble_holdout_exact'] is not None else 'null'} |",
+                f"| ensemble holdout delta | {comparison['ensemble_holdout_delta_lora_minus_dense'] if comparison['ensemble_holdout_delta_lora_minus_dense'] is not None else 'null'} |",
                 "",
                 "| gate | pass |",
                 "| --- | ---: |",
@@ -208,6 +223,9 @@ def render_markdown(summary: dict) -> str:
         f"| dense candidate/sec | {summary['dense_candidate_sec']} |",
         f"| LoRA candidate/sec | {summary['lora_candidate_sec']} |",
         f"| speed ratio LoRA/dense | {summary['speed_ratio_lora_over_dense'] if summary['speed_ratio_lora_over_dense'] is not None else 'null'} |",
+        f"| dense best ensemble holdout | {summary['dense_best_ensemble_holdout_exact'] if summary['dense_best_ensemble_holdout_exact'] is not None else 'null'} |",
+        f"| LoRA best ensemble holdout | {summary['lora_best_ensemble_holdout_exact'] if summary['lora_best_ensemble_holdout_exact'] is not None else 'null'} |",
+        f"| ensemble holdout delta LoRA-dense | {summary['ensemble_holdout_delta_lora_minus_dense'] if summary['ensemble_holdout_delta_lora_minus_dense'] is not None else 'null'} |",
         "",
         "## Gates",
         "",

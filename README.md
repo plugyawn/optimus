@@ -81,11 +81,19 @@ python -m randopt_lora_lab.experiments search \
   --data "$DATA" \
   --perturbation-backend dense \
   --family dense_gaussian \
-  --population 64 \
+  --population 512 \
   --prompts 64 \
   --holdout-prompts 256 \
+  --sigma-values 0.0005,0.001,0.002 \
+  --promote 64 \
+  --ensemble-ks 8,16,32,64 \
   --stop-at-answer
 ```
+
+`top_holdout` is the old single-candidate diagnostic. Paper-style RandOpt
+quality claims must read `ensemble_holdout`: candidates are selected by screen
+score, the top-K candidates are evaluated on holdout, and Countdown votes by
+valid numeric result rather than formula string.
 
 Dense vs LoRA parity baseline:
 

@@ -8,15 +8,26 @@ POPULATION=${POPULATION:-64}
 PROMPTS=${PROMPTS:-64}
 HOLDOUT_PROMPTS=${HOLDOUT_PROMPTS:-256}
 SIGMA=${SIGMA:-0.01}
+SIGMA_VALUES=${SIGMA_VALUES:-}
 SEED=${SEED:-20260507}
 RANK=${RANK:-8}
 TARGETS=${TARGETS:-q_proj,v_proj}
 MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-32}
 BATCH_SIZE=${BATCH_SIZE:-16}
+PROMOTE=${PROMOTE:-4}
+ENSEMBLE_KS=${ENSEMBLE_KS:-}
 DENSE_SNAPSHOT_DEVICE=${DENSE_SNAPSHOT_DEVICE:-model}
 INCLUDE_PROJECTED=${INCLUDE_PROJECTED:-1}
 DENSE_REF_DIR=${DENSE_REF_DIR:-}
 RUN_DENSE=${RUN_DENSE:-1}
+
+extra_search_args=()
+if [[ -n "$SIGMA_VALUES" ]]; then
+  extra_search_args+=(--sigma-values "$SIGMA_VALUES")
+fi
+if [[ -n "$ENSEMBLE_KS" ]]; then
+  extra_search_args+=(--ensemble-ks "$ENSEMBLE_KS")
+fi
 
 if [[ ! -f "$DATA" ]]; then
   python -m randopt_lora_lab.make_countdown_data \
@@ -42,11 +53,13 @@ elif [[ "$RUN_DENSE" == "1" ]]; then
     --rank "$RANK" \
     --sigma "$SIGMA" \
     --targets "$TARGETS" \
+    --promote "$PROMOTE" \
     --max-new-tokens "$MAX_NEW_TOKENS" \
     --batch-size "$BATCH_SIZE" \
     --dense-snapshot-device "$DENSE_SNAPSHOT_DEVICE" \
     --seed "$SEED" \
-    --stop-at-answer
+    --stop-at-answer \
+    "${extra_search_args[@]}"
 elif [[ ! -f "$OUT/dense/summary.json" ]]; then
   echo "RUN_DENSE=0 requires an existing $OUT/dense/summary.json or DENSE_REF_DIR" >&2
   exit 1
@@ -64,10 +77,12 @@ python -m randopt_lora_lab.experiments search \
   --rank "$RANK" \
   --sigma "$SIGMA" \
   --targets "$TARGETS" \
+  --promote "$PROMOTE" \
   --max-new-tokens "$MAX_NEW_TOKENS" \
   --batch-size "$BATCH_SIZE" \
   --seed "$SEED" \
-  --stop-at-answer
+  --stop-at-answer \
+  "${extra_search_args[@]}"
 
 extra_candidates=()
 if [[ "$INCLUDE_PROJECTED" == "1" ]]; then
@@ -83,10 +98,12 @@ if [[ "$INCLUDE_PROJECTED" == "1" ]]; then
     --rank "$RANK" \
     --sigma "$SIGMA" \
     --targets "$TARGETS" \
+    --promote "$PROMOTE" \
     --max-new-tokens "$MAX_NEW_TOKENS" \
     --batch-size "$BATCH_SIZE" \
     --seed "$SEED" \
-    --stop-at-answer
+    --stop-at-answer \
+    "${extra_search_args[@]}"
   extra_candidates+=(--candidate "projected=$OUT/projected")
 fi
 

@@ -6,9 +6,12 @@ from pathlib import Path
 from randopt_lora_lab.parity_report import candidate_spec_key, compare_candidate_runs, compare_runs, load_run
 
 
-def write_run(path: Path, family: str, scores: list[float], candidate_sec: float):
+def write_run(path: Path, family: str, scores: list[float], candidate_sec: float, ensemble: float | None = None):
     path.mkdir(parents=True)
-    (path / "summary.json").write_text(json.dumps({"candidate_sec": candidate_sec}) + "\n")
+    summary = {"candidate_sec": candidate_sec}
+    if ensemble is not None:
+        summary["best_ensemble_holdout_exact"] = ensemble
+    (path / "summary.json").write_text(json.dumps(summary) + "\n")
     with (path / "candidate_summary.jsonl").open("w") as f:
         for idx, score in enumerate(scores):
             row = {
@@ -69,6 +72,29 @@ class ParityReportTests(unittest.TestCase):
             self.assertTrue(summary["comparisons"]["lora"]["pass"])
             self.assertFalse(summary["comparisons"]["projected"]["pass"])
             self.assertEqual(summary["comparisons"]["projected"]["topk_overlap"], 0)
+
+    def test_compare_runs_fails_when_ensemble_quality_regresses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_run(root / "dense", "dense_gaussian", [0.4, 0.3, 0.2, 0.1], candidate_sec=1.0, ensemble=0.5)
+            write_run(root / "lora", "factor_gaussian_lora", [0.4, 0.3, 0.2, 0.1], candidate_sec=4.0, ensemble=0.45)
+
+            summary = compare_runs(load_run(root / "dense"), load_run(root / "lora"), top_k=2, min_topk_overlap=2)
+
+            self.assertFalse(summary["pass"])
+            self.assertFalse(summary["gates"]["ensemble_quality"])
+            self.assertAlmostEqual(summary["ensemble_holdout_delta_lora_minus_dense"], -0.05)
+
+    def test_compare_runs_fails_when_ensemble_metric_is_asymmetric(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_run(root / "dense", "dense_gaussian", [0.4, 0.3, 0.2, 0.1], candidate_sec=1.0, ensemble=0.5)
+            write_run(root / "lora", "factor_gaussian_lora", [0.4, 0.3, 0.2, 0.1], candidate_sec=4.0)
+
+            summary = compare_runs(load_run(root / "dense"), load_run(root / "lora"), top_k=2, min_topk_overlap=2)
+
+            self.assertFalse(summary["pass"])
+            self.assertFalse(summary["gates"]["ensemble_quality"])
 
 
 if __name__ == "__main__":

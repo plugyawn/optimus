@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -10,11 +11,13 @@ import torch
 
 from .backends import TransformersDenseGaussianBackend, TransformersLoraBackend
 from .countdown import (
+    extract_numeric_vote,
     load_examples,
     prompts as make_prompts,
     score_completion,
     unique_example_count,
     unique_semantic_example_count,
+    voted_answer_exact,
 )
 from .lora_space import Candidate
 
@@ -149,14 +152,27 @@ def run_oracle(args):
     print(json.dumps(summary, indent=2, sort_keys=True))
 
 
-def candidate_panel(family: str, population: int, sigma: float, seed: int, antithetic: bool) -> list[Candidate]:
+def parse_float_list(text: str) -> list[float]:
+    return [float(x) for x in text.split(",") if x.strip()]
+
+
+def candidate_panel(
+    family: str,
+    population: int,
+    sigma: float,
+    seed: int,
+    antithetic: bool,
+    sigma_values: list[float] | None = None,
+) -> list[Candidate]:
     rng = np.random.default_rng(seed)
+    sigmas = sigma_values or [sigma]
     seeds = [int(x) for x in rng.integers(1, 2**31 - 1, size=population if not antithetic else population // 2)]
+    sampled_sigmas = [float(x) for x in rng.choice(sigmas, size=len(seeds), replace=True)]
     out = []
-    for s in seeds:
-        out.append(Candidate(family, s, sigma, 1))
+    for s, sampled_sigma in zip(seeds, sampled_sigmas):
+        out.append(Candidate(family, s, sampled_sigma, 1))
         if antithetic:
-            out.append(Candidate(family, s, sigma, -1))
+            out.append(Candidate(family, s, sampled_sigma, -1))
     return out[:population]
 
 
@@ -168,6 +184,73 @@ def parse_candidate_key(key: str) -> Candidate:
         float(parts[2].removeprefix("s")),
         int(parts[3].removeprefix("sign")),
     )
+
+
+def parse_k_list(text: str) -> list[int]:
+    return sorted({int(x) for x in text.split(",") if x.strip()})
+
+
+def rows_by_candidate_and_example(rows: list[dict]) -> dict[str, dict[int, dict]]:
+    out: dict[str, dict[int, dict]] = {}
+    for row in rows:
+        out.setdefault(str(row["candidate"]), {})[int(row["example_id"])] = row
+    return out
+
+
+def majority_vote_evaluation(candidate_order: list[str], rows: list[dict], examples, k_values: list[int]) -> tuple[list[dict], list[dict]]:
+    by_candidate = rows_by_candidate_and_example(rows)
+    result_rows = []
+    per_prompt_rows = []
+    for k in k_values:
+        active = candidate_order[: min(k, len(candidate_order))]
+        exact_values = []
+        coverage_values = []
+        valid_vote_counts = []
+        for ex in examples:
+            votes = []
+            rejects = Counter()
+            for candidate in active:
+                row = by_candidate.get(candidate, {}).get(ex.id)
+                if not row:
+                    continue
+                vote = extract_numeric_vote(str(row.get("text", "")), ex)
+                if vote["valid_vote"]:
+                    votes.append(str(vote["vote"]))
+                else:
+                    rejects[str(vote["vote_reject"])] += 1
+            counter = Counter(votes)
+            final_vote = counter.most_common(1)[0][0] if counter else ""
+            exact = voted_answer_exact(final_vote, ex)
+            exact_values.append(exact)
+            coverage_values.append(float(bool(counter)))
+            valid_vote_counts.append(len(votes))
+            per_prompt_rows.append(
+                {
+                    "k": k,
+                    "example_id": ex.id,
+                    "numbers": list(ex.numbers),
+                    "target": ex.target,
+                    "final_vote": final_vote,
+                    "exact": exact,
+                    "valid_vote_count": len(votes),
+                    "missing_vote_count": max(len(active) - len(votes), 0),
+                    "vote_counts": dict(counter),
+                    "reject_counts": dict(rejects),
+                }
+            )
+        denom = max(len(examples), 1)
+        result_rows.append(
+            {
+                "k": k,
+                "evaluated_candidates": len(active),
+                "exact_mean": float(np.mean(exact_values)) if exact_values else 0.0,
+                "coverage_mean": float(np.mean(coverage_values)) if coverage_values else 0.0,
+                "valid_votes_per_prompt": float(np.mean(valid_vote_counts)) if valid_vote_counts else 0.0,
+                "correct": int(sum(exact_values)),
+                "total": denom,
+            }
+        )
+    return result_rows, per_prompt_rows
 
 
 def anzo_anchor_prompts() -> list[str]:
@@ -231,7 +314,7 @@ def maybe_build_family_state(args, backend, screen):
 def run_search(args):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    reset_outputs(out, ["per_prompt.jsonl", "candidate_summary.jsonl", "holdout_per_prompt.jsonl"])
+    reset_outputs(out, ["per_prompt.jsonl", "candidate_summary.jsonl", "holdout_per_prompt.jsonl", "ensemble_per_prompt.jsonl"])
     backend = make_backend(args)
     screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     holdout = load_examples(
@@ -246,7 +329,8 @@ def run_search(args):
     write_jsonl(out / "per_prompt.jsonl", tag_rows(base_screen["rows"], mode="base_screen"))
     write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
     family_state = maybe_build_family_state(args, backend, screen)
-    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic)
+    sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
+    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
     summaries = []
     start = time.time()
     for i, cand in enumerate(candidates):
@@ -254,12 +338,26 @@ def run_search(args):
         summaries.append({k: v for k, v in ev.items() if k != "rows"})
         write_jsonl(out / "per_prompt.jsonl", tag_rows(ev["rows"], mode="screen"))
         print(f"{i+1}/{len(candidates)} {cand.key} exact={ev['exact_mean']:.4f} elapsed={ev['elapsed_s']:.2f}", flush=True)
-    top = sorted(summaries, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(summaries))]
+    ensemble_ks = parse_k_list(args.ensemble_ks) if args.ensemble_ks else []
+    promote_n = max(args.promote, max(ensemble_ks, default=0))
+    top = sorted(summaries, key=lambda r: r["exact_mean"], reverse=True)[: min(promote_n, len(summaries))]
     holdout_rows = []
+    holdout_per_candidate_rows = []
     for row in top:
         ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, family_state)
         holdout_rows.append({k: v for k, v in ev.items() if k != "rows"})
-        write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(ev["rows"], mode="holdout"))
+        tagged = tag_rows(ev["rows"], mode="holdout")
+        holdout_per_candidate_rows.extend(tagged)
+        write_jsonl(out / "holdout_per_prompt.jsonl", tagged)
+    ensemble_rows = []
+    if ensemble_ks:
+        ensemble_rows, ensemble_per_prompt = majority_vote_evaluation(
+            [str(row["candidate"]) for row in top],
+            holdout_per_candidate_rows,
+            holdout,
+            ensemble_ks,
+        )
+        write_jsonl(out / "ensemble_per_prompt.jsonl", ensemble_per_prompt)
     total_s = time.time() - start
     summary = {
         "kind": "search",
@@ -269,6 +367,7 @@ def run_search(args):
         "population": len(candidates),
         "rank": args.rank,
         "sigma": args.sigma,
+        "sigma_values": sigma_values,
         "seed": args.seed,
         "targets": args.targets,
         "perturbation_backend": args.perturbation_backend,
@@ -290,6 +389,9 @@ def run_search(args):
         "pair_sec": len(candidates) * len(screen) / total_s,
         "max_new_tokens": args.max_new_tokens,
         "stop_at_answer": args.stop_at_answer,
+        "ensemble_ks": ensemble_ks,
+        "ensemble_holdout": ensemble_rows,
+        "best_ensemble_holdout_exact": max((row["exact_mean"] for row in ensemble_rows), default=None),
         "top_screen": top,
         "top_holdout": holdout_rows,
     }
@@ -328,7 +430,8 @@ def run_halving(args):
     write_jsonl(out / "full_per_prompt.jsonl", tag_rows(base_screen["rows"], mode="base_screen"))
     write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
     family_state = maybe_build_family_state(args, backend, screen)
-    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic)
+    sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
+    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
     stage_rows = []
     start = time.time()
     for i, cand in enumerate(candidates):
@@ -365,6 +468,7 @@ def run_halving(args):
         "population": len(candidates),
         "rank": args.rank,
         "sigma": args.sigma,
+        "sigma_values": sigma_values,
         "seed": args.seed,
         "targets": args.targets,
         "perturbation_backend": args.perturbation_backend,
@@ -482,6 +586,7 @@ def main():
         sp.add_argument("--seed", type=int, default=1234)
         sp.add_argument("--rank", type=int, default=8)
         sp.add_argument("--sigma", type=float, default=0.02)
+        sp.add_argument("--sigma-values", default="")
         sp.add_argument("--targets", default="q_proj,v_proj")
         sp.add_argument("--max-new-tokens", type=int, default=32)
         sp.add_argument("--batch-size", type=int, default=16)
@@ -509,6 +614,7 @@ def main():
         )
         sp.add_argument("--population", type=int, default=32)
         sp.add_argument("--promote", type=int, default=4)
+        sp.add_argument("--ensemble-ks", default="")
         sp.add_argument("--stage-prompts", type=int, default=8)
         sp.add_argument("--survivors", type=int, default=8)
         sp.add_argument("--batch-sizes", default="4,8,16,32")

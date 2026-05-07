@@ -209,5 +209,45 @@ def score_completion(text: str, example: CountdownExample, *, strict: bool = Tru
     }
 
 
+def extract_numeric_vote(text: str, example: CountdownExample) -> dict:
+    """Return the numeric Countdown vote for a valid formula completion.
+
+    This mirrors the paper-style Countdown ensemble rule: candidates vote by
+    evaluated numeric result, but only formulas using exactly the given numbers
+    are allowed into the vote.
+    """
+    answer = extract_answer(text)
+    if not answer:
+        return {"valid_vote": False, "vote": "", "vote_reject": "missing_answer"}
+    if "=" in answer or not re.match(r"^[0-9+\-*/(). ]+$", answer):
+        return {"valid_vote": False, "vote": "", "vote_reject": "invalid_chars"}
+    used = sorted(int(x) for x in re.findall(r"\d+", answer))
+    if used != sorted(example.numbers):
+        return {
+            "valid_vote": False,
+            "vote": "",
+            "vote_reject": "wrong_numbers",
+            "used_numbers": used,
+        }
+    try:
+        value = safe_eval_expr(answer)
+    except Exception:
+        return {"valid_vote": False, "vote": "", "vote_reject": "eval_error"}
+    if math.isclose(value, round(value), abs_tol=1e-9):
+        vote = str(int(round(value)))
+    else:
+        vote = str(value)
+    return {"valid_vote": True, "vote": vote, "vote_reject": ""}
+
+
+def voted_answer_exact(vote: str, example: CountdownExample) -> float:
+    if not vote:
+        return 0.0
+    try:
+        return float(math.isclose(float(vote), float(example.target), abs_tol=1e-5))
+    except ValueError:
+        return 0.0
+
+
 def prompts(examples: Iterable[CountdownExample]) -> list[str]:
     return [prompt(ex) for ex in examples]

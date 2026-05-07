@@ -3,7 +3,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from randopt_lora_lab.countdown import CountdownExample, load_examples, score_completion, unique_semantic_example_count
+from randopt_lora_lab.countdown import (
+    CountdownExample,
+    extract_numeric_vote,
+    load_examples,
+    score_completion,
+    unique_semantic_example_count,
+    voted_answer_exact,
+)
 from randopt_lora_lab.backends import TransformersLoraBackend
 
 
@@ -69,6 +76,17 @@ class CountdownParserTests(unittest.TestCase):
         self.assertEqual(score["exact"], 0.0)
         self.assertTrue(score["malformed"])
         self.assertTrue(score["multiple_answers"])
+
+    def test_numeric_vote_uses_evaluated_result(self):
+        vote = extract_numeric_vote("<answer>8*(7-3)-8</answer>", self.example)
+        self.assertTrue(vote["valid_vote"])
+        self.assertEqual(vote["vote"], "24")
+        self.assertEqual(voted_answer_exact(vote["vote"], self.example), 1.0)
+
+    def test_numeric_vote_rejects_wrong_numbers_even_if_target_matches(self):
+        vote = extract_numeric_vote("<answer>24</answer>", self.example)
+        self.assertFalse(vote["valid_vote"])
+        self.assertEqual(vote["vote_reject"], "wrong_numbers")
 
 
 class BackendTextNormalizationTests(unittest.TestCase):
