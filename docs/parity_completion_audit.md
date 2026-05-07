@@ -85,6 +85,22 @@ This preserves the systems speed signal but blocks vLLM as a selector of record.
 The next diagnosis is not a larger vLLM search; it is base/zero/candidate
 logit or next-token parity for the two disagreeing candidates.
 
+Saved-output diff: `results/backend_parity_gate_p16/output_diff` shows the
+ranking failure comes from real per-prompt output differences, not just aggregate
+report formatting:
+
+```text
+common rows: 256
+exact disagreement rate: 2.34375%
+answer equal rate: 67.578125%
+text equal rate: 55.078125%
+max candidate exact delta: 0.125
+```
+
+The sparse exact reward makes a few row-level disagreements enough to invert a
+P=16 ranking. That strengthens the case for a lower-level next-token/logit
+parity probe before any more vLLM selection work.
+
 Then run a rank sweep before any broader LoRA-vs-dense claim:
 
 ```bash

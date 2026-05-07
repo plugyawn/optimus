@@ -133,6 +133,15 @@ canonical materializer, and then requires ranking correlation/top-k overlap.
 Use `python -m randopt_lora_lab.backend_parity_gate` directly when comparing
 two already-existing matched run directories.
 
+Backend output diff for a failed gate:
+
+```bash
+python -m randopt_lora_lab.backend_output_diff \
+  --trusted results/backend_parity_gate_p16/peft \
+  --candidate results/backend_parity_gate_p16/vllm \
+  --out results/backend_parity_gate_p16/output_diff
+```
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 The current completion checklist is in `docs/parity_completion_audit.md`.
 
