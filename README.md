@@ -77,6 +77,12 @@ SIGMA=0.01 \
 scripts/run_gaussian_parity_baseline.sh
 ```
 
+The baseline script runs `dense_gaussian`, `factor_gaussian_lora`, and
+`projected_gaussian_rank_r`, then compares each LoRA-style arm against the same
+dense panel. The projected arm is an SVD bridge baseline, not the fast path; it
+is useful for separating "rank-r cannot carry the dense direction" from "our
+factor-Gaussian sampling is the wrong low-rank distribution."
+
 The first run is a correctness oracle. It must pass before any throughput or research claim.
 
 ## Evidence Rules

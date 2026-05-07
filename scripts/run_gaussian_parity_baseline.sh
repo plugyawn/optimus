@@ -43,7 +43,21 @@ python -m randopt_lora_lab.experiments search \
   --seed "$SEED" \
   --stop-at-answer
 
+python -m randopt_lora_lab.experiments search \
+  --out "$OUT/projected" \
+  --model "$MODEL" \
+  --data "$DATA" \
+  --perturbation-backend lora \
+  --family projected_gaussian_rank_r \
+  --population "$POPULATION" \
+  --prompts "$PROMPTS" \
+  --holdout-prompts "$HOLDOUT_PROMPTS" \
+  --sigma "$SIGMA" \
+  --seed "$SEED" \
+  --stop-at-answer
+
 python -m randopt_lora_lab.parity_report \
   --dense "$OUT/dense" \
   --lora "$OUT/lora" \
+  --candidate "projected=$OUT/projected" \
   --out "$OUT/report"

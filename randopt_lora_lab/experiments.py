@@ -199,7 +199,7 @@ def anzo_random_target_prompts(seed: int, n: int) -> list[str]:
 
 
 def maybe_build_family_state(args, backend, screen):
-    if args.family in {"isotropic", "dense_gaussian", "factor_gaussian_lora"}:
+    if args.family in {"isotropic", "dense_gaussian", "factor_gaussian_lora", "projected_gaussian_rank_r"}:
         return None
     if args.family == "random_ortho":
         return backend.build_random_orthonormal_state(args.seed)
@@ -462,6 +462,7 @@ def main():
             choices=[
                 "isotropic",
                 "factor_gaussian_lora",
+                "projected_gaussian_rank_r",
                 "dense_gaussian",
                 "anzo",
                 "target_svd",

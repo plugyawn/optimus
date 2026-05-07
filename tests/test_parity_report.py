@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from randopt_lora_lab.parity_report import candidate_spec_key, compare_runs, load_run
+from randopt_lora_lab.parity_report import candidate_spec_key, compare_candidate_runs, compare_runs, load_run
 
 
 def write_run(path: Path, family: str, scores: list[float], candidate_sec: float):
@@ -47,6 +47,28 @@ class ParityReportTests(unittest.TestCase):
             self.assertFalse(summary["pass"])
             self.assertGreater(summary["selected_regret"], 0.0)
             self.assertFalse(summary["gates"]["spearman"])
+
+    def test_compare_candidate_runs_reports_each_arm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_run(root / "dense", "dense_gaussian", [0.4, 0.3, 0.2, 0.1], candidate_sec=1.0)
+            write_run(root / "lora", "factor_gaussian_lora", [0.4, 0.3, 0.2, 0.1], candidate_sec=2.0)
+            write_run(root / "projected", "projected_gaussian_rank_r", [0.1, 0.2, 0.3, 0.4], candidate_sec=0.5)
+
+            summary = compare_candidate_runs(
+                load_run(root / "dense"),
+                {
+                    "lora": load_run(root / "lora"),
+                    "projected": load_run(root / "projected"),
+                },
+                top_k=2,
+                min_topk_overlap=2,
+            )
+
+            self.assertFalse(summary["pass"])
+            self.assertTrue(summary["comparisons"]["lora"]["pass"])
+            self.assertFalse(summary["comparisons"]["projected"]["pass"])
+            self.assertEqual(summary["comparisons"]["projected"]["topk_overlap"], 0)
 
 
 if __name__ == "__main__":

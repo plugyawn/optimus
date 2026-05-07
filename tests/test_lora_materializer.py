@@ -6,6 +6,8 @@ from pathlib import Path
 import torch
 from safetensors.torch import load_file
 
+from randopt_lora_lab.dense_space import dense_noise_tensor
+from randopt_lora_lab.gaussian_parity import best_rank_projection, lora_update
 from randopt_lora_lab.lora_space import Candidate, canonical_module_name, lora_noise_tensors
 from randopt_lora_lab.vllm_lora_bench import save_seed_adapter
 
@@ -43,6 +45,19 @@ class LoraMaterializerTests(unittest.TestCase):
         prefix = f"base_model.model.{module}"
         self.assertTrue(torch.equal(tensors[f"{prefix}.lora_A.weight"], expected_a))
         self.assertTrue(torch.equal(tensors[f"{prefix}.lora_B.weight"], expected_b))
+
+    def test_projected_gaussian_family_factors_dense_projection(self):
+        candidate = Candidate("projected_gaussian_rank_r", seed=456, sigma=0.01, sign=1)
+        rank = 3
+        module = "model.layers.0.self_attn.q_proj"
+
+        a, b = lora_noise_tensors(module, (rank, 8), (7, rank), candidate, rank)
+        dense = dense_noise_tensor(module, (7, 8), Candidate("dense_gaussian", seed=456, sigma=0.01, sign=1))
+        projected = best_rank_projection(dense, rank)
+
+        self.assertEqual(tuple(a.shape), (rank, 8))
+        self.assertEqual(tuple(b.shape), (7, rank))
+        self.assertTrue(torch.allclose(lora_update(a, b), projected.to(a.dtype), atol=1e-6, rtol=1e-6))
 
 
 if __name__ == "__main__":

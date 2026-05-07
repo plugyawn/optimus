@@ -124,7 +124,60 @@ def compare_runs(
     }
 
 
+def compare_candidate_runs(
+    dense_run: dict,
+    candidate_runs: dict[str, dict],
+    *,
+    top_k: int = 8,
+    min_spearman: float = 0.85,
+    min_topk_overlap: int = 6,
+    max_selected_regret: float = 0.0,
+) -> dict:
+    comparisons = {
+        name: compare_runs(
+            dense_run,
+            candidate_run,
+            top_k=top_k,
+            min_spearman=min_spearman,
+            min_topk_overlap=min_topk_overlap,
+            max_selected_regret=max_selected_regret,
+        )
+        for name, candidate_run in candidate_runs.items()
+    }
+    return {
+        "reference": "dense",
+        "comparisons": comparisons,
+        "pass": all(comparison["pass"] for comparison in comparisons.values()),
+    }
+
+
 def render_markdown(summary: dict) -> str:
+    if "comparisons" in summary:
+        lines = ["# Dense Gaussian Parity Report", ""]
+        for name, comparison in summary["comparisons"].items():
+            lines.extend([
+                f"## {name}",
+                "",
+                "| metric | value |",
+                "| --- | ---: |",
+                f"| shared candidates | {comparison['shared_candidates']} |",
+                f"| Spearman | {comparison['spearman'] if comparison['spearman'] is not None else 'null'} |",
+                f"| top-{comparison['top_k']} overlap | {comparison['topk_overlap']} |",
+                f"| selected regret | {comparison['selected_regret'] if comparison['selected_regret'] is not None else 'null'} |",
+                f"| dense candidate/sec | {comparison['dense_candidate_sec']} |",
+                f"| candidate/sec | {comparison['lora_candidate_sec']} |",
+                f"| speed ratio candidate/dense | {comparison['speed_ratio_lora_over_dense'] if comparison['speed_ratio_lora_over_dense'] is not None else 'null'} |",
+                "",
+                "| gate | pass |",
+                "| --- | ---: |",
+            ])
+            for gate, passed in comparison["gates"].items():
+                lines.append(f"| {gate} | {str(passed).lower()} |")
+            lines.extend(["", f"Pass: `{str(comparison['pass']).lower()}`", ""])
+        lines.append(f"Overall pass: `{str(summary['pass']).lower()}`")
+        lines.append("")
+        return "\n".join(lines)
+
     lines = [
         "# Dense Gaussian vs LoRA Parity Report",
         "",
@@ -153,10 +206,27 @@ def render_markdown(summary: dict) -> str:
     return "\n".join(lines)
 
 
+def parse_candidate_arg(value: str) -> tuple[str, Path]:
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("--candidate must be NAME=RUN_DIR")
+    name, path = value.split("=", 1)
+    name = name.strip()
+    if not name:
+        raise argparse.ArgumentTypeError("--candidate name cannot be empty")
+    return name, Path(path)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Compare dense Gaussian and LoRA search result parity.")
     parser.add_argument("--dense", type=Path, required=True, help="Dense Gaussian run directory")
     parser.add_argument("--lora", type=Path, required=True, help="LoRA run directory")
+    parser.add_argument(
+        "--candidate",
+        type=parse_candidate_arg,
+        action="append",
+        default=[],
+        help="Additional candidate arm as NAME=RUN_DIR, for example projected=results/projected",
+    )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--top-k", type=int, default=8)
     parser.add_argument("--min-spearman", type=float, default=0.85)
@@ -164,14 +234,30 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--max-selected-regret", type=float, default=0.0)
     args = parser.parse_args(argv)
 
-    summary = compare_runs(
-        load_run(args.dense),
-        load_run(args.lora),
-        top_k=args.top_k,
-        min_spearman=args.min_spearman,
-        min_topk_overlap=args.min_topk_overlap,
-        max_selected_regret=args.max_selected_regret,
-    )
+    dense_run = load_run(args.dense)
+    if args.candidate:
+        candidate_runs = {"lora": load_run(args.lora)}
+        for name, path in args.candidate:
+            if name in candidate_runs:
+                raise ValueError(f"duplicate candidate name: {name}")
+            candidate_runs[name] = load_run(path)
+        summary = compare_candidate_runs(
+            dense_run,
+            candidate_runs,
+            top_k=args.top_k,
+            min_spearman=args.min_spearman,
+            min_topk_overlap=args.min_topk_overlap,
+            max_selected_regret=args.max_selected_regret,
+        )
+    else:
+        summary = compare_runs(
+            dense_run,
+            load_run(args.lora),
+            top_k=args.top_k,
+            min_spearman=args.min_spearman,
+            min_topk_overlap=args.min_topk_overlap,
+            max_selected_regret=args.max_selected_regret,
+        )
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     (args.out / "report.md").write_text(render_markdown(summary))
