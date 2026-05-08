@@ -198,6 +198,24 @@ def parse_candidate_key(key: str) -> Candidate:
     )
 
 
+def read_candidate_file(path: str) -> list[Candidate]:
+    candidates = []
+    with Path(path).open() as f:
+        for line_no, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                item = line
+            key = item.get("candidate") if isinstance(item, dict) else str(item)
+            if not key:
+                raise ValueError(f"{path}:{line_no} missing candidate")
+            candidates.append(parse_candidate_key(str(key)))
+    return candidates
+
+
 def parse_k_list(text: str) -> list[int]:
     return sorted({int(x) for x in text.split(",") if x.strip()})
 
@@ -361,7 +379,11 @@ def run_search(args):
     write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
     family_state = maybe_build_family_state(args, backend, screen)
     sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
-    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
+    candidates = (
+        read_candidate_file(args.candidate_file)
+        if args.candidate_file
+        else candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
+    )
     summaries = []
     start = time.time()
     for i, cand in enumerate(candidates):
@@ -409,6 +431,7 @@ def run_search(args):
         "dtype": args.dtype,
         "batch_size": args.batch_size,
         "allow_repeat_data": args.allow_repeat_data,
+        "candidate_file": args.candidate_file,
         "antithetic": args.antithetic,
         "promote": args.promote,
         "screen_prompts": len(screen),
@@ -467,7 +490,11 @@ def run_halving(args):
     write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
     family_state = maybe_build_family_state(args, backend, screen)
     sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
-    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
+    candidates = (
+        read_candidate_file(args.candidate_file)
+        if args.candidate_file
+        else candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
+    )
     stage_rows = []
     start = time.time()
     for i, cand in enumerate(candidates):
@@ -512,6 +539,7 @@ def run_halving(args):
         "dtype": args.dtype,
         "batch_size": args.batch_size,
         "allow_repeat_data": args.allow_repeat_data,
+        "candidate_file": args.candidate_file,
         "antithetic": args.antithetic,
         "promote": args.promote,
         "stage_prompts": len(stage),
@@ -660,6 +688,7 @@ def main():
             ],
         )
         sp.add_argument("--population", type=int, default=32)
+        sp.add_argument("--candidate-file", default="", help="Optional JSONL/list of exact candidate keys to evaluate.")
         sp.add_argument("--promote", type=int, default=4)
         sp.add_argument("--ensemble-ks", default="")
         sp.add_argument("--ensemble-ratios", default="")

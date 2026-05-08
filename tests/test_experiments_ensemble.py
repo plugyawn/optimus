@@ -1,7 +1,7 @@
 import unittest
 
 from randopt_lora_lab.countdown import CountdownExample
-from randopt_lora_lab.experiments import candidate_panel, ensemble_ks_from_values, majority_vote_evaluation, parse_k_list
+from randopt_lora_lab.experiments import candidate_panel, ensemble_ks_from_values, majority_vote_evaluation, parse_k_list, read_candidate_file as read_peft_candidate_file
 from randopt_lora_lab.vllm_lora_search import candidate_panel as vllm_candidate_panel, read_candidate_file
 
 
@@ -62,6 +62,23 @@ class ExperimentEnsembleTests(unittest.TestCase):
         self.assertEqual([c.seed for c in candidates], [7, 8])
         self.assertEqual([c.sign for c in candidates], [1, -1])
         self.assertEqual([c.sigma for c in candidates], [0.01, 0.02])
+
+    def test_peft_candidate_file_reads_same_jsonl_candidate_keys(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "candidates.jsonl"
+            path.write_text(
+                '{"candidate":"sparse_low_rank_lora_d0p125:seed7:s0.001:sign1"}\n'
+                "sparse_low_rank_lora_d0p125:seed8:s0.002:sign-1\n"
+            )
+            candidates = read_peft_candidate_file(str(path))
+
+        self.assertEqual([c.family for c in candidates], ["sparse_low_rank_lora_d0p125", "sparse_low_rank_lora_d0p125"])
+        self.assertEqual([c.seed for c in candidates], [7, 8])
+        self.assertEqual([c.sign for c in candidates], [1, -1])
+        self.assertEqual([c.sigma for c in candidates], [0.001, 0.002])
 
     def test_majority_vote_uses_numeric_answers_not_formula_strings(self):
         example = CountdownExample(1, (1, 2, 3), 6)

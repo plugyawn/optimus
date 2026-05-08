@@ -62,7 +62,19 @@ The blockers are:
 5. d0p25 did not improve over factor.
 ```
 
-The next useful sparse test should be smaller but prompt-robust, or should move
-the sparse d0p125 proposal into the accelerated vLLM shortlist path and confirm
-only the top candidates with PEFT. A full PEFT all-arms sweep is too slow for
-iteration.
+The next useful sparse test should move the sparse d0p125 proposal into the
+accelerated vLLM shortlist path and confirm only the top candidates with PEFT.
+A full PEFT all-arms sweep is too slow for iteration. The follow-up entry point
+is:
+
+```bash
+OUT_ROOT=results/vllm_shortlist_sparse_d0p125_p64 \
+FAMILY=sparse_low_rank_lora_d0p125 \
+POPULATION=64 \
+SHORTLIST_K=8 \
+PROMPT_VARIANTS=default,reordered,xml \
+scripts/run_vllm_shortlist_confirmation.sh
+```
+
+That run keeps dense Gaussian as the full reference, uses vLLM only for proposal
+ranking, and PEFT-confirms only the shortlist.

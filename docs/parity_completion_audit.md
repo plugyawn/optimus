@@ -151,6 +151,7 @@ stability gates are still red.
 | Paper-aligned geometry | sparse SGD RLVR note added after arXiv 2602.07729 | hypothesis only |
 | Sample-size aggregation | rank-32 top-4 score-weighted aggregate improved holdout, but with high cap-hit | promising, invalid until cap audit |
 | Sparse-low-rank family | `sparse_low_rank_lora` implemented with density variants and variance matching | implemented, not run |
+| Sparse d0p125 quality lead | P16 default-prompt panel improved best ensemble holdout by 2/128 over factor LoRA, but failed dense ranking/regret and prompt-robust replication | weak lead, not parity |
 | Prompt robustness | prompt-relative report gate added; method claims require multiple valid prompt templates | implemented, not passed |
 | vLLM backend parity | P=16 gate passed protocol/base/tensor checks but failed ranking with Spearman -0.181 | missing |
 | Two-stage acceleration | tokenized vLLM proposal + PEFT confirmation recovered PEFT best at k=1 with 10.55x eval-only speedup and 1.93x speedup including vLLM load/build | same-family systems path passed on one P64 panel; dense-referenced confirmation now required |
@@ -242,6 +243,18 @@ gates separately:
 vLLM-only selector parity: strict, currently failing.
 vLLM proposal + PEFT confirmation: same-family recall/speed gate, currently passed on one P64 panel.
 dense-referenced confirmation: required before treating the accelerated path as dense RandOpt quality evidence.
+```
+
+For sparse-low-rank follow-up, avoid full PEFT all-arm sweeps. Use vLLM to
+screen the sparse family, write a top-K shortlist, PEFT-confirm only that
+shortlist, and compare against the full dense Gaussian reference:
+
+```bash
+OUT_ROOT=results/vllm_shortlist_sparse_d0p125_p64 \
+FAMILY=sparse_low_rank_lora_d0p125 \
+POPULATION=64 \
+SHORTLIST_K=8 \
+scripts/run_vllm_shortlist_confirmation.sh
 ```
 
 The current next entrypoint for a quality-coupled systems test is:
