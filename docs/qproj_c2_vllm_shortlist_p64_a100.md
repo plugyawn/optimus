@@ -51,7 +51,10 @@ This is a real systems positive for `vLLM proposal + PEFT confirmation`.
 
 ## Quality Result
 
-The quality gate failed. vLLM did not shortlist the dense best candidate:
+There are two quality questions, and they give different answers.
+
+The dense seed/spec parity gate failed. vLLM did not shortlist the dense best
+candidate:
 
 ```text
 dense best: dense_gaussian:seed1267011527:s0.002:sign1
@@ -90,6 +93,25 @@ vLLM robust shortlist did not recover the dense best or zero-regret candidate.
 q-only c2 is not yet a quality-preserving accelerated replacement for dense
 Gaussian RandOpt.
 ```
+
+However, the operational search-quality gate passes on trusted strict holdout:
+
+```text
+out: results/qproj_c2_vllm_shortlist_p64/search_quality_confirmation
+gate: PASS
+passing k: 4
+```
+
+| k | confirmed strict holdout | dense strict holdout at k | delta vs dense best strict | full speedup | pass |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | 6.2500% | 6.2500% | -0.781 pp | 6.67x | false |
+| 4 | 8.5938% | 7.0312% | +1.5625 pp | 5.71x | true |
+| 8 | 7.0312% | 7.0312% | 0.000 pp | 5.32x | true |
+
+This distinction matters. The run does not prove q-only c2 is a faithful
+low-rank surrogate for dense Gaussian perturbations, but it does show that this
+accelerated LoRA search path can recover an equal-or-better trusted strict
+holdout ensemble on this P64 panel with a 5.3x-5.7x full speedup.
 
 ## Validity
 
@@ -164,17 +186,20 @@ vLLM/PEFT default condition is not rank-stable enough to repair it.
 
 ## Verdict
 
-This run supports only the systems half of the claim:
+This run supports a narrow systems-plus-quality claim, but not full dense
+Gaussian perturbation parity:
 
 ```text
 Supported:
   vLLM can screen this LoRA family much faster than all-candidate PEFT.
   vLLM proposal + PEFT confirmation gives 5.3x-6.7x full speedup at k<=8.
+  PEFT-confirmed strict holdout matches/beats dense at k=4 and k=8 on this panel.
 
 Not supported:
   vLLM robust selection is quality-preserving.
   q-only c2 is as powerful as dense Gaussian RandOpt at P64.
   the current shortlist policy can replace a dense PEFT screen.
+  seed/spec-level dense Gaussian parity.
 ```
 
 The next highest-leverage fix is not to scale P. It is to debug ranking
