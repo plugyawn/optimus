@@ -35,10 +35,14 @@ $OUT_ROOT/spectral
 $OUT_ROOT/parity
 $OUT_ROOT/vllm_spectral
 $OUT_ROOT/confirmation
+$OUT_ROOT/dense_reference_confirmation
 ```
 
 `$OUT_ROOT/parity` is the quality/stability artifact. `$OUT_ROOT/confirmation`
-is the systems artifact.
+is the same-family systems artifact. `$OUT_ROOT/dense_reference_confirmation`
+checks whether the vLLM shortlist plus spectral PEFT confirmation also recovers
+the dense Gaussian reference best; without it, a confirmation pass is not dense
+quality evidence.
 
 ## Defaults
 
@@ -78,12 +82,16 @@ Treat the run as positive only if all of these hold:
 4. $OUT_ROOT/confirmation recovers the PEFT spectral best within CONFIRM_MAX_K.
 5. confirmation speedup remains positive after vLLM load/build and PEFT
    confirmation cost.
-6. cap-hit and malformed metrics do not regress on the promoted candidates.
+6. $OUT_ROOT/dense_reference_confirmation recovers the dense Gaussian best
+   within DENSE_REF_MAX_K with negligible dense regret.
+7. cap-hit and malformed metrics do not regress on the promoted candidates.
 ```
 
 A successful confirmation gate only says vLLM is a fast proposal engine for this
 same spectral family. It does not prove that vLLM itself is an exact quality
 selector, and it does not prove that spectral LoRA beats dense Gaussian.
+Dense-reference confirmation is the extra check that prevents same-family
+spectral recall from being mistaken for dense RandOpt parity.
 
 ## Negative Outcomes
 
@@ -95,6 +103,10 @@ parity fails, confirmation passes:
 
 parity passes, confirmation fails:
   family may be useful, but vLLM proposal scoring is not reliable enough.
+
+confirmation passes, dense-reference confirmation fails:
+  vLLM can recover the spectral PEFT best, but the spectral family is still not
+  a dense RandOpt replacement.
 
 both fail:
   do not scale this spectral configuration.
@@ -118,9 +130,9 @@ VLLM_HOLDOUT_PROMPTS=8 \
 scripts/run_spectral_vllm_multirun_gate.sh
 ```
 
-This gate keeps systems confirmation, dense parity, validity, and prompt
-robustness separate. It should fail a default-prompt-only run even if vLLM
-shortlisting is fast.
+This gate keeps same-family systems confirmation, dense-referenced
+confirmation, dense parity, validity, and prompt robustness separate. It should
+fail a default-prompt-only run even if vLLM shortlisting is fast.
 
 The wrapper sets `RUN_VLLM_FIRST=1` by default. That makes the robust vLLM
 prompt-validity check run before the expensive PEFT dense/control/spectral arms,

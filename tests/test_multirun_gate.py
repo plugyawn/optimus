@@ -20,7 +20,9 @@ def write_run(
     selected_regret: float = 0.0,
     spearman: float = 0.9,
     zero_regret_k: int | None = 2,
+    zero_dense_regret_k: int | None = 2,
     full_speedup: float = 2.0,
+    dense_reference_pass: bool = True,
 ) -> None:
     prompt_variants = prompt_variants or ["default", "xml"]
     write_json(
@@ -66,6 +68,17 @@ def write_run(
         },
     )
     write_json(
+        root / "dense_reference_confirmation" / "summary.json",
+        {
+            "zero_dense_regret_k": zero_dense_regret_k,
+            "dense_best_recovered_k": zero_dense_regret_k,
+            "gate": {
+                "pass": dense_reference_pass,
+                "failed": [] if dense_reference_pass else ["zero_dense_regret_within_k"],
+            },
+        },
+    )
+    write_json(
         root / "vllm_spectral" / "summary.json",
         {
             "screen_selection_prompt_variants": prompt_variants,
@@ -92,8 +105,10 @@ class MultiRunGateTests(unittest.TestCase):
 
             self.assertTrue(row["parity_pass"])
             self.assertTrue(row["confirmation_pass"])
+            self.assertTrue(row["dense_reference_pass"])
             self.assertEqual(row["prompt_variant_count"], 2)
             self.assertEqual(row["zero_regret_k"], 2)
+            self.assertEqual(row["zero_dense_regret_k"], 2)
             self.assertEqual(row["full_without_load_speedup_at_zero_regret"], 2.0)
 
     def test_aggregate_passes_only_when_all_strict_gates_pass(self):
@@ -107,6 +122,7 @@ class MultiRunGateTests(unittest.TestCase):
             self.assertTrue(summary["pass"])
             self.assertEqual(summary["failed"], [])
             self.assertEqual(summary["aggregate"]["parity_pass_count"], 2)
+            self.assertEqual(summary["aggregate"]["dense_reference_pass_count"], 2)
 
     def test_aggregate_fails_for_single_default_prompt_quality_negative(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -119,6 +135,17 @@ class MultiRunGateTests(unittest.TestCase):
             self.assertIn("min_runs", summary["failed"])
             self.assertIn("all_quality_parity_pass", summary["failed"])
             self.assertIn("prompt_robust_selection", summary["failed"])
+
+    def test_aggregate_fails_when_dense_reference_gate_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "run"
+            write_run(root)
+            (root / "dense_reference_confirmation" / "summary.json").unlink()
+
+            summary = aggregate([root], min_runs=1, min_prompt_variants=2)
+
+            self.assertFalse(summary["pass"])
+            self.assertIn("all_dense_reference_pass", summary["failed"])
 
 
 if __name__ == "__main__":

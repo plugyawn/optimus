@@ -58,7 +58,9 @@ python -m randopt_lora_lab.multirun_gate \
 ```
 
 The multi-run gate is intentionally strict: single-seed, default-prompt-only, or
-parity-negative runs fail even if their confirmation economics pass.
+parity-negative runs fail even if their same-family confirmation economics
+pass. Runs also fail if they lack dense-referenced confirmation, because
+recovering the spectral PEFT best is not enough to claim dense RandOpt parity.
 
 For new spectral-vLLM runs, prefer:
 
@@ -72,7 +74,8 @@ scripts/run_spectral_vllm_multirun_gate.sh
 ```
 
 The wrapper runs the vLLM prompt-validity/proposal stage before the expensive
-PEFT arms by default.
+PEFT arms by default, then runs dense-referenced confirmation after the dense
+and spectral PEFT artifacts exist.
 
 Drift evidence should be task-conditioned, not only a parameter-norm proxy:
 
@@ -150,7 +153,7 @@ stability gates are still red.
 | Sparse-low-rank family | `sparse_low_rank_lora` implemented with density variants and variance matching | implemented, not run |
 | Prompt robustness | prompt-relative report gate added; method claims require multiple valid prompt templates | implemented, not passed |
 | vLLM backend parity | P=16 gate passed protocol/base/tensor checks but failed ranking with Spearman -0.181 | missing |
-| Two-stage acceleration | tokenized vLLM proposal + PEFT confirmation recovered PEFT best at k=1 with 10.55x eval-only speedup and 1.93x speedup including vLLM load/build | systems path passed on one P64 panel |
+| Two-stage acceleration | tokenized vLLM proposal + PEFT confirmation recovered PEFT best at k=1 with 10.55x eval-only speedup and 1.93x speedup including vLLM load/build | same-family systems path passed on one P64 panel; dense-referenced confirmation now required |
 
 ## Next Gate
 
@@ -237,7 +240,8 @@ gates separately:
 
 ```text
 vLLM-only selector parity: strict, currently failing.
-vLLM proposal + PEFT confirmation: recall/speed gate, currently passed on one P64 panel.
+vLLM proposal + PEFT confirmation: same-family recall/speed gate, currently passed on one P64 panel.
+dense-referenced confirmation: required before treating the accelerated path as dense RandOpt quality evidence.
 ```
 
 The current next entrypoint for a quality-coupled systems test is:
@@ -249,10 +253,11 @@ scripts/run_spectral_vllm_confirmation.sh
 That script runs a dense PEFT reference, a matched factor-LoRA control, a
 calibrated spectral-LoRA PEFT trusted arm, a tokenized multi-prompt vLLM
 proposal arm for the same spectral family, dense-vs-spectral `parity_report`,
-and same-family `confirmation_economics`. Read `docs/spectral_vllm_confirmation.md`
-before interpreting the result. A confirmation pass is systems evidence only;
-the spectral arm still needs PEFT dense-parity and validity evidence before any
-quality claim.
+same-family `confirmation_economics`, and dense-referenced confirmation. Read
+`docs/spectral_vllm_confirmation.md` before interpreting the result. A
+same-family confirmation pass is systems evidence only; the spectral arm still
+needs PEFT dense-parity, dense-referenced confirmation, and validity evidence
+before any quality claim.
 
 First gate result: `results/backend_parity_gate_p16` failed. The run had
 matching protocol metadata, saved base rows, and `576/576` sampled adapter tensor

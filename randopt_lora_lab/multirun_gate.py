@@ -21,6 +21,12 @@ def read_json(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def read_optional_json(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    return json.loads(path.read_text())
+
+
 def select_parity_arm(summary: dict, arm: str) -> dict:
     comparisons = summary.get("comparisons")
     if not comparisons:
@@ -65,9 +71,11 @@ def load_run(run_dir: Path, *, parity_arm: str, validity_arms: list[str]) -> dic
     parity_raw = read_json(run_dir / "parity" / "summary.json")
     parity = select_parity_arm(parity_raw, parity_arm)
     confirmation = read_json(run_dir / "confirmation" / "summary.json")
+    dense_reference = read_optional_json(run_dir / "dense_reference_confirmation" / "summary.json")
     vllm = read_json(run_dir / "vllm_spectral" / "summary.json")
     valid, valid_by_arm = validity_pass(run_dir, validity_arms)
     confirm_gate = confirmation.get("gate", confirmation)
+    dense_reference_gate = (dense_reference or {}).get("gate", {}) if dense_reference else {}
     zero_row = zero_regret_row(confirmation)
     gates = parity.get("gates", {})
     return {
@@ -86,6 +94,11 @@ def load_run(run_dir: Path, *, parity_arm: str, validity_arms: list[str]) -> dic
         "mutation_ratio_lora_over_dense": parity.get("mutation_s_ratio_lora_over_dense"),
         "confirmation_pass": bool(confirm_gate.get("pass")),
         "confirmation_failed": confirm_gate.get("failed", []),
+        "dense_reference_pass": bool(dense_reference_gate.get("pass")),
+        "dense_reference_failed": dense_reference_gate.get("failed", ["missing"] if dense_reference is None else []),
+        "zero_dense_regret_k": None if dense_reference is None else dense_reference.get("zero_dense_regret_k"),
+        "dense_best_recovered_k": None if dense_reference is None else dense_reference.get("dense_best_recovered_k"),
+        "dense_reference_gate": dense_reference_gate,
         "zero_regret_k": confirmation.get("zero_regret_k"),
         "best_recovered_k": confirmation.get("best_recovered_k"),
         "eval_only_speedup_at_zero_regret": None
@@ -122,6 +135,7 @@ def aggregate(
     min_prompt_variants: int = 2,
     max_zero_regret_k: int = 8,
     min_full_without_load_speedup: float = 1.0,
+    require_dense_reference: bool = True,
 ) -> dict:
     validity_arms = validity_arms or ["dense", "control", "spectral"]
     runs = [load_run(path, parity_arm=parity_arm, validity_arms=validity_arms) for path in run_dirs]
@@ -152,6 +166,19 @@ def aggregate(
             "all_confirmation_pass",
             all(row["confirmation_pass"] for row in runs),
             {row["run_dir"]: row["confirmation_failed"] for row in runs},
+        ),
+        GateCheck(
+            "all_dense_reference_pass",
+            (not require_dense_reference) or all(row["dense_reference_pass"] for row in runs),
+            {
+                row["run_dir"]: {
+                    "pass": row["dense_reference_pass"],
+                    "failed": row["dense_reference_failed"],
+                    "zero_dense_regret_k": row["zero_dense_regret_k"],
+                    "dense_best_recovered_k": row["dense_best_recovered_k"],
+                }
+                for row in runs
+            },
         ),
         GateCheck(
             "zero_regret_within_k",
@@ -192,11 +219,13 @@ def aggregate(
             "min_prompt_variants": min_prompt_variants,
             "max_zero_regret_k": max_zero_regret_k,
             "min_full_without_load_speedup": min_full_without_load_speedup,
+            "require_dense_reference": require_dense_reference,
         },
         "aggregate": {
             "runs": len(runs),
             "parity_pass_count": sum(1 for row in runs if row["parity_pass"]),
             "confirmation_pass_count": sum(1 for row in runs if row["confirmation_pass"]),
+            "dense_reference_pass_count": sum(1 for row in runs if row["dense_reference_pass"]),
             "validity_pass_count": sum(1 for row in runs if row["validity_pass"]),
             "min_spearman": min(spearman) if spearman else None,
             "mean_spearman": mean(spearman) if spearman else None,
@@ -248,6 +277,21 @@ def render_markdown(summary: dict) -> str:
                 ensemble=row["ensemble_delta"],
             )
         )
+    lines.extend(
+        [
+            "",
+            "## Dense-Referenced Confirmation",
+            "",
+            "| run | pass | zero dense-regret k | dense best recovered k | failed |",
+            "| --- | ---: | ---: | ---: | --- |",
+        ]
+    )
+    for row in summary["runs"]:
+        lines.append(
+            f"| `{row['run_dir']}` | {str(row['dense_reference_pass']).lower()} | "
+            f"{row['zero_dense_regret_k']} | {row['dense_best_recovered_k']} | "
+            f"`{json.dumps(row['dense_reference_failed'])}` |"
+        )
     lines.append("")
     return "\n".join(lines)
 
@@ -266,6 +310,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-prompt-variants", type=int, default=2)
     parser.add_argument("--max-zero-regret-k", type=int, default=8)
     parser.add_argument("--min-full-without-load-speedup", type=float, default=1.0)
+    parser.add_argument("--no-require-dense-reference", action="store_true")
     args = parser.parse_args(argv)
 
     summary = aggregate(
@@ -276,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
         min_prompt_variants=args.min_prompt_variants,
         max_zero_regret_k=args.max_zero_regret_k,
         min_full_without_load_speedup=args.min_full_without_load_speedup,
+        require_dense_reference=not args.no_require_dense_reference,
     )
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
