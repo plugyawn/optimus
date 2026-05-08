@@ -1,0 +1,79 @@
+{
+  "confirmed_best_screen_exact": 0.078125,
+  "confirmed_best_strict_holdout_exact": 0.078125,
+  "dense_best_screen_exact": 0.09375,
+  "dense_best_strict_holdout_exact": 0.0703125,
+  "gate": {
+    "checks": [
+      {
+        "check": "dense_validity_pass",
+        "detail": {
+          "pass": true
+        },
+        "passed": true
+      },
+      {
+        "check": "confirmed_validity_pass",
+        "detail": {
+          "pass": true
+        },
+        "passed": true
+      },
+      {
+        "check": "strict_holdout_quality_at_speed",
+        "detail": {
+          "max_confirm_k": 8,
+          "min_full_speedup": 1.0,
+          "min_holdout_delta": 0.0,
+          "passing_k": 4
+        },
+        "passed": true
+      }
+    ],
+    "failed": [],
+    "pass": true,
+    "thresholds": {
+      "max_confirm_k": 8,
+      "min_full_speedup": 1.0,
+      "min_holdout_delta": 0.0
+    }
+  },
+  "kind": "search_quality_confirmation",
+  "rows": [
+    {
+      "confirmed_strict_exact": 0.0546875,
+      "delta_vs_dense_best_strict": -0.015625,
+      "delta_vs_dense_same_k": 0.0,
+      "dense_strict_exact_at_k": 0.0546875,
+      "eval_only_speedup": 17.693187295542177,
+      "full_speedup": 10.210789495975064,
+      "k": 1,
+      "passes_quality": false,
+      "passes_speed": true
+    },
+    {
+      "confirmed_strict_exact": 0.078125,
+      "delta_vs_dense_best_strict": 0.0078125,
+      "delta_vs_dense_same_k": 0.0078125,
+      "dense_strict_exact_at_k": 0.0703125,
+      "eval_only_speedup": 9.51685520134732,
+      "full_speedup": 6.826245247224962,
+      "k": 4,
+      "passes_quality": true,
+      "passes_speed": true
+    },
+    {
+      "confirmed_strict_exact": 0.0703125,
+      "delta_vs_dense_best_strict": 0.0,
+      "delta_vs_dense_same_k": 0.0,
+      "dense_strict_exact_at_k": 0.0703125,
+      "eval_only_speedup": 6.348815035398166,
+      "full_speedup": 5.026984894296559,
+      "k": 8,
+      "passes_quality": true,
+      "passes_speed": true
+    }
+  ],
+  "run_root": "results/tscale_qv_global_p64_seed20260507",
+  "screen_delta_vs_dense": -0.015625
+}

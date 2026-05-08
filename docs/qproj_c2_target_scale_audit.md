@@ -93,3 +93,19 @@ q + k + v + o matched total norm:
 
 Use the same PEFT-confirmed quality gate as the two P64 panels. The selector is
 not trusted, so report PEFT confirmation as authority.
+
+## P64 Outcome
+
+The first target-scaled mixed-target GPU check is recorded in
+`docs/target_scaled_mixed_targets_p64_l40s.md`.
+
+```text
+q+v matched relative norm: 9/128 strict holdout
+q+v matched total norm:   10/128 strict holdout
+q+k+v+o matched total:    11/128 strict holdout
+strong-positive gate:     13/128 strict holdout
+```
+
+All runs passed validity and the vLLM path stayed 5x-8x faster after PEFT
+confirmation, but no arm cleared the quality gate. Do not scale this target
+scaling branch without a stronger selector or parameterization signal.

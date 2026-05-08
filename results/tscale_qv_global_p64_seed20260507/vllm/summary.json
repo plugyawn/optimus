@@ -1,0 +1,163 @@
+{
+  "adapter_build_s": 5.540210723876953,
+  "adapter_dtype": "bfloat16",
+  "adapters_kept": true,
+  "allow_repeat_data": false,
+  "antithetic": false,
+  "base_holdout_by_prompt": {
+    "default": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.20206236839294434,
+      "exact_mean": 0.125,
+      "malformed_mean": 0.0,
+      "output_tokens": 133,
+      "prompt_variant": "default",
+      "prompts_per_sec": 39.59173627244956,
+      "tokens_per_sec": 658.212615529474
+    },
+    "reordered": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.20828485488891602,
+      "exact_mean": 0.125,
+      "malformed_mean": 0.0,
+      "output_tokens": 129,
+      "prompt_variant": "reordered",
+      "prompts_per_sec": 38.40893762662973,
+      "tokens_per_sec": 619.3441192294044
+    },
+    "xml": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.2503519058227539,
+      "exact_mean": 0.25,
+      "malformed_mean": 0.125,
+      "output_tokens": 152,
+      "prompt_variant": "xml",
+      "prompts_per_sec": 31.955019370469273,
+      "tokens_per_sec": 607.1453680389162
+    }
+  },
+  "base_holdout_exact": 0.16666666666666666,
+  "base_screen_by_prompt": {
+    "default": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.34898996353149414,
+      "exact_mean": 0.03125,
+      "malformed_mean": 0.0,
+      "output_tokens": 1036,
+      "prompt_variant": "default",
+      "prompts_per_sec": 183.38636261161247,
+      "tokens_per_sec": 2968.566744775477
+    },
+    "reordered": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.3667185306549072,
+      "exact_mean": 0.109375,
+      "malformed_mean": 0.015625,
+      "output_tokens": 1017,
+      "prompt_variant": "reordered",
+      "prompts_per_sec": 174.52076906423324,
+      "tokens_per_sec": 2773.2440959113314
+    },
+    "xml": {
+      "answer_closed_mean": 1.0,
+      "cap_hit_mean": 0.0,
+      "elapsed_s": 0.3796670436859131,
+      "exact_mean": 0.09375,
+      "malformed_mean": 0.171875,
+      "output_tokens": 1170,
+      "prompt_variant": "xml",
+      "prompts_per_sec": 168.5687527120348,
+      "tokens_per_sec": 3081.6475105168865
+    }
+  },
+  "base_screen_exact": 0.078125,
+  "best_ensemble_holdout_exact": null,
+  "best_prompts_per_sec": 236.74196022613833,
+  "best_strict_ensemble_holdout_exact": null,
+  "best_tokens_per_sec": 4056.7877276185745,
+  "candidate_families": [
+    "activation_spectral_lora_tscale_q1p886_v0p985"
+  ],
+  "candidate_file": "",
+  "candidate_score_metric": "exact_answer",
+  "candidate_sec": 1.2330310428444706,
+  "cap_hit_penalty": 1.0,
+  "chunk_adapters": 8,
+  "data": "data/countdown_generated_1200_seed20260507.json",
+  "dtype": "bfloat16",
+  "enforce_eager": false,
+  "ensemble_holdout": [],
+  "ensemble_ks": [],
+  "ensemble_ratios": [],
+  "ensemble_vote_metric": "valid_numeric_majority_vote",
+  "eval_elapsed_s": 51.904613733291626,
+  "family": "activation_spectral_lora_tscale_q1p886_v0p985",
+  "family_state": "family_state.pt",
+  "holdout_prompts": 8,
+  "holdout_selection_prompt_variants": [
+    "default",
+    "reordered"
+  ],
+  "holdout_stress_prompt_variants": [
+    "xml"
+  ],
+  "holdout_tokens_per_sec": 0.0,
+  "holdout_unique_prompts": 8,
+  "holdout_unique_semantic_prompts": 8,
+  "kind": "vllm_lora_search",
+  "load_s": 36.844780683517456,
+  "malformed_penalty": 1.0,
+  "max_base_cap_hit_for_selection": 0.05,
+  "max_base_malformed_for_selection": 0.05,
+  "max_loras": 8,
+  "max_new_tokens": 128,
+  "max_num_batched_tokens": 0,
+  "min_selection_prompt_variants": 2,
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "population": 64,
+  "promote": 0,
+  "prompt_input": "token_ids",
+  "prompt_variants": [
+    "default",
+    "reordered",
+    "xml"
+  ],
+  "rank": 32,
+  "score_mode": "robust_mean",
+  "screen_candidate_sec": 1.2330310428444706,
+  "screen_holdout_overlap": 0,
+  "screen_prompts": 64,
+  "screen_prompts_per_sec": 236.74196022613833,
+  "screen_selection_prompt_variants": [
+    "default",
+    "reordered"
+  ],
+  "screen_stress_prompt_variants": [
+    "xml"
+  ],
+  "screen_tokens_per_sec": 4056.7877276185745,
+  "screen_unique_prompts": 64,
+  "screen_unique_semantic_prompts": 64,
+  "seed": 20260507,
+  "sigma": 0.001,
+  "sigma_values": [
+    0.0005,
+    0.001,
+    0.002
+  ],
+  "stop_at_answer": true,
+  "strict_ensemble_holdout": [],
+  "strict_ensemble_vote_metric": "strict_parser_then_valid_numeric_majority_vote",
+  "targets": [
+    "q_proj",
+    "v_proj"
+  ],
+  "top_holdout": [],
+  "top_screen": [],
+  "use_chat_template": false
+}

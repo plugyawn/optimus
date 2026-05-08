@@ -1,0 +1,16 @@
+{
+  "activation_state_anchor_prompt_count": 8,
+  "activation_state_no_anchor_subtract": false,
+  "activation_state_prompt_variants": [
+    "default",
+    "reordered",
+    "xml"
+  ],
+  "activation_state_prompts": 16,
+  "activation_state_target_prompt_count": 48,
+  "elapsed_s": 11.25667428970337,
+  "family": "activation_spectral_lora_tscale_q2_v1p045",
+  "kind": "activation_spectral_family_state",
+  "modules": 72,
+  "rank": 32
+}
