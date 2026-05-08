@@ -22,6 +22,13 @@ def by_spec(rows: list[dict]) -> dict[str, dict]:
     return {candidate_spec_key(str(row["candidate"])): row for row in rows}
 
 
+def candidate_file_rows(path: Path) -> list[dict]:
+    rows = read_jsonl(path)
+    if not rows:
+        raise FileNotFoundError(f"missing candidate rows in {path}")
+    return rows
+
+
 def elapsed(row: dict) -> float:
     return float(row.get("elapsed_s", 0.0) or 0.0)
 
@@ -35,6 +42,7 @@ def analyze(
     dense_score_col: str = "exact_mean",
     confirmed_score_col: str = "exact_mean",
     proposal_score_col: str = "exact_mean",
+    candidate_file: Path | None = None,
 ) -> tuple[list[dict], dict]:
     dense_rows = read_jsonl(dense_dir / "candidate_summary.jsonl")
     confirmed_rows = read_jsonl(confirmed_dir / "candidate_summary.jsonl")
@@ -51,7 +59,12 @@ def analyze(
     proposal_summary = read_json(proposal_dir / "summary.json")
     dense_by_spec = by_spec(dense_rows)
     confirmed_by_spec = by_spec(confirmed_rows)
-    proposal_ranked = sorted_rows(proposal_rows, proposal_score_col)
+    if candidate_file is None:
+        proposal_ranked = sorted_rows(proposal_rows, proposal_score_col)
+        proposal_order_source = f"proposal_score_col:{proposal_score_col}"
+    else:
+        proposal_ranked = candidate_file_rows(candidate_file)
+        proposal_order_source = f"candidate_file:{candidate_file}"
     dense_ranked_specs = sorted(dense_by_spec, key=lambda key: (score(dense_by_spec[key], dense_score_col), key), reverse=True)
     dense_best_spec = dense_ranked_specs[0]
     dense_best_score = score(dense_by_spec[dense_best_spec], dense_score_col)
@@ -114,9 +127,12 @@ def analyze(
         "dense_dir": str(dense_dir),
         "confirmed_dir": str(confirmed_dir),
         "proposal_dir": str(proposal_dir),
+        "candidate_file": None if candidate_file is None else str(candidate_file),
+        "proposal_order_source": proposal_order_source,
         "dense_candidates": len(dense_rows),
         "confirmed_candidates": len(confirmed_rows),
-        "proposal_candidates": len(proposal_rows),
+        "proposal_candidates": len(proposal_ranked),
+        "proposal_rows_available": len(proposal_rows),
         "dense_best_spec": dense_best_spec,
         "dense_best_candidate": dense_by_spec[dense_best_spec]["candidate"],
         "dense_best_score": dense_best_score,
@@ -137,6 +153,17 @@ def first_row_at_or_below(rows: list[dict], k: int | None) -> dict | None:
     return min(eligible, key=lambda row: int(row["k"])) if eligible else None
 
 
+def first_row_with_regret_at_or_below(rows: list[dict], *, max_confirm_k: int, max_dense_regret: float) -> dict | None:
+    eligible = [
+        row
+        for row in rows
+        if int(row["k"]) <= int(max_confirm_k)
+        and row["dense_regret_vs_best"] is not None
+        and float(row["dense_regret_vs_best"]) <= float(max_dense_regret)
+    ]
+    return min(eligible, key=lambda row: int(row["k"])) if eligible else None
+
+
 def gate(
     rows: list[dict],
     summary: dict,
@@ -147,33 +174,40 @@ def gate(
 ) -> dict:
     zero_k = summary.get("zero_dense_regret_k")
     zero_row = first_row_at_or_below(rows, zero_k)
+    regret_row = first_row_with_regret_at_or_below(
+        rows,
+        max_confirm_k=max_confirm_k,
+        max_dense_regret=max_dense_regret,
+    )
+    require_zero = float(max_dense_regret) <= 0.0
     checks = [
         {
             "check": "zero_dense_regret_within_k",
             "passed": zero_k is not None and int(zero_k) <= max_confirm_k,
+            "required": require_zero,
             "detail": {"zero_dense_regret_k": zero_k, "max_confirm_k": max_confirm_k},
         },
         {
             "check": "dense_regret_threshold",
-            "passed": zero_row is not None and float(zero_row["dense_regret_vs_best"]) <= max_dense_regret,
+            "passed": regret_row is not None,
             "detail": {
-                "k": None if zero_row is None else zero_row["k"],
-                "dense_regret": None if zero_row is None else zero_row["dense_regret_vs_best"],
+                "k": None if regret_row is None else regret_row["k"],
+                "dense_regret": None if regret_row is None else regret_row["dense_regret_vs_best"],
                 "max_dense_regret": max_dense_regret,
             },
         },
         {
             "check": "positive_full_speedup_vs_dense",
-            "passed": zero_row is not None
-            and float(zero_row["full_without_dense_load_speedup_vs_dense_full"]) >= min_full_without_dense_load_speedup,
+            "passed": regret_row is not None
+            and float(regret_row["full_without_dense_load_speedup_vs_dense_full"]) >= min_full_without_dense_load_speedup,
             "detail": {
-                "k": None if zero_row is None else zero_row["k"],
-                "speedup": None if zero_row is None else zero_row["full_without_dense_load_speedup_vs_dense_full"],
+                "k": None if regret_row is None else regret_row["k"],
+                "speedup": None if regret_row is None else regret_row["full_without_dense_load_speedup_vs_dense_full"],
                 "min_speedup": min_full_without_dense_load_speedup,
             },
         },
     ]
-    failed = [row["check"] for row in checks if not row["passed"]]
+    failed = [row["check"] for row in checks if row.get("required", True) and not row["passed"]]
     return {
         "pass": not failed,
         "failed": failed,
@@ -206,6 +240,7 @@ def render_report(summary: dict) -> str:
         f"| dense candidates | {summary['dense_candidates']} |",
         f"| confirmed candidates | {summary['confirmed_candidates']} |",
         f"| proposal candidates | {summary['proposal_candidates']} |",
+        f"| proposal order source | `{summary['proposal_order_source']}` |",
         f"| dense best | `{summary['dense_best_candidate']}` |",
         f"| dense best score | {summary['dense_best_score']:.6g} |",
         f"| zero dense-regret k | {summary['zero_dense_regret_k']} |",
@@ -242,6 +277,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dense-score-col", default="exact_mean")
     parser.add_argument("--confirmed-score-col", default="exact_mean")
     parser.add_argument("--proposal-score-col", default="exact_mean")
+    parser.add_argument("--candidate-file", type=Path, default=None)
     parser.add_argument("--max-confirm-k", type=int, default=8)
     parser.add_argument("--max-dense-regret", type=float, default=0.0)
     parser.add_argument("--min-full-without-dense-load-speedup", type=float, default=1.0)
@@ -255,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
         dense_score_col=args.dense_score_col,
         confirmed_score_col=args.confirmed_score_col,
         proposal_score_col=args.proposal_score_col,
+        candidate_file=args.candidate_file,
     )
     summary["gate"] = gate(
         rows,

@@ -107,3 +107,45 @@ def test_shortlist_dense_confirmation_passes_when_shortlist_confirms_dense_best(
 
     assert summary["zero_dense_regret_k"] == 1
     assert gate(rows, summary, max_confirm_k=1, min_full_without_dense_load_speedup=0.1)["pass"]
+
+
+def test_shortlist_dense_confirmation_can_pass_with_configured_nonzero_regret(tmp_path: Path):
+    dense = tmp_path / "dense"
+    proposal = tmp_path / "proposal"
+    confirmed = tmp_path / "confirmed"
+    write_run(dense, "dense_gaussian", [0.8, 0.9], candidate_sec=1.0)
+    write_run(proposal, "sparse_low_rank_lora_d0p125", [0.8, 0.1], candidate_sec=10.0)
+    write_run(confirmed, "sparse_low_rank_lora_d0p125", [0.8], seeds=[1], candidate_sec=2.0)
+
+    rows, summary = analyze(dense, confirmed, proposal, ks=[1])
+
+    assert summary["zero_dense_regret_k"] is None
+    strict_gate = gate(rows, summary, max_confirm_k=1, min_full_without_dense_load_speedup=0.1)
+    relaxed_gate = gate(rows, summary, max_confirm_k=1, max_dense_regret=0.1, min_full_without_dense_load_speedup=0.1)
+    assert strict_gate["pass"] is False
+    assert relaxed_gate["pass"] is True
+
+
+def test_shortlist_dense_confirmation_can_use_candidate_file_order(tmp_path: Path):
+    dense = tmp_path / "dense"
+    proposal = tmp_path / "proposal"
+    confirmed = tmp_path / "confirmed"
+    candidate_file = tmp_path / "shortlist.jsonl"
+    write_run(dense, "dense_gaussian", [0.9, 0.3, 0.2], candidate_sec=1.0)
+    write_run(proposal, "sparse_low_rank_lora_d0p125", [0.1, 0.8, 0.7], candidate_sec=10.0)
+    write_run(confirmed, "sparse_low_rank_lora_d0p125", [0.7, 0.1], seeds=[3, 1], candidate_sec=2.0)
+    write_jsonl(
+        candidate_file,
+        [
+            {"candidate": "sparse_low_rank_lora_d0p125:seed3:s0.001:sign1"},
+            {"candidate": "sparse_low_rank_lora_d0p125:seed1:s0.001:sign1"},
+        ],
+    )
+
+    rows, summary = analyze(dense, confirmed, proposal, ks=[1, 2], candidate_file=candidate_file)
+
+    assert summary["proposal_order_source"].startswith("candidate_file:")
+    assert rows[0]["confirmed_spec"] == "seed3:s0.001:sign1"
+    assert rows[1]["confirmed_spec"] == "seed3:s0.001:sign1"
+    assert rows[1]["contains_dense_best"] is True
+    assert summary["dense_best_recovered_k"] == 2

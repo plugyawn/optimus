@@ -73,6 +73,7 @@ CONFIRM_MAX_DENSE_REGRET=${CONFIRM_MAX_DENSE_REGRET:-0.0}
 CONFIRM_MIN_FULL_SPEEDUP=${CONFIRM_MIN_FULL_SPEEDUP:-1.0}
 PROPOSAL_SCORE_COL=${PROPOSAL_SCORE_COL:-selection_score}
 SHORTLIST_POLICY=${SHORTLIST_POLICY:-}
+SHORTLIST_REPORT_ARGS=()
 
 export PYTHONUNBUFFERED=1
 export VLLM_USAGE_STATS_ENABLED=${VLLM_USAGE_STATS_ENABLED:-0}
@@ -165,6 +166,7 @@ if [[ -n "$SHORTLIST_POLICY" ]]; then
     --out "$OUT_ROOT/shortlist_top${SHORTLIST_K}.jsonl" \
     --policy "$SHORTLIST_POLICY" \
     --k "$SHORTLIST_K"
+  SHORTLIST_REPORT_ARGS+=(--candidate-file "$OUT_ROOT/shortlist_top${SHORTLIST_K}.jsonl")
 else
   "$PYTHON" -m randopt_lora_lab.shortlist_from_run \
     --run "$OUT_ROOT/vllm" \
@@ -206,6 +208,7 @@ if [[ "$RUN_REPORT" == "1" ]]; then
     --out "$OUT_ROOT/shortlist_dense_confirmation" \
     --ks "$CONFIRM_KS" \
     --proposal-score-col "$PROPOSAL_SCORE_COL" \
+    "${SHORTLIST_REPORT_ARGS[@]}" \
     --max-confirm-k "$CONFIRM_MAX_K" \
     --max-dense-regret "$CONFIRM_MAX_DENSE_REGRET" \
     --min-full-without-dense-load-speedup "$CONFIRM_MIN_FULL_SPEEDUP"
