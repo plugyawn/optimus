@@ -47,14 +47,43 @@ def check_confirmation(path: Path | None, payload: dict | None) -> GoalCheck:
     )
 
 
-def check_parity_report(path: Path | None, payload: dict | None) -> list[GoalCheck]:
+def check_multirun_gate(path: Path | None, payload: dict | None) -> GoalCheck:
+    if payload is None:
+        return GoalCheck("multi-run prompt-robust confirmation", False, str(path) if path else "missing", "missing multi-run gate")
+    return GoalCheck(
+        "multi-run prompt-robust confirmation",
+        bool(payload.get("pass")),
+        str(path),
+        {
+            "pass": payload.get("pass"),
+            "failed": payload.get("failed", []),
+            "aggregate": payload.get("aggregate", {}),
+            "thresholds": payload.get("thresholds", {}),
+        },
+    )
+
+
+def select_parity_payload(payload: dict, arm: str) -> dict:
+    comparisons = payload.get("comparisons")
+    if not comparisons:
+        return payload
+    if arm not in comparisons:
+        return {"pass": False, "gates": {}, "missing_arm": arm, "available_arms": sorted(comparisons)}
+    selected = dict(comparisons[arm])
+    selected["selected_arm"] = arm
+    return selected
+
+
+def check_parity_report(path: Path | None, payload: dict | None, *, arm: str = "lora") -> list[GoalCheck]:
     if payload is None:
         return [
             GoalCheck("quality parity", False, str(path) if path else "missing", "missing parity report"),
             GoalCheck("stability parity", False, str(path) if path else "missing", "missing parity report"),
             GoalCheck("speed parity", False, str(path) if path else "missing", "missing parity report"),
         ]
+    payload = select_parity_payload(payload, arm)
     gates = payload.get("gates", {})
+    missing_arm = payload.get("missing_arm")
     return [
         GoalCheck(
             "quality parity",
@@ -62,6 +91,8 @@ def check_parity_report(path: Path | None, payload: dict | None) -> list[GoalChe
             str(path),
             {
                 "overall_pass": payload.get("pass"),
+                "selected_arm": payload.get("selected_arm", arm),
+                "missing_arm": missing_arm,
                 "ensemble_quality": gates.get("ensemble_quality"),
                 "ensemble_delta": payload.get("ensemble_holdout_delta_lora_minus_dense"),
             },
@@ -71,6 +102,8 @@ def check_parity_report(path: Path | None, payload: dict | None) -> list[GoalChe
             bool(gates.get("spearman")) and bool(gates.get("topk_overlap")) and bool(gates.get("selected_regret")),
             str(path),
             {
+                "selected_arm": payload.get("selected_arm", arm),
+                "missing_arm": missing_arm,
                 "spearman": payload.get("spearman"),
                 "topk_overlap": payload.get("topk_overlap"),
                 "selected_regret": payload.get("selected_regret"),
@@ -86,6 +119,8 @@ def check_parity_report(path: Path | None, payload: dict | None) -> list[GoalChe
             bool(gates.get("speed")),
             str(path),
             {
+                "selected_arm": payload.get("selected_arm", arm),
+                "missing_arm": missing_arm,
                 "speed_ratio_lora_over_dense": payload.get("speed_ratio_lora_over_dense"),
                 "gate": gates.get("speed"),
             },
@@ -154,6 +189,7 @@ def run_goal_audit(args) -> dict:
     parity = read_json(args.parity_report)
     backend = read_json(args.backend_gate)
     confirmation = read_json(args.confirmation_gate)
+    multirun = read_json(getattr(args, "multirun_gate", None))
     prompt = read_json(args.prompt_robustness)
     drift = read_json(args.drift_report)
     eval_validity = read_json(args.eval_validity)
@@ -165,7 +201,7 @@ def run_goal_audit(args) -> dict:
             evidence_name=str(args.reproduction_audit),
         )
     )
-    checks.extend(check_parity_report(args.parity_report, parity))
+    checks.extend(check_parity_report(args.parity_report, parity, arm=getattr(args, "parity_arm", "lora")))
     checks.append(
         check_present_pass(
             "trusted accelerated backend selector",
@@ -175,6 +211,7 @@ def run_goal_audit(args) -> dict:
         )
     )
     checks.append(check_confirmation(args.confirmation_gate, confirmation))
+    checks.append(check_multirun_gate(getattr(args, "multirun_gate", None), multirun))
     checks.append(check_prompt_robustness(args.prompt_robustness, prompt))
     checks.append(check_drift(args.drift_report, drift))
     checks.append(check_eval_validity(args.eval_validity, eval_validity))
@@ -209,8 +246,10 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Audit whether the end-to-end LoRA perturbation-search goal is met.")
     parser.add_argument("--reproduction-audit", type=Path)
     parser.add_argument("--parity-report", type=Path)
+    parser.add_argument("--parity-arm", default="lora")
     parser.add_argument("--backend-gate", type=Path)
     parser.add_argument("--confirmation-gate", type=Path)
+    parser.add_argument("--multirun-gate", type=Path)
     parser.add_argument("--prompt-robustness", type=Path)
     parser.add_argument("--drift-report", type=Path)
     parser.add_argument("--eval-validity", type=Path)

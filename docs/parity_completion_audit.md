@@ -30,7 +30,9 @@ treated as completion:
 python -m randopt_lora_lab.goal_audit \
   --reproduction-audit results/PAPER_DENSE/reproduction_audit/summary.json \
   --parity-report results/PARITY/report/summary.json \
+  --parity-arm lora \
   --backend-gate results/BACKEND_GATE/summary.json \
+  --multirun-gate results/spectral_vllm_multirun_gate/summary.json \
   --prompt-robustness results/PROMPT_ROBUSTNESS/summary.json \
   --drift-report results/DRIFT_AUDIT/summary.json \
   --eval-validity results/SEARCH_RUN/validity/summary.json \
@@ -40,6 +42,23 @@ python -m randopt_lora_lab.goal_audit \
 
 Missing evidence is a failure. The audit only passes when every objective axis
 has a concrete artifact.
+
+For spectral vLLM confirmation, aggregate across runs before making any project
+claim:
+
+```bash
+python -m randopt_lora_lab.multirun_gate \
+  --run results/spectral_vllm_confirmation_rank32_c1p5_seed1 \
+  --run results/spectral_vllm_confirmation_rank32_c1p5_seed2 \
+  --parity-arm lora \
+  --min-runs 2 \
+  --min-prompt-variants 2 \
+  --max-zero-regret-k 8 \
+  --out results/spectral_vllm_multirun_gate
+```
+
+The multi-run gate is intentionally strict: single-seed, default-prompt-only, or
+parity-negative runs fail even if their confirmation economics pass.
 
 Drift evidence should be task-conditioned, not only a parameter-norm proxy:
 

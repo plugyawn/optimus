@@ -19,6 +19,7 @@ class GoalAuditTests(unittest.TestCase):
             parity_report=None,
             backend_gate=None,
             confirmation_gate=None,
+            multirun_gate=None,
             prompt_robustness=None,
             drift_report=None,
             eval_validity=None,
@@ -31,6 +32,7 @@ class GoalAuditTests(unittest.TestCase):
         self.assertIn("official full-Gaussian baseline validity", summary["failed"])
         self.assertIn("quality parity", summary["failed"])
         self.assertIn("two-stage accelerated confirmation", summary["failed"])
+        self.assertIn("multi-run prompt-robust confirmation", summary["failed"])
         self.assertIn("drift parity", summary["failed"])
         self.assertIn("eval validity", summary["failed"])
 
@@ -41,6 +43,7 @@ class GoalAuditTests(unittest.TestCase):
             parity = root / "parity" / "summary.json"
             backend = root / "backend" / "summary.json"
             confirmation = root / "confirmation" / "summary.json"
+            multirun = root / "multirun" / "summary.json"
             prompt = root / "prompt" / "summary.json"
             drift = root / "drift" / "summary.json"
             eval_validity = root / "eval_validity" / "summary.json"
@@ -63,6 +66,7 @@ class GoalAuditTests(unittest.TestCase):
             )
             write_json(backend, {"pass": True})
             write_json(confirmation, {"gate": {"pass": True}, "best_recovered_k": 1, "zero_regret_k": 1})
+            write_json(multirun, {"pass": True, "failed": [], "aggregate": {"runs": 2}})
             write_json(prompt, {"gate": {"pass": True, "valid_prompt_variants": 2, "passing_prompt_variants": 2, "min_valid_prompts": 2}})
             write_json(drift, {"pass": True})
             write_json(eval_validity, {"pass": True})
@@ -72,6 +76,7 @@ class GoalAuditTests(unittest.TestCase):
                 parity_report=parity,
                 backend_gate=backend,
                 confirmation_gate=confirmation,
+                multirun_gate=multirun,
                 prompt_robustness=prompt,
                 drift_report=drift,
                 eval_validity=eval_validity,
@@ -109,6 +114,7 @@ class GoalAuditTests(unittest.TestCase):
                 parity_report=parity,
                 backend_gate=None,
                 confirmation_gate=None,
+                multirun_gate=None,
                 prompt_robustness=None,
                 drift_report=None,
                 eval_validity=None,
@@ -121,11 +127,63 @@ class GoalAuditTests(unittest.TestCase):
             self.assertIn("stability parity", summary["failed"])
             self.assertIn("speed parity", summary["failed"])
 
+    def test_nested_parity_report_uses_named_arm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            parity = root / "parity" / "summary.json"
+            write_json(
+                parity,
+                {
+                    "pass": False,
+                    "comparisons": {
+                        "lora": {
+                            "pass": True,
+                            "spearman": 0.9,
+                            "topk_overlap": 8,
+                            "selected_regret": 0.0,
+                            "ensemble_holdout_delta_lora_minus_dense": 0.0,
+                            "speed_ratio_lora_over_dense": 1.2,
+                            "gates": {
+                                "ensemble_quality": True,
+                                "spearman": True,
+                                "topk_overlap": True,
+                                "selected_regret": True,
+                                "speed": True,
+                            },
+                        },
+                        "control": {
+                            "pass": False,
+                            "gates": {},
+                        },
+                    },
+                },
+            )
+            args = Namespace(
+                reproduction_audit=None,
+                parity_report=parity,
+                parity_arm="lora",
+                backend_gate=None,
+                confirmation_gate=None,
+                multirun_gate=None,
+                prompt_robustness=None,
+                drift_report=None,
+                eval_validity=None,
+                adapter_run=None,
+            )
+
+            summary = run_goal_audit(args)
+            by_requirement = {row["requirement"]: row for row in summary["checks"]}
+
+            self.assertTrue(by_requirement["quality parity"]["passed"])
+            self.assertTrue(by_requirement["stability parity"]["passed"])
+            self.assertTrue(by_requirement["speed parity"]["passed"])
+
     def test_confirmation_gate_is_separate_from_backend_selector(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             backend = root / "backend" / "summary.json"
             confirmation = root / "confirmation" / "summary.json"
+            multirun = root / "multirun" / "summary.json"
             write_json(backend, {"pass": False, "failed": ["ranking"]})
             write_json(
                 confirmation,
@@ -135,11 +193,13 @@ class GoalAuditTests(unittest.TestCase):
                     "gate": {"pass": True, "failed": [], "thresholds": {"max_confirm_k": 16}},
                 },
             )
+            write_json(multirun, {"pass": False, "failed": ["all_quality_parity_pass"]})
             args = Namespace(
                 reproduction_audit=None,
                 parity_report=None,
                 backend_gate=backend,
                 confirmation_gate=confirmation,
+                multirun_gate=multirun,
                 prompt_robustness=None,
                 drift_report=None,
                 eval_validity=None,
@@ -151,6 +211,7 @@ class GoalAuditTests(unittest.TestCase):
 
             self.assertFalse(by_requirement["trusted accelerated backend selector"]["passed"])
             self.assertTrue(by_requirement["two-stage accelerated confirmation"]["passed"])
+            self.assertFalse(by_requirement["multi-run prompt-robust confirmation"]["passed"])
             self.assertIn("trusted accelerated backend selector", summary["failed"])
             self.assertNotIn("two-stage accelerated confirmation", summary["failed"])
 

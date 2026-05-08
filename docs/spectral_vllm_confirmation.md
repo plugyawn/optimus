@@ -106,6 +106,23 @@ validity fails:
 The first scale-up should require multi-seed replication. A single P64 pass is
 only permission for a larger diagnostic, not a project-level claim.
 
+Use the multi-run gate before interpreting repeated runs:
+
+```bash
+python -m randopt_lora_lab.multirun_gate \
+  --run results/spectral_vllm_confirmation_rank32_c1p5_seed1 \
+  --run results/spectral_vllm_confirmation_rank32_c1p5_seed2 \
+  --parity-arm lora \
+  --min-runs 2 \
+  --min-prompt-variants 2 \
+  --max-zero-regret-k 8 \
+  --out results/spectral_vllm_multirun_gate
+```
+
+This gate keeps systems confirmation, dense parity, validity, and prompt
+robustness separate. It should fail a default-prompt-only run even if vLLM
+shortlisting is fast.
+
 ## P16 A100 Update
 
 The first A100 P16 run is recorded in
