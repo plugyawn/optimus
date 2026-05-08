@@ -1,6 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Run a matched dense/factor/sparse LoRA family sweep.
+
+Configure with environment variables, for example:
+
+  OUT_ROOT=results/lora_family_sweep_rank32_p64 \
+  FAMILIES=factor_gaussian_lora,sparse_low_rank_lora_d0p25,sparse_low_rank_lora_d0p125 \
+  PROMPT_VARIANTS=default,reordered \
+  POPULATION=64 \
+  scripts/run_lora_family_sweep.sh
+
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+if [[ "$#" -ne 0 ]]; then
+  usage >&2
+  echo "unexpected positional arguments: $*" >&2
+  exit 2
+fi
+
 DATA=${DATA:-data/countdown_generated_1200_seed20260507.json}
 MODEL=${MODEL:-Qwen/Qwen2.5-3B-Instruct}
 OUT_ROOT=${OUT_ROOT:-results/lora_family_sweep_rank32_p64}
