@@ -265,6 +265,17 @@ def build_parser() -> argparse.ArgumentParser:
             "activation_generalized_projected_gaussian_rank_r_c1p25",
             "activation_generalized_projected_gaussian_rank_r_c1p5",
             "activation_generalized_projected_gaussian_rank_r_c2",
+            "activation_generalized_spectral_lora",
+            "activation_generalized_spectral_lora_c0p5",
+            "activation_generalized_spectral_lora_c0p75",
+            "activation_generalized_spectral_lora_c1p25",
+            "activation_generalized_spectral_lora_c1p5",
+            "activation_generalized_spectral_lora_c2",
+            "activation_generalized_spectral_lora_sv",
+            "activation_generalized_spectral_lora_sv_c0p75",
+            "activation_generalized_spectral_lora_sv_c1p25",
+            "activation_generalized_spectral_lora_sv_c1p5",
+            "activation_generalized_spectral_lora_sv_c2",
         ],
     )
     p.add_argument("--antithetic", action="store_true")

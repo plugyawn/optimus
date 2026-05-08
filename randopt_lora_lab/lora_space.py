@@ -79,6 +79,34 @@ def activation_spectral_uses_singular_values(family: str) -> bool:
     return family.startswith("activation_spectral_lora_sv")
 
 
+def activation_generalized_spectral_scale(family: str) -> float:
+    if family in {"activation_generalized_spectral_lora", "activation_generalized_spectral_lora_sv"}:
+        return 1.0
+    match = re.fullmatch(r"activation_generalized_spectral_lora(?:_sv)?_c([0-9]+(?:p[0-9]+)?)", family)
+    if not match:
+        raise ValueError(f"not an activation generalized spectral LoRA family: {family}")
+    scale = float(match.group(1).replace("p", "."))
+    if scale <= 0.0:
+        raise ValueError(f"activation generalized spectral scale must be positive, got {scale}")
+    return scale
+
+
+def activation_generalized_spectral_uses_singular_values(family: str) -> bool:
+    return family.startswith("activation_generalized_spectral_lora_sv")
+
+
+def activation_basis_spectral_scale(family: str) -> float:
+    if family.startswith("activation_generalized_spectral_lora"):
+        return activation_generalized_spectral_scale(family)
+    return activation_spectral_scale(family)
+
+
+def activation_basis_spectral_uses_singular_values(family: str) -> bool:
+    if family.startswith("activation_generalized_spectral_lora"):
+        return activation_generalized_spectral_uses_singular_values(family)
+    return activation_spectral_uses_singular_values(family)
+
+
 def activation_projected_scale(family: str) -> float:
     if family == "activation_projected_gaussian_rank_r":
         return 1.0
@@ -262,10 +290,10 @@ def activation_spectral_lora_factors(
     u_raw = torch.randn((out_features, k), generator=gen_u, dtype=torch.float32)
     u, _ = torch.linalg.qr(u_raw, mode="reduced")
 
-    scale = activation_spectral_scale(candidate.family)
+    scale = activation_basis_spectral_scale(candidate.family)
     edge = abs(float(candidate.sigma)) * scale * (math.sqrt(float(out_features)) + math.sqrt(float(in_features)))
     singulars = torch.full((k,), edge, dtype=torch.float32)
-    if activation_spectral_uses_singular_values(candidate.family) and singular_values is not None:
+    if activation_basis_spectral_uses_singular_values(candidate.family) and singular_values is not None:
         values = singular_values[:k].cpu().float().abs()
         if values.shape[0] < k:
             values = F.pad(values, (0, k - values.shape[0]), value=0.0)
@@ -361,7 +389,9 @@ def lora_noise_tensors(
             basis,
             candidate,
         )
-    if candidate.family.startswith("activation_spectral_lora"):
+    if candidate.family.startswith("activation_spectral_lora") or candidate.family.startswith(
+        "activation_generalized_spectral_lora"
+    ):
         if family_spec is None:
             raise ValueError(f"{candidate.family} requires an activation basis for {lookup_key}")
         basis = family_spec.get("basis") if isinstance(family_spec, dict) else family_spec

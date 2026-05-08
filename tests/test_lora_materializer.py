@@ -10,6 +10,7 @@ from randopt_lora_lab.dense_space import dense_noise_tensor
 from randopt_lora_lab.gaussian_parity import best_rank_projection, lora_update
 from randopt_lora_lab.lora_space import (
     Candidate,
+    activation_generalized_spectral_scale,
     activation_generalized_projected_scale,
     activation_projected_scale,
     activation_spectral_scale,
@@ -242,6 +243,26 @@ class LoraMaterializerTests(unittest.TestCase):
         self.assertLessEqual(int(torch.linalg.matrix_rank(update, atol=1e-6).item()), rank)
         self.assertTrue(torch.isfinite(update).all())
         self.assertTrue(torch.allclose(a1[:, rank:], torch.zeros_like(a1[:, rank:])))
+
+    def test_activation_generalized_spectral_lora_uses_generalized_family_name(self):
+        rank = 3
+        module = "model.layers.0.self_attn.q_proj"
+        family_state = {
+            module: {
+                "basis": torch.eye(8)[:rank].contiguous(),
+                "singular_values": torch.tensor([3.0, 2.0, 1.0]),
+            }
+        }
+        candidate = Candidate("activation_generalized_spectral_lora_c2", seed=456, sigma=0.01, sign=1)
+
+        a, b = lora_noise_tensors(module, (rank, 8), (7, rank), candidate, rank, family_state=family_state)
+        update = lora_update(a.double(), b.double())
+
+        self.assertEqual(activation_generalized_spectral_scale(candidate.family), 2.0)
+        self.assertEqual(tuple(a.shape), (rank, 8))
+        self.assertEqual(tuple(b.shape), (7, rank))
+        self.assertLessEqual(int(torch.linalg.matrix_rank(update, atol=1e-6).item()), rank)
+        self.assertTrue(torch.isfinite(update).all())
 
     def test_activation_spectral_lora_requires_state(self):
         candidate = Candidate("activation_spectral_lora", seed=456, sigma=0.01, sign=1)

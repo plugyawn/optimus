@@ -363,6 +363,11 @@ def maybe_build_family_state(args, backend, screen):
             make_prompts_for_backend(backend, args, screen[: min(16, len(screen))]),
             anzo_anchor_prompts(),
         )
+    if args.family.startswith("activation_generalized_spectral_lora"):
+        return backend.build_activation_generalized_state(
+            make_prompts_for_backend(backend, args, screen[: min(16, len(screen))]),
+            anzo_anchor_prompts(),
+        )
     if args.family.startswith("activation_projected_gaussian_rank_r"):
         return backend.build_anzo_state(make_prompts_for_backend(backend, args, screen[: min(16, len(screen))]), anzo_anchor_prompts())
     if args.family.startswith("activation_spectral_lora_sv"):
@@ -730,6 +735,17 @@ def main():
                 "activation_generalized_projected_gaussian_rank_r_c1p25",
                 "activation_generalized_projected_gaussian_rank_r_c1p5",
                 "activation_generalized_projected_gaussian_rank_r_c2",
+                "activation_generalized_spectral_lora",
+                "activation_generalized_spectral_lora_c0p5",
+                "activation_generalized_spectral_lora_c0p75",
+                "activation_generalized_spectral_lora_c1p25",
+                "activation_generalized_spectral_lora_c1p5",
+                "activation_generalized_spectral_lora_c2",
+                "activation_generalized_spectral_lora_sv",
+                "activation_generalized_spectral_lora_sv_c0p75",
+                "activation_generalized_spectral_lora_sv_c1p25",
+                "activation_generalized_spectral_lora_sv_c1p5",
+                "activation_generalized_spectral_lora_sv_c2",
                 "activation_spectral_lora",
                 "activation_spectral_lora_c0p5",
                 "activation_spectral_lora_c0p75",

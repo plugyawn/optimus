@@ -154,6 +154,7 @@ def build_activation_family_state(args, out: Path, screen, prompt_variants: list
         args.family.startswith("activation_spectral_lora")
         or args.family.startswith("activation_projected_gaussian_rank_r")
         or args.family.startswith("activation_generalized_projected_gaussian_rank_r")
+        or args.family.startswith("activation_generalized_spectral_lora")
     ):
         return None
 
@@ -184,7 +185,9 @@ def build_activation_family_state(args, out: Path, screen, prompt_variants: list
         )
     if args.family.startswith("activation_spectral_lora_sv"):
         build_state = backend.build_activation_spectral_state
-    elif args.family.startswith("activation_generalized_projected_gaussian_rank_r"):
+    elif args.family.startswith("activation_generalized_projected_gaussian_rank_r") or args.family.startswith(
+        "activation_generalized_spectral_lora"
+    ):
         build_state = backend.build_activation_generalized_state
     else:
         build_state = backend.build_anzo_state
@@ -750,6 +753,17 @@ def build_parser() -> argparse.ArgumentParser:
             "activation_generalized_projected_gaussian_rank_r_c1p25",
             "activation_generalized_projected_gaussian_rank_r_c1p5",
             "activation_generalized_projected_gaussian_rank_r_c2",
+            "activation_generalized_spectral_lora",
+            "activation_generalized_spectral_lora_c0p5",
+            "activation_generalized_spectral_lora_c0p75",
+            "activation_generalized_spectral_lora_c1p25",
+            "activation_generalized_spectral_lora_c1p5",
+            "activation_generalized_spectral_lora_c2",
+            "activation_generalized_spectral_lora_sv",
+            "activation_generalized_spectral_lora_sv_c0p75",
+            "activation_generalized_spectral_lora_sv_c1p25",
+            "activation_generalized_spectral_lora_sv_c1p5",
+            "activation_generalized_spectral_lora_sv_c2",
             "activation_spectral_lora",
             "activation_spectral_lora_c0p5",
             "activation_spectral_lora_c0p75",
