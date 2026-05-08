@@ -1,0 +1,79 @@
+{
+  "confirmed_best_screen_exact": 0.078125,
+  "confirmed_best_strict_holdout_exact": 0.078125,
+  "dense_best_screen_exact": 0.09375,
+  "dense_best_strict_holdout_exact": 0.0546875,
+  "gate": {
+    "checks": [
+      {
+        "check": "dense_validity_pass",
+        "detail": {
+          "pass": true
+        },
+        "passed": true
+      },
+      {
+        "check": "confirmed_validity_pass",
+        "detail": {
+          "pass": true
+        },
+        "passed": true
+      },
+      {
+        "check": "strict_holdout_quality_at_speed",
+        "detail": {
+          "max_confirm_k": 8,
+          "min_full_speedup": 1.0,
+          "min_holdout_delta": 0.0,
+          "passing_k": 4
+        },
+        "passed": true
+      }
+    ],
+    "failed": [],
+    "pass": true,
+    "thresholds": {
+      "max_confirm_k": 8,
+      "min_full_speedup": 1.0,
+      "min_holdout_delta": 0.0
+    }
+  },
+  "kind": "search_quality_confirmation",
+  "rows": [
+    {
+      "confirmed_strict_exact": 0.03125,
+      "delta_vs_dense_best_strict": -0.0234375,
+      "delta_vs_dense_same_k": -0.0078125,
+      "dense_strict_exact_at_k": 0.0390625,
+      "eval_only_speedup": 15.516876915348108,
+      "full_speedup": 6.210506982331414,
+      "k": 1,
+      "passes_quality": false,
+      "passes_speed": true
+    },
+    {
+      "confirmed_strict_exact": 0.0703125,
+      "delta_vs_dense_best_strict": 0.015625,
+      "delta_vs_dense_same_k": 0.0234375,
+      "dense_strict_exact_at_k": 0.046875,
+      "eval_only_speedup": 9.387826994429775,
+      "full_speedup": 4.923866786354244,
+      "k": 4,
+      "passes_quality": true,
+      "passes_speed": true
+    },
+    {
+      "confirmed_strict_exact": 0.078125,
+      "delta_vs_dense_best_strict": 0.0234375,
+      "delta_vs_dense_same_k": 0.0234375,
+      "dense_strict_exact_at_k": 0.0546875,
+      "eval_only_speedup": 6.538186774707889,
+      "full_speedup": 4.007709293520752,
+      "k": 8,
+      "passes_quality": true,
+      "passes_speed": true
+    }
+  ],
+  "run_root": "results/qproj_c2_vllm_shortlist_p64_seed20260508",
+  "screen_delta_vs_dense": -0.015625
+}
