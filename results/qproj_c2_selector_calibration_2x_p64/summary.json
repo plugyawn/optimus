@@ -1,0 +1,4447 @@
+{
+  "folds": [
+    {
+      "chosen_fixed_selector": "default_exact",
+      "chosen_fixed_test": {
+        "candidates": 64,
+        "dense_best_rank": 64,
+        "dense_best_score": 0.109375,
+        "dense_best_spec": "seed1267011527:s0.002:sign1",
+        "pearson": 0.13636180690012648,
+        "rows": [
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.046875,
+            "dense_topk_overlap": 0,
+            "k": 1,
+            "selected_best_dense": 0.0625,
+            "selected_specs": [
+              "seed2113567481:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 2,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed2113567481:s0.002:sign1",
+              "seed239990546:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 2,
+            "k": 4,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed2113567481:s0.002:sign1",
+              "seed239990546:s0.002:sign1",
+              "seed591259173:s0.002:sign1",
+              "seed49457673:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 3,
+            "k": 8,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed2113567481:s0.002:sign1",
+              "seed239990546:s0.002:sign1",
+              "seed591259173:s0.002:sign1",
+              "seed49457673:s0.001:sign1",
+              "seed273426313:s0.002:sign1",
+              "seed1838555499:s0.0005:sign1",
+              "seed1751477245:s0.001:sign1",
+              "seed1617523:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 5,
+            "k": 16,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed2113567481:s0.002:sign1",
+              "seed239990546:s0.002:sign1",
+              "seed591259173:s0.002:sign1",
+              "seed49457673:s0.001:sign1",
+              "seed273426313:s0.002:sign1",
+              "seed1838555499:s0.0005:sign1",
+              "seed1751477245:s0.001:sign1",
+              "seed1617523:s0.001:sign1",
+              "seed1352790260:s0.002:sign1",
+              "seed765487669:s0.0005:sign1",
+              "seed73027057:s0.002:sign1",
+              "seed432059716:s0.0005:sign1",
+              "seed414161978:s0.0005:sign1",
+              "seed325723807:s0.0005:sign1",
+              "seed2071213761:s0.001:sign1",
+              "seed2020458541:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 20,
+            "k": 32,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed2113567481:s0.002:sign1",
+              "seed239990546:s0.002:sign1",
+              "seed591259173:s0.002:sign1",
+              "seed49457673:s0.001:sign1",
+              "seed273426313:s0.002:sign1",
+              "seed1838555499:s0.0005:sign1",
+              "seed1751477245:s0.001:sign1",
+              "seed1617523:s0.001:sign1",
+              "seed1352790260:s0.002:sign1",
+              "seed765487669:s0.0005:sign1",
+              "seed73027057:s0.002:sign1",
+              "seed432059716:s0.0005:sign1",
+              "seed414161978:s0.0005:sign1",
+              "seed325723807:s0.0005:sign1",
+              "seed2071213761:s0.001:sign1",
+              "seed2020458541:s0.002:sign1",
+              "seed1973132888:s0.001:sign1",
+              "seed1907982355:s0.001:sign1",
+              "seed1827632720:s0.002:sign1",
+              "seed1814961664:s0.001:sign1",
+              "seed1677712344:s0.002:sign1",
+              "seed1602437690:s0.002:sign1",
+              "seed1283028042:s0.0005:sign1",
+              "seed1241581202:s0.0005:sign1",
+              "seed1219141227:s0.0005:sign1",
+              "seed1181017907:s0.001:sign1",
+              "seed1109140247:s0.002:sign1",
+              "seed858586901:s0.002:sign1",
+              "seed6215413:s0.0005:sign1",
+              "seed46787066:s0.001:sign1",
+              "seed410114451:s0.0005:sign1",
+              "seed38722925:s0.0005:sign1"
+            ]
+          }
+        ],
+        "score_key": "default_exact",
+        "spearman": 0.14011707077047156
+      },
+      "chosen_fixed_train": {
+        "candidates": 64,
+        "dense_best_rank": 26,
+        "dense_best_score": 0.09375,
+        "dense_best_spec": "seed931683830:s0.001:sign1",
+        "pearson": 0.15329126520124686,
+        "rows": [
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 1,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 2,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 1,
+            "k": 4,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1306350613:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 2,
+            "k": 8,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1306350613:s0.0005:sign1",
+              "seed1091126466:s0.001:sign1",
+              "seed1019436086:s0.0005:sign1",
+              "seed1012140481:s0.001:sign1",
+              "seed987894309:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 6,
+            "k": 16,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1306350613:s0.0005:sign1",
+              "seed1091126466:s0.001:sign1",
+              "seed1019436086:s0.0005:sign1",
+              "seed1012140481:s0.001:sign1",
+              "seed987894309:s0.001:sign1",
+              "seed976484927:s0.002:sign1",
+              "seed62519474:s0.0005:sign1",
+              "seed618254012:s0.001:sign1",
+              "seed576868863:s0.0005:sign1",
+              "seed379122577:s0.001:sign1",
+              "seed320056936:s0.0005:sign1",
+              "seed243384290:s0.001:sign1",
+              "seed2135912827:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 19,
+            "k": 32,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1306350613:s0.0005:sign1",
+              "seed1091126466:s0.001:sign1",
+              "seed1019436086:s0.0005:sign1",
+              "seed1012140481:s0.001:sign1",
+              "seed987894309:s0.001:sign1",
+              "seed976484927:s0.002:sign1",
+              "seed62519474:s0.0005:sign1",
+              "seed618254012:s0.001:sign1",
+              "seed576868863:s0.0005:sign1",
+              "seed379122577:s0.001:sign1",
+              "seed320056936:s0.0005:sign1",
+              "seed243384290:s0.001:sign1",
+              "seed2135912827:s0.002:sign1",
+              "seed2091464267:s0.0005:sign1",
+              "seed2072422341:s0.001:sign1",
+              "seed1491988516:s0.001:sign1",
+              "seed1489214902:s0.002:sign1",
+              "seed1225314396:s0.0005:sign1",
+              "seed117003261:s0.0005:sign1",
+              "seed1090660478:s0.001:sign1",
+              "seed1062333723:s0.0005:sign1",
+              "seed1018167784:s0.001:sign1",
+              "seed931683830:s0.001:sign1",
+              "seed808065183:s0.002:sign1",
+              "seed472897520:s0.001:sign1",
+              "seed1972524579:s0.002:sign1",
+              "seed1924852974:s0.001:sign1",
+              "seed1920188830:s0.002:sign1",
+              "seed1841606524:s0.0005:sign1"
+            ]
+          }
+        ],
+        "score_key": "default_exact",
+        "spearman": 0.17131135183388455
+      },
+      "linear_model": {
+        "features": [
+          "selection_score",
+          "proposal_exact",
+          "mean_condition_selection_score",
+          "min_condition_selection_score",
+          "mean_exact_lift_vs_base",
+          "min_exact_lift_vs_base",
+          "max_malformed_regression_vs_base",
+          "max_cap_hit_regression_vs_base",
+          "sigma",
+          "default_exact",
+          "default_lift",
+          "default_condition_score",
+          "default_malformed",
+          "default_output_tokens",
+          "reordered_exact",
+          "reordered_lift",
+          "reordered_condition_score",
+          "reordered_malformed",
+          "reordered_output_tokens",
+          "xml_exact",
+          "xml_lift",
+          "xml_condition_score",
+          "xml_malformed",
+          "xml_output_tokens",
+          "valid_mean_exact",
+          "valid_mean_lift",
+          "valid_min_lift",
+          "valid_max_lift",
+          "valid_lift_spread",
+          "all_mean_exact",
+          "all_mean_lift",
+          "all_min_lift",
+          "all_max_lift",
+          "malformed_cap_penalty"
+        ],
+        "means": [
+          -0.0137939453125,
+          0.0582275390625,
+          -0.0137939453125,
+          -0.04736328125,
+          0.0035400390625,
+          -0.015380859375,
+          0.032470703125,
+          0.0009765625,
+          0.001335937500000001,
+          0.06298828125,
+          -0.01513671875,
+          -0.020751953125,
+          0.005615234375,
+          1053.28125,
+          0.053466796875,
+          0.022216796875,
+          -0.0068359375,
+          0.028076171875,
+          1019.8125,
+          0.055419921875,
+          0.008544921875,
+          -0.024658203125,
+          0.192138671875,
+          1227.3125,
+          0.0582275390625,
+          0.0035400390625,
+          -0.015380859375,
+          0.0224609375,
+          0.037841796875,
+          0.057291666666666664,
+          0.005208333333333333,
+          -0.01806640625,
+          0.026123046875,
+          0.209716796875
+        ],
+        "ridge": 1.0,
+        "stds": [
+          0.06500917498317528,
+          0.015124408268978835,
+          0.06500917498317528,
+          0.1149184211300114,
+          0.015124408268978835,
+          0.019627144957516097,
+          0.10879115542687737,
+          0.006098630857810936,
+          0.0006127211813653498,
+          0.019912059086038752,
+          0.019912059086038752,
+          0.024867613265946487,
+          0.00971360657425672,
+          9.515560857747692,
+          0.019687788219461454,
+          0.019687788219461454,
+          0.12364607946194087,
+          0.10952067891478227,
+          69.86457323815841,
+          0.016089219131440825,
+          0.016089219131440825,
+          0.04178087159857804,
+          0.0523845229129197,
+          34.411968757250726,
+          0.015124408268978835,
+          0.015124408268978835,
+          0.019627144957516097,
+          0.019506820659607595,
+          0.02482923359493533,
+          0.011826759195693327,
+          0.011826759195693327,
+          0.017075887158247764,
+          0.01726162272882181,
+          0.08816384129122531
+        ],
+        "weights": [
+          0.06958007812499999,
+          -0.0009252814450415372,
+          -0.0002968398530133628,
+          -0.0009252814450415357,
+          0.00045918849626869185,
+          -0.00029683985301335583,
+          0.0016896590009543215,
+          -8.780752100255789e-05,
+          -0.0006223558692671288,
+          -0.00446449249796408,
+          -0.0024442051761445586,
+          -0.0024442051761445634,
+          -0.0017537988827298792,
+          -0.0005205446077268202,
+          0.0007742629898245112,
+          0.0020159757504699576,
+          0.0020159757504699585,
+          -0.0006202442868430867,
+          0.0010972941174885594,
+          0.004826421687319093,
+          0.002725994073578442,
+          0.00272599407357845,
+          -0.006598753795862777,
+          -0.00397165780309346,
+          0.0009769577985730411,
+          -0.0002968398530134007,
+          -0.00029683985301340147,
+          0.0016896590009542862,
+          -0.0021603846742040004,
+          -0.0030329336686142168,
+          0.0009830831131534305,
+          0.000983083113153569,
+          0.002717301503212156,
+          -0.0023984714806275257,
+          -0.006354227505306712
+        ]
+      },
+      "linear_test": {
+        "candidates": 64,
+        "dense_best_rank": 28,
+        "dense_best_score": 0.109375,
+        "dense_best_spec": "seed1267011527:s0.002:sign1",
+        "pearson": -0.29586986263328124,
+        "rows": [
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0625,
+            "dense_topk_overlap": 0,
+            "k": 1,
+            "selected_best_dense": 0.046875,
+            "selected_specs": [
+              "seed2066410643:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0625,
+            "dense_topk_overlap": 0,
+            "k": 2,
+            "selected_best_dense": 0.046875,
+            "selected_specs": [
+              "seed2066410643:s0.001:sign1",
+              "seed10101934:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0625,
+            "dense_topk_overlap": 0,
+            "k": 4,
+            "selected_best_dense": 0.046875,
+            "selected_specs": [
+              "seed2066410643:s0.001:sign1",
+              "seed10101934:s0.0005:sign1",
+              "seed2058926115:s0.0005:sign1",
+              "seed1474485656:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0625,
+            "dense_topk_overlap": 0,
+            "k": 8,
+            "selected_best_dense": 0.046875,
+            "selected_specs": [
+              "seed2066410643:s0.001:sign1",
+              "seed10101934:s0.0005:sign1",
+              "seed2058926115:s0.0005:sign1",
+              "seed1474485656:s0.0005:sign1",
+              "seed410114451:s0.0005:sign1",
+              "seed898653034:s0.0005:sign1",
+              "seed313061198:s0.0005:sign1",
+              "seed1682388582:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0625,
+            "dense_topk_overlap": 0,
+            "k": 16,
+            "selected_best_dense": 0.046875,
+            "selected_specs": [
+              "seed2066410643:s0.001:sign1",
+              "seed10101934:s0.0005:sign1",
+              "seed2058926115:s0.0005:sign1",
+              "seed1474485656:s0.0005:sign1",
+              "seed410114451:s0.0005:sign1",
+              "seed898653034:s0.0005:sign1",
+              "seed313061198:s0.0005:sign1",
+              "seed1682388582:s0.001:sign1",
+              "seed1898600253:s0.0005:sign1",
+              "seed1918508891:s0.0005:sign1",
+              "seed6215413:s0.0005:sign1",
+              "seed1245646949:s0.0005:sign1",
+              "seed2050215265:s0.0005:sign1",
+              "seed723039624:s0.0005:sign1",
+              "seed2103302888:s0.0005:sign1",
+              "seed1010225643:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 10,
+            "k": 32,
+            "selected_best_dense": 0.109375,
+            "selected_specs": [
+              "seed2066410643:s0.001:sign1",
+              "seed10101934:s0.0005:sign1",
+              "seed2058926115:s0.0005:sign1",
+              "seed1474485656:s0.0005:sign1",
+              "seed410114451:s0.0005:sign1",
+              "seed898653034:s0.0005:sign1",
+              "seed313061198:s0.0005:sign1",
+              "seed1682388582:s0.001:sign1",
+              "seed1898600253:s0.0005:sign1",
+              "seed1918508891:s0.0005:sign1",
+              "seed6215413:s0.0005:sign1",
+              "seed1245646949:s0.0005:sign1",
+              "seed2050215265:s0.0005:sign1",
+              "seed723039624:s0.0005:sign1",
+              "seed2103302888:s0.0005:sign1",
+              "seed1010225643:s0.0005:sign1",
+              "seed331873293:s0.0005:sign1",
+              "seed1788319049:s0.002:sign1",
+              "seed1532350378:s0.001:sign1",
+              "seed1645925441:s0.002:sign1",
+              "seed1513749778:s0.001:sign1",
+              "seed414161978:s0.0005:sign1",
+              "seed286751931:s0.0005:sign1",
+              "seed38722925:s0.0005:sign1",
+              "seed780802177:s0.0005:sign1",
+              "seed1970200126:s0.001:sign1",
+              "seed2071213761:s0.001:sign1",
+              "seed1267011527:s0.002:sign1",
+              "seed765487669:s0.0005:sign1",
+              "seed1283028042:s0.0005:sign1",
+              "seed214050811:s0.001:sign1",
+              "seed1486444614:s0.001:sign1"
+            ]
+          }
+        ],
+        "score_key": "linear_calibrated_score",
+        "spearman": -0.3567590089948336
+      },
+      "linear_train": {
+        "candidates": 64,
+        "dense_best_rank": 21,
+        "dense_best_score": 0.09375,
+        "dense_best_spec": "seed931683830:s0.001:sign1",
+        "pearson": 0.5439163716550732,
+        "rows": [
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 1,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1491988516:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 2,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1491988516:s0.001:sign1",
+              "seed117003261:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 4,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1491988516:s0.001:sign1",
+              "seed117003261:s0.0005:sign1",
+              "seed1602141324:s0.002:sign1",
+              "seed1989327004:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 2,
+            "k": 8,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1491988516:s0.001:sign1",
+              "seed117003261:s0.0005:sign1",
+              "seed1602141324:s0.002:sign1",
+              "seed1989327004:s0.001:sign1",
+              "seed576868863:s0.0005:sign1",
+              "seed808065183:s0.002:sign1",
+              "seed1091126466:s0.001:sign1",
+              "seed1251158349:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 4,
+            "k": 16,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1491988516:s0.001:sign1",
+              "seed117003261:s0.0005:sign1",
+              "seed1602141324:s0.002:sign1",
+              "seed1989327004:s0.001:sign1",
+              "seed576868863:s0.0005:sign1",
+              "seed808065183:s0.002:sign1",
+              "seed1091126466:s0.001:sign1",
+              "seed1251158349:s0.0005:sign1",
+              "seed472897520:s0.001:sign1",
+              "seed2072422341:s0.001:sign1",
+              "seed1686084785:s0.0005:sign1",
+              "seed987894309:s0.001:sign1",
+              "seed320056936:s0.0005:sign1",
+              "seed1018167784:s0.001:sign1",
+              "seed243384290:s0.001:sign1",
+              "seed1306350613:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 24,
+            "k": 32,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1491988516:s0.001:sign1",
+              "seed117003261:s0.0005:sign1",
+              "seed1602141324:s0.002:sign1",
+              "seed1989327004:s0.001:sign1",
+              "seed576868863:s0.0005:sign1",
+              "seed808065183:s0.002:sign1",
+              "seed1091126466:s0.001:sign1",
+              "seed1251158349:s0.0005:sign1",
+              "seed472897520:s0.001:sign1",
+              "seed2072422341:s0.001:sign1",
+              "seed1686084785:s0.0005:sign1",
+              "seed987894309:s0.001:sign1",
+              "seed320056936:s0.0005:sign1",
+              "seed1018167784:s0.001:sign1",
+              "seed243384290:s0.001:sign1",
+              "seed1306350613:s0.0005:sign1",
+              "seed1841606524:s0.0005:sign1",
+              "seed1090660478:s0.001:sign1",
+              "seed2135912827:s0.002:sign1",
+              "seed2091464267:s0.0005:sign1",
+              "seed931683830:s0.001:sign1",
+              "seed1019436086:s0.0005:sign1",
+              "seed1062333723:s0.0005:sign1",
+              "seed62519474:s0.0005:sign1",
+              "seed976484927:s0.002:sign1",
+              "seed1924852974:s0.001:sign1",
+              "seed1556258250:s0.001:sign1",
+              "seed311993413:s0.002:sign1",
+              "seed379122577:s0.001:sign1",
+              "seed1278353962:s0.001:sign1",
+              "seed1278910506:s0.001:sign1",
+              "seed147046182:s0.0005:sign1"
+            ]
+          }
+        ],
+        "score_key": "linear_calibrated_score",
+        "spearman": 0.5567527217869057
+      },
+      "test_run": "qproj_c2_vllm_shortlist_p64",
+      "train_runs": [
+        "qproj_c2_vllm_shortlist_p64_seed20260508"
+      ]
+    },
+    {
+      "chosen_fixed_selector": "valid_min_lift",
+      "chosen_fixed_test": {
+        "candidates": 64,
+        "dense_best_rank": 26,
+        "dense_best_score": 0.09375,
+        "dense_best_spec": "seed931683830:s0.001:sign1",
+        "pearson": 0.16326559546193128,
+        "rows": [
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 1,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 2,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 1,
+            "k": 4,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1306350613:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 3,
+            "k": 8,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1306350613:s0.0005:sign1",
+              "seed1091126466:s0.001:sign1",
+              "seed1019436086:s0.0005:sign1",
+              "seed987894309:s0.001:sign1",
+              "seed976484927:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 7,
+            "k": 16,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1306350613:s0.0005:sign1",
+              "seed1091126466:s0.001:sign1",
+              "seed1019436086:s0.0005:sign1",
+              "seed987894309:s0.001:sign1",
+              "seed976484927:s0.002:sign1",
+              "seed62519474:s0.0005:sign1",
+              "seed618254012:s0.001:sign1",
+              "seed576868863:s0.0005:sign1",
+              "seed379122577:s0.001:sign1",
+              "seed320056936:s0.0005:sign1",
+              "seed243384290:s0.001:sign1",
+              "seed2135912827:s0.002:sign1",
+              "seed2091464267:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 19,
+            "k": 32,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1278353962:s0.001:sign1",
+              "seed990718095:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1306350613:s0.0005:sign1",
+              "seed1091126466:s0.001:sign1",
+              "seed1019436086:s0.0005:sign1",
+              "seed987894309:s0.001:sign1",
+              "seed976484927:s0.002:sign1",
+              "seed62519474:s0.0005:sign1",
+              "seed618254012:s0.001:sign1",
+              "seed576868863:s0.0005:sign1",
+              "seed379122577:s0.001:sign1",
+              "seed320056936:s0.0005:sign1",
+              "seed243384290:s0.001:sign1",
+              "seed2135912827:s0.002:sign1",
+              "seed2091464267:s0.0005:sign1",
+              "seed2072422341:s0.001:sign1",
+              "seed1491988516:s0.001:sign1",
+              "seed1489214902:s0.002:sign1",
+              "seed1225314396:s0.0005:sign1",
+              "seed117003261:s0.0005:sign1",
+              "seed1090660478:s0.001:sign1",
+              "seed1062333723:s0.0005:sign1",
+              "seed1018167784:s0.001:sign1",
+              "seed1012140481:s0.001:sign1",
+              "seed931683830:s0.001:sign1",
+              "seed808065183:s0.002:sign1",
+              "seed472897520:s0.001:sign1",
+              "seed1972524579:s0.002:sign1",
+              "seed1924852974:s0.001:sign1",
+              "seed1920188830:s0.002:sign1",
+              "seed1841606524:s0.0005:sign1"
+            ]
+          }
+        ],
+        "score_key": "valid_min_lift",
+        "spearman": 0.1811329364343035
+      },
+      "chosen_fixed_train": {
+        "candidates": 64,
+        "dense_best_rank": 53,
+        "dense_best_score": 0.109375,
+        "dense_best_spec": "seed1267011527:s0.002:sign1",
+        "pearson": -0.22527881519729767,
+        "rows": [
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0625,
+            "dense_topk_overlap": 0,
+            "k": 1,
+            "selected_best_dense": 0.046875,
+            "selected_specs": [
+              "seed765487669:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0625,
+            "dense_topk_overlap": 0,
+            "k": 2,
+            "selected_best_dense": 0.046875,
+            "selected_specs": [
+              "seed765487669:s0.0005:sign1",
+              "seed6215413:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.0625,
+            "dense_topk_overlap": 0,
+            "k": 4,
+            "selected_best_dense": 0.046875,
+            "selected_specs": [
+              "seed765487669:s0.0005:sign1",
+              "seed6215413:s0.0005:sign1",
+              "seed414161978:s0.0005:sign1",
+              "seed410114451:s0.0005:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 2,
+            "k": 8,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed765487669:s0.0005:sign1",
+              "seed6215413:s0.0005:sign1",
+              "seed414161978:s0.0005:sign1",
+              "seed410114451:s0.0005:sign1",
+              "seed38722925:s0.0005:sign1",
+              "seed313061198:s0.0005:sign1",
+              "seed273426313:s0.002:sign1",
+              "seed2071213761:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 4,
+            "k": 16,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed765487669:s0.0005:sign1",
+              "seed6215413:s0.0005:sign1",
+              "seed414161978:s0.0005:sign1",
+              "seed410114451:s0.0005:sign1",
+              "seed38722925:s0.0005:sign1",
+              "seed313061198:s0.0005:sign1",
+              "seed273426313:s0.002:sign1",
+              "seed2071213761:s0.001:sign1",
+              "seed2066410643:s0.001:sign1",
+              "seed2058926115:s0.0005:sign1",
+              "seed2050215265:s0.0005:sign1",
+              "seed2020458541:s0.002:sign1",
+              "seed1973132888:s0.001:sign1",
+              "seed1970200126:s0.001:sign1",
+              "seed1918508891:s0.0005:sign1",
+              "seed1907982355:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 13,
+            "k": 32,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed765487669:s0.0005:sign1",
+              "seed6215413:s0.0005:sign1",
+              "seed414161978:s0.0005:sign1",
+              "seed410114451:s0.0005:sign1",
+              "seed38722925:s0.0005:sign1",
+              "seed313061198:s0.0005:sign1",
+              "seed273426313:s0.002:sign1",
+              "seed2071213761:s0.001:sign1",
+              "seed2066410643:s0.001:sign1",
+              "seed2058926115:s0.0005:sign1",
+              "seed2050215265:s0.0005:sign1",
+              "seed2020458541:s0.002:sign1",
+              "seed1973132888:s0.001:sign1",
+              "seed1970200126:s0.001:sign1",
+              "seed1918508891:s0.0005:sign1",
+              "seed1907982355:s0.001:sign1",
+              "seed1898600253:s0.0005:sign1",
+              "seed1838555499:s0.0005:sign1",
+              "seed1828774463:s0.002:sign1",
+              "seed1788319049:s0.002:sign1",
+              "seed1474485656:s0.0005:sign1",
+              "seed1283028042:s0.0005:sign1",
+              "seed1245646949:s0.0005:sign1",
+              "seed1181017907:s0.001:sign1",
+              "seed1010225643:s0.0005:sign1",
+              "seed10101934:s0.0005:sign1",
+              "seed898653034:s0.0005:sign1",
+              "seed73027057:s0.002:sign1",
+              "seed723039624:s0.0005:sign1",
+              "seed49457673:s0.001:sign1",
+              "seed46787066:s0.001:sign1",
+              "seed432059716:s0.0005:sign1"
+            ]
+          }
+        ],
+        "score_key": "valid_min_lift",
+        "spearman": -0.2500129606880524
+      },
+      "linear_model": {
+        "features": [
+          "selection_score",
+          "proposal_exact",
+          "mean_condition_selection_score",
+          "min_condition_selection_score",
+          "mean_exact_lift_vs_base",
+          "min_exact_lift_vs_base",
+          "max_malformed_regression_vs_base",
+          "max_cap_hit_regression_vs_base",
+          "sigma",
+          "default_exact",
+          "default_lift",
+          "default_condition_score",
+          "default_malformed",
+          "default_output_tokens",
+          "reordered_exact",
+          "reordered_lift",
+          "reordered_condition_score",
+          "reordered_malformed",
+          "reordered_output_tokens",
+          "xml_exact",
+          "xml_lift",
+          "xml_condition_score",
+          "xml_malformed",
+          "xml_output_tokens",
+          "valid_mean_exact",
+          "valid_mean_lift",
+          "valid_min_lift",
+          "valid_max_lift",
+          "valid_lift_spread",
+          "all_mean_exact",
+          "all_mean_lift",
+          "all_min_lift",
+          "all_max_lift",
+          "malformed_cap_penalty"
+        ],
+        "means": [
+          -0.035400390625,
+          0.0732421875,
+          -0.035400390625,
+          -0.07763671875,
+          -0.0048828125,
+          -0.0185546875,
+          0.058837890625,
+          0.0009765625,
+          0.0011406250000000008,
+          0.0537109375,
+          0.0068359375,
+          0.004150390625,
+          0.002685546875,
+          1035.6875,
+          0.0927734375,
+          -0.0166015625,
+          -0.074951171875,
+          0.071044921875,
+          1032.21875,
+          0.07470703125,
+          -0.00341796875,
+          -0.023681640625,
+          0.204833984375,
+          1183.828125,
+          0.0732421875,
+          -0.0048828125,
+          -0.0185546875,
+          0.0087890625,
+          0.02734375,
+          0.07373046874999999,
+          -0.004394531250000001,
+          -0.022216796875,
+          0.012451171875,
+          0.25
+        ],
+        "ridge": 1.0,
+        "stds": [
+          0.11886790595964171,
+          0.013636953167743106,
+          0.11886790595964171,
+          0.23505709258972254,
+          0.013636953167743106,
+          0.024059931630380702,
+          0.21296662540173675,
+          0.006098630857810936,
+          0.0006523320545358781,
+          0.016544017916110758,
+          0.016544017916110758,
+          0.02052959919742193,
+          0.010169270312333266,
+          6.072157256692221,
+          0.024685985663602614,
+          0.024685985663602614,
+          0.2356116413002652,
+          0.2137566546469449,
+          97.55086313527677,
+          0.015739024864537304,
+          0.015739024864537304,
+          0.0587233064760511,
+          0.07350173737944315,
+          33.801606233792725,
+          0.013636953167743106,
+          0.013636953167743106,
+          0.024059931630380702,
+          0.014319217088491386,
+          0.02870495792324037,
+          0.009263055517664188,
+          0.009263055517664187,
+          0.02291152780887528,
+          0.014132769178131156,
+          0.18725570022198257
+        ],
+        "weights": [
+          0.05322265625000001,
+          0.0025988175935921435,
+          0.0007659188288734892,
+          0.002598817593592137,
+          -0.0033579901137314803,
+          0.0007659188288734415,
+          -0.0016134486688395785,
+          0.0005714705845516017,
+          0.007572433497234328,
+          0.006358941000522257,
+          -0.0007224789484042767,
+          -0.0007224789484042769,
+          -0.0014254436057980228,
+          0.0017022933511939013,
+          0.004914161693710631,
+          0.0013304027440201101,
+          0.001330402744020111,
+          0.0027464508671018817,
+          -0.0027398455641234614,
+          -0.004430049939615679,
+          -0.0003550018413937239,
+          -0.0003550018413937216,
+          0.0044304655263497274,
+          0.0014167577246826256,
+          -0.0013633695681211939,
+          0.0007659188288735025,
+          0.0007659188288735029,
+          -0.001613448668839653,
+          0.004169855285501915,
+          0.003432456789715103,
+          0.0005506539953772581,
+          0.0005506539953774381,
+          -0.0011355600231766376,
+          -0.0040681298231259495,
+          0.004399518933726639
+        ]
+      },
+      "linear_test": {
+        "candidates": 64,
+        "dense_best_rank": 28,
+        "dense_best_score": 0.09375,
+        "dense_best_spec": "seed931683830:s0.001:sign1",
+        "pearson": -0.2278222035993431,
+        "rows": [
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 1,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1682333082:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 2,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1682333082:s0.002:sign1",
+              "seed837787327:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 4,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1682333082:s0.002:sign1",
+              "seed837787327:s0.002:sign1",
+              "seed1318822822:s0.002:sign1",
+              "seed1548206410:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 0,
+            "k": 8,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1682333082:s0.002:sign1",
+              "seed837787327:s0.002:sign1",
+              "seed1318822822:s0.002:sign1",
+              "seed1548206410:s0.002:sign1",
+              "seed1112709546:s0.002:sign1",
+              "seed348810271:s0.002:sign1",
+              "seed1920188830:s0.002:sign1",
+              "seed199192970:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": false,
+            "dense_regret": 0.015625,
+            "dense_topk_overlap": 2,
+            "k": 16,
+            "selected_best_dense": 0.078125,
+            "selected_specs": [
+              "seed1682333082:s0.002:sign1",
+              "seed837787327:s0.002:sign1",
+              "seed1318822822:s0.002:sign1",
+              "seed1548206410:s0.002:sign1",
+              "seed1112709546:s0.002:sign1",
+              "seed348810271:s0.002:sign1",
+              "seed1920188830:s0.002:sign1",
+              "seed199192970:s0.001:sign1",
+              "seed1548096458:s0.001:sign1",
+              "seed1171715071:s0.001:sign1",
+              "seed1602141324:s0.002:sign1",
+              "seed1105967110:s0.002:sign1",
+              "seed364454685:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1559858878:s0.002:sign1",
+              "seed1735940901:s0.001:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 10,
+            "k": 32,
+            "selected_best_dense": 0.09375,
+            "selected_specs": [
+              "seed1682333082:s0.002:sign1",
+              "seed837787327:s0.002:sign1",
+              "seed1318822822:s0.002:sign1",
+              "seed1548206410:s0.002:sign1",
+              "seed1112709546:s0.002:sign1",
+              "seed348810271:s0.002:sign1",
+              "seed1920188830:s0.002:sign1",
+              "seed199192970:s0.001:sign1",
+              "seed1548096458:s0.001:sign1",
+              "seed1171715071:s0.001:sign1",
+              "seed1602141324:s0.002:sign1",
+              "seed1105967110:s0.002:sign1",
+              "seed364454685:s0.002:sign1",
+              "seed246147040:s0.002:sign1",
+              "seed1559858878:s0.002:sign1",
+              "seed1735940901:s0.001:sign1",
+              "seed472897520:s0.001:sign1",
+              "seed311993413:s0.002:sign1",
+              "seed2072422341:s0.001:sign1",
+              "seed1489214902:s0.002:sign1",
+              "seed1477013529:s0.002:sign1",
+              "seed1787940758:s0.002:sign1",
+              "seed243384290:s0.001:sign1",
+              "seed976484927:s0.002:sign1",
+              "seed1972524579:s0.002:sign1",
+              "seed1395092000:s0.002:sign1",
+              "seed1081082032:s0.002:sign1",
+              "seed931683830:s0.001:sign1",
+              "seed1729064507:s0.002:sign1",
+              "seed154116212:s0.002:sign1",
+              "seed1278910506:s0.001:sign1",
+              "seed990718095:s0.002:sign1"
+            ]
+          }
+        ],
+        "score_key": "linear_calibrated_score",
+        "spearman": -0.2549846494475177
+      },
+      "linear_train": {
+        "candidates": 64,
+        "dense_best_rank": 1,
+        "dense_best_score": 0.109375,
+        "dense_best_spec": "seed1267011527:s0.002:sign1",
+        "pearson": 0.5863318128721628,
+        "rows": [
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 1,
+            "k": 1,
+            "selected_best_dense": 0.109375,
+            "selected_specs": [
+              "seed1267011527:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 1,
+            "k": 2,
+            "selected_best_dense": 0.109375,
+            "selected_specs": [
+              "seed1267011527:s0.002:sign1",
+              "seed591259173:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 3,
+            "k": 4,
+            "selected_best_dense": 0.109375,
+            "selected_specs": [
+              "seed1267011527:s0.002:sign1",
+              "seed591259173:s0.002:sign1",
+              "seed1645925441:s0.002:sign1",
+              "seed273426313:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 4,
+            "k": 8,
+            "selected_best_dense": 0.109375,
+            "selected_specs": [
+              "seed1267011527:s0.002:sign1",
+              "seed591259173:s0.002:sign1",
+              "seed1645925441:s0.002:sign1",
+              "seed273426313:s0.002:sign1",
+              "seed1827632720:s0.002:sign1",
+              "seed1352790260:s0.002:sign1",
+              "seed858586901:s0.002:sign1",
+              "seed2113567481:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 8,
+            "k": 16,
+            "selected_best_dense": 0.109375,
+            "selected_specs": [
+              "seed1267011527:s0.002:sign1",
+              "seed591259173:s0.002:sign1",
+              "seed1645925441:s0.002:sign1",
+              "seed273426313:s0.002:sign1",
+              "seed1827632720:s0.002:sign1",
+              "seed1352790260:s0.002:sign1",
+              "seed858586901:s0.002:sign1",
+              "seed2113567481:s0.002:sign1",
+              "seed1828774463:s0.002:sign1",
+              "seed1109140247:s0.002:sign1",
+              "seed239990546:s0.002:sign1",
+              "seed1988878581:s0.002:sign1",
+              "seed1788319049:s0.002:sign1",
+              "seed2020458541:s0.002:sign1",
+              "seed1513749778:s0.001:sign1",
+              "seed1217694784:s0.002:sign1"
+            ]
+          },
+          {
+            "contains_dense_best": true,
+            "dense_regret": 0.0,
+            "dense_topk_overlap": 23,
+            "k": 32,
+            "selected_best_dense": 0.109375,
+            "selected_specs": [
+              "seed1267011527:s0.002:sign1",
+              "seed591259173:s0.002:sign1",
+              "seed1645925441:s0.002:sign1",
+              "seed273426313:s0.002:sign1",
+              "seed1827632720:s0.002:sign1",
+              "seed1352790260:s0.002:sign1",
+              "seed858586901:s0.002:sign1",
+              "seed2113567481:s0.002:sign1",
+              "seed1828774463:s0.002:sign1",
+              "seed1109140247:s0.002:sign1",
+              "seed239990546:s0.002:sign1",
+              "seed1988878581:s0.002:sign1",
+              "seed1788319049:s0.002:sign1",
+              "seed2020458541:s0.002:sign1",
+              "seed1513749778:s0.001:sign1",
+              "seed1217694784:s0.002:sign1",
+              "seed1617523:s0.001:sign1",
+              "seed1884135719:s0.002:sign1",
+              "seed271202801:s0.002:sign1",
+              "seed1602437690:s0.002:sign1",
+              "seed288595619:s0.002:sign1",
+              "seed49457673:s0.001:sign1",
+              "seed46787066:s0.001:sign1",
+              "seed1752399668:s0.002:sign1",
+              "seed325723807:s0.0005:sign1",
+              "seed1973132888:s0.001:sign1",
+              "seed1838555499:s0.0005:sign1",
+              "seed73027057:s0.002:sign1",
+              "seed1751477245:s0.001:sign1",
+              "seed6215413:s0.0005:sign1",
+              "seed1814961664:s0.001:sign1",
+              "seed410114451:s0.0005:sign1"
+            ]
+          }
+        ],
+        "score_key": "linear_calibrated_score",
+        "spearman": 0.487416456114997
+      },
+      "test_run": "qproj_c2_vllm_shortlist_p64_seed20260508",
+      "train_runs": [
+        "qproj_c2_vllm_shortlist_p64"
+      ]
+    }
+  ],
+  "kind": "selector_calibration_audit",
+  "ks": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32
+  ],
+  "per_run": {
+    "qproj_c2_vllm_shortlist_p64": {
+      "candidate_count": 64,
+      "root": "results/qproj_c2_vllm_shortlist_p64",
+      "selectors": {
+        "current_selection": {
+          "candidates": 64,
+          "dense_best_rank": 60,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.07905786229055838,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 2,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 4,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed432059716:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 15,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1898600253:s0.0005:sign1",
+                "seed1827632720:s0.002:sign1",
+                "seed1814961664:s0.001:sign1",
+                "seed1474485656:s0.0005:sign1",
+                "seed1245646949:s0.0005:sign1",
+                "seed1219141227:s0.0005:sign1",
+                "seed1010225643:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "selection_score",
+          "spearman": 0.002962382957779
+        },
+        "default_exact": {
+          "candidates": 64,
+          "dense_best_rank": 64,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": 0.13636180690012648,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 4,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed49457673:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 3,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1751477245:s0.001:sign1",
+                "seed1617523:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1751477245:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1352790260:s0.002:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed325723807:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 20,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1751477245:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1352790260:s0.002:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed325723807:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1827632720:s0.002:sign1",
+                "seed1814961664:s0.001:sign1",
+                "seed1677712344:s0.002:sign1",
+                "seed1602437690:s0.002:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1241581202:s0.0005:sign1",
+                "seed1219141227:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed1109140247:s0.002:sign1",
+                "seed858586901:s0.002:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed46787066:s0.001:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "default_exact",
+          "spearman": 0.14011707077047156
+        },
+        "default_minus_instability": {
+          "candidates": 64,
+          "dense_best_rank": 59,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.23767383144310214,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2071213761:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 4,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1907982355:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 13,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1898600253:s0.0005:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1828774463:s0.002:sign1",
+                "seed1788319049:s0.002:sign1",
+                "seed1474485656:s0.0005:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1245646949:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed1010225643:s0.0005:sign1",
+                "seed10101934:s0.0005:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed46787066:s0.001:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed288595619:s0.002:sign1",
+                "seed286751931:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "default_minus_instability",
+          "spearman": -0.24327229378469445
+        },
+        "low_spread_valid_mean": {
+          "candidates": 64,
+          "dense_best_rank": 49,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.25439688348601736,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed6215413:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed6215413:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed6215413:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 8,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed6215413:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed1970200126:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 2,
+              "k": 16,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed6215413:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1898600253:s0.0005:sign1",
+                "seed1828774463:s0.002:sign1",
+                "seed1788319049:s0.002:sign1",
+                "seed1474485656:s0.0005:sign1",
+                "seed1245646949:s0.0005:sign1",
+                "seed1010225643:s0.0005:sign1",
+                "seed10101934:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 13,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed6215413:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1898600253:s0.0005:sign1",
+                "seed1828774463:s0.002:sign1",
+                "seed1788319049:s0.002:sign1",
+                "seed1474485656:s0.0005:sign1",
+                "seed1245646949:s0.0005:sign1",
+                "seed1010225643:s0.0005:sign1",
+                "seed10101934:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1532350378:s0.001:sign1",
+                "seed898653034:s0.0005:sign1",
+                "seed723039624:s0.0005:sign1",
+                "seed46787066:s0.001:sign1",
+                "seed331873293:s0.0005:sign1",
+                "seed288595619:s0.002:sign1"
+              ]
+            }
+          ],
+          "score_key": "low_spread_valid_mean",
+          "spearman": -0.3173795595464566
+        },
+        "mean_minus_malformed": {
+          "candidates": 64,
+          "dense_best_rank": 53,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.07885803679813609,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed239990546:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed239990546:s0.002:sign1",
+                "seed1352790260:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 4,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed239990546:s0.002:sign1",
+                "seed1352790260:s0.002:sign1",
+                "seed1884135719:s0.002:sign1",
+                "seed273426313:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed239990546:s0.002:sign1",
+                "seed1352790260:s0.002:sign1",
+                "seed1884135719:s0.002:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed2058926115:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 3,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed239990546:s0.002:sign1",
+                "seed1352790260:s0.002:sign1",
+                "seed1884135719:s0.002:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed1751477245:s0.001:sign1",
+                "seed1474485656:s0.0005:sign1",
+                "seed10101934:s0.0005:sign1",
+                "seed898653034:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed1217694784:s0.002:sign1",
+                "seed1109140247:s0.002:sign1",
+                "seed410114451:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 13,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed239990546:s0.002:sign1",
+                "seed1352790260:s0.002:sign1",
+                "seed1884135719:s0.002:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed1751477245:s0.001:sign1",
+                "seed1474485656:s0.0005:sign1",
+                "seed10101934:s0.0005:sign1",
+                "seed898653034:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed1217694784:s0.002:sign1",
+                "seed1109140247:s0.002:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed1010225643:s0.0005:sign1",
+                "seed46787066:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed1682388582:s0.001:sign1",
+                "seed1645925441:s0.002:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed325723807:s0.0005:sign1",
+                "seed1788319049:s0.002:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed331873293:s0.0005:sign1",
+                "seed286751931:s0.0005:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1898600253:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "mean_minus_malformed",
+          "spearman": -0.12149164229274864
+        },
+        "proposal_exact": {
+          "candidates": 64,
+          "dense_best_rank": 59,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.10097724622809932,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 2,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 4,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed591259173:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 16,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1898600253:s0.0005:sign1",
+                "seed1828774463:s0.002:sign1",
+                "seed1827632720:s0.002:sign1",
+                "seed1814961664:s0.001:sign1",
+                "seed1788319049:s0.002:sign1",
+                "seed1751477245:s0.001:sign1"
+              ]
+            }
+          ],
+          "score_key": "proposal_exact",
+          "spearman": -0.02659674695089332
+        },
+        "reordered_exact": {
+          "candidates": 64,
+          "dense_best_rank": 47,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.20294981129541362,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.078125,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.03125,
+              "selected_specs": [
+                "seed898653034:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed898653034:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed898653034:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed723039624:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 8,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed898653034:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed723039624:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed331873293:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 4,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed898653034:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed723039624:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed331873293:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2103302888:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed2020458541:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 12,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed898653034:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed723039624:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed331873293:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2103302888:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1898600253:s0.0005:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1828774463:s0.002:sign1",
+                "seed1788319049:s0.002:sign1",
+                "seed1682388582:s0.001:sign1",
+                "seed1645925441:s0.002:sign1",
+                "seed1513749778:s0.001:sign1",
+                "seed1474485656:s0.0005:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1245646949:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed1010225643:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "reordered_exact",
+          "spearman": -0.24723767588565243
+        },
+        "valid_max_lift": {
+          "candidates": 64,
+          "dense_best_rank": 64,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": 0.18619376459642292,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 4,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed49457673:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 3,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1751477245:s0.001:sign1",
+                "seed1617523:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1751477245:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1352790260:s0.002:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed325723807:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 20,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2113567481:s0.002:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1751477245:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1352790260:s0.002:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed325723807:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1827632720:s0.002:sign1",
+                "seed1814961664:s0.001:sign1",
+                "seed1677712344:s0.002:sign1",
+                "seed1602437690:s0.002:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1241581202:s0.0005:sign1",
+                "seed1219141227:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed1109140247:s0.002:sign1",
+                "seed898653034:s0.0005:sign1",
+                "seed858586901:s0.002:sign1",
+                "seed723039624:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed46787066:s0.001:sign1"
+              ]
+            }
+          ],
+          "score_key": "valid_max_lift",
+          "spearman": 0.1416185565477092
+        },
+        "valid_mean_exact": {
+          "candidates": 64,
+          "dense_best_rank": 59,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.10097724622809932,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 2,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 4,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed591259173:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 16,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1898600253:s0.0005:sign1",
+                "seed1828774463:s0.002:sign1",
+                "seed1827632720:s0.002:sign1",
+                "seed1814961664:s0.001:sign1",
+                "seed1788319049:s0.002:sign1",
+                "seed1751477245:s0.001:sign1"
+              ]
+            }
+          ],
+          "score_key": "valid_mean_exact",
+          "spearman": -0.02659674695089332
+        },
+        "valid_mean_lift": {
+          "candidates": 64,
+          "dense_best_rank": 59,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.10097724622809932,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 2,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 4,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed591259173:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 16,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed273426313:s0.002:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1617523:s0.001:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed591259173:s0.002:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1898600253:s0.0005:sign1",
+                "seed1828774463:s0.002:sign1",
+                "seed1827632720:s0.002:sign1",
+                "seed1814961664:s0.001:sign1",
+                "seed1788319049:s0.002:sign1",
+                "seed1751477245:s0.001:sign1"
+              ]
+            }
+          ],
+          "score_key": "valid_mean_lift",
+          "spearman": -0.02659674695089332
+        },
+        "valid_min_lift": {
+          "candidates": 64,
+          "dense_best_rank": 53,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.22527881519729767,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 2,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2071213761:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 4,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1907982355:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 13,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed765487669:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed38722925:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed273426313:s0.002:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2066410643:s0.001:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed2020458541:s0.002:sign1",
+                "seed1973132888:s0.001:sign1",
+                "seed1970200126:s0.001:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1907982355:s0.001:sign1",
+                "seed1898600253:s0.0005:sign1",
+                "seed1838555499:s0.0005:sign1",
+                "seed1828774463:s0.002:sign1",
+                "seed1788319049:s0.002:sign1",
+                "seed1474485656:s0.0005:sign1",
+                "seed1283028042:s0.0005:sign1",
+                "seed1245646949:s0.0005:sign1",
+                "seed1181017907:s0.001:sign1",
+                "seed1010225643:s0.0005:sign1",
+                "seed10101934:s0.0005:sign1",
+                "seed898653034:s0.0005:sign1",
+                "seed73027057:s0.002:sign1",
+                "seed723039624:s0.0005:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed46787066:s0.001:sign1",
+                "seed432059716:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "valid_min_lift",
+          "spearman": -0.2500129606880524
+        },
+        "xml_exact": {
+          "candidates": 64,
+          "dense_best_rank": 53,
+          "dense_best_score": 0.109375,
+          "dense_best_spec": "seed1267011527:s0.002:sign1",
+          "pearson": -0.13868243714786452,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed2066410643:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed2066410643:s0.001:sign1",
+                "seed1988878581:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed2066410643:s0.001:sign1",
+                "seed1988878581:s0.002:sign1",
+                "seed1752399668:s0.002:sign1",
+                "seed1645925441:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 8,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed2066410643:s0.001:sign1",
+                "seed1988878581:s0.002:sign1",
+                "seed1752399668:s0.002:sign1",
+                "seed1645925441:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed1682388582:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 2,
+              "k": 16,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed2066410643:s0.001:sign1",
+                "seed1988878581:s0.002:sign1",
+                "seed1752399668:s0.002:sign1",
+                "seed1645925441:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed1682388582:s0.001:sign1",
+                "seed1486444614:s0.001:sign1",
+                "seed1219141227:s0.0005:sign1",
+                "seed1217694784:s0.002:sign1",
+                "seed10101934:s0.0005:sign1",
+                "seed898653034:s0.0005:sign1",
+                "seed858586901:s0.002:sign1",
+                "seed780802177:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 14,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed2066410643:s0.001:sign1",
+                "seed1988878581:s0.002:sign1",
+                "seed1752399668:s0.002:sign1",
+                "seed1645925441:s0.002:sign1",
+                "seed49457673:s0.001:sign1",
+                "seed414161978:s0.0005:sign1",
+                "seed2058926115:s0.0005:sign1",
+                "seed1682388582:s0.001:sign1",
+                "seed1486444614:s0.001:sign1",
+                "seed1219141227:s0.0005:sign1",
+                "seed1217694784:s0.002:sign1",
+                "seed10101934:s0.0005:sign1",
+                "seed898653034:s0.0005:sign1",
+                "seed858586901:s0.002:sign1",
+                "seed780802177:s0.0005:sign1",
+                "seed765487669:s0.0005:sign1",
+                "seed723039624:s0.0005:sign1",
+                "seed6215413:s0.0005:sign1",
+                "seed432059716:s0.0005:sign1",
+                "seed410114451:s0.0005:sign1",
+                "seed325723807:s0.0005:sign1",
+                "seed313061198:s0.0005:sign1",
+                "seed286751931:s0.0005:sign1",
+                "seed271202801:s0.002:sign1",
+                "seed239990546:s0.002:sign1",
+                "seed214050811:s0.001:sign1",
+                "seed2113567481:s0.002:sign1",
+                "seed2103302888:s0.0005:sign1",
+                "seed2071213761:s0.001:sign1",
+                "seed2050215265:s0.0005:sign1",
+                "seed1918508891:s0.0005:sign1",
+                "seed1898600253:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "xml_exact",
+          "spearman": -0.15504489445402866
+        }
+      }
+    },
+    "qproj_c2_vllm_shortlist_p64_seed20260508": {
+      "candidate_count": 64,
+      "root": "results/qproj_c2_vllm_shortlist_p64_seed20260508",
+      "selectors": {
+        "current_selection": {
+          "candidates": 64,
+          "dense_best_rank": 31,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": -0.03045459986521535,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 1,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed1062333723:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": true,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 17,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1729064507:s0.002:sign1",
+                "seed1686084785:s0.0005:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed147046182:s0.0005:sign1",
+                "seed1225314396:s0.0005:sign1",
+                "seed1105967110:s0.002:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed931683830:s0.001:sign1",
+                "seed62519474:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "selection_score",
+          "spearman": 0.08203904703862534
+        },
+        "default_exact": {
+          "candidates": 64,
+          "dense_best_rank": 26,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": 0.15329126520124686,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 4,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 2,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed987894309:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 6,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2135912827:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": true,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 19,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2135912827:s0.002:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1225314396:s0.0005:sign1",
+                "seed117003261:s0.0005:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed931683830:s0.001:sign1",
+                "seed808065183:s0.002:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed1972524579:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1841606524:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "default_exact",
+          "spearman": 0.17131135183388455
+        },
+        "default_minus_instability": {
+          "candidates": 64,
+          "dense_best_rank": 26,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": 0.2096075327234598,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 4,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed576868863:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 3,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed2135912827:s0.002:sign1",
+                "seed117003261:s0.0005:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 6,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed2135912827:s0.002:sign1",
+                "seed117003261:s0.0005:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed808065183:s0.002:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1491988516:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": true,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 18,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed2135912827:s0.002:sign1",
+                "seed117003261:s0.0005:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed808065183:s0.002:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1225314396:s0.0005:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed154116212:s0.002:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed931683830:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed236815619:s0.002:sign1",
+                "seed1972524579:s0.002:sign1",
+                "seed1841606524:s0.0005:sign1",
+                "seed1682333082:s0.002:sign1",
+                "seed1477013529:s0.002:sign1"
+              ]
+            }
+          ],
+          "score_key": "default_minus_instability",
+          "spearman": 0.2184436370228412
+        },
+        "low_spread_valid_mean": {
+          "candidates": 64,
+          "dense_best_rank": 28,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": 0.20336918828933137,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 2,
+              "k": 4,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 3,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed2135912827:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed2135912827:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed117003261:s0.0005:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed1225314396:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": true,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 19,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed2135912827:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed117003261:s0.0005:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed1225314396:s0.0005:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed808065183:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed154116212:s0.002:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed931683830:s0.001:sign1",
+                "seed1972524579:s0.002:sign1",
+                "seed1841606524:s0.0005:sign1",
+                "seed1682333082:s0.002:sign1",
+                "seed1477013529:s0.002:sign1"
+              ]
+            }
+          ],
+          "score_key": "low_spread_valid_mean",
+          "spearman": 0.21681900578430843
+        },
+        "mean_minus_malformed": {
+          "candidates": 64,
+          "dense_best_rank": 29,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": -0.004893905009556213,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed1729064507:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed1729064507:s0.002:sign1",
+                "seed1548206410:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1729064507:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed837787327:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 2,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1729064507:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed364454685:s0.002:sign1",
+                "seed311993413:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed243384290:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 4,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1729064507:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed364454685:s0.002:sign1",
+                "seed311993413:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1251158349:s0.0005:sign1",
+                "seed1989327004:s0.001:sign1",
+                "seed1395092000:s0.002:sign1",
+                "seed1195574204:s0.002:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed1252368710:s0.002:sign1",
+                "seed199192970:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": true,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 16,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1729064507:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed364454685:s0.002:sign1",
+                "seed311993413:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1251158349:s0.0005:sign1",
+                "seed1989327004:s0.001:sign1",
+                "seed1395092000:s0.002:sign1",
+                "seed1195574204:s0.002:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed1252368710:s0.002:sign1",
+                "seed199192970:s0.001:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1686084785:s0.0005:sign1",
+                "seed1105967110:s0.002:sign1",
+                "seed1735940901:s0.001:sign1",
+                "seed1556258250:s0.001:sign1",
+                "seed1477013529:s0.002:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed147046182:s0.0005:sign1",
+                "seed1081082032:s0.002:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed931683830:s0.001:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed976484927:s0.002:sign1"
+              ]
+            }
+          ],
+          "score_key": "mean_minus_malformed",
+          "spearman": 0.007894653033059649
+        },
+        "proposal_exact": {
+          "candidates": 64,
+          "dense_best_rank": 33,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": 0.03172877450710859,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 1,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1489214902:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 16,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed1729064507:s0.002:sign1",
+                "seed1686084785:s0.0005:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed147046182:s0.0005:sign1",
+                "seed1225314396:s0.0005:sign1",
+                "seed1171715071:s0.001:sign1",
+                "seed1105967110:s0.002:sign1",
+                "seed1012140481:s0.001:sign1"
+              ]
+            }
+          ],
+          "score_key": "proposal_exact",
+          "spearman": 0.07151685611169337
+        },
+        "reordered_exact": {
+          "candidates": 64,
+          "dense_best_rank": 34,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": -0.10628856973139204,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed837787327:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 8,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 4,
+              "k": 16,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1171715071:s0.001:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed364454685:s0.002:sign1",
+                "seed348810271:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 17,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1171715071:s0.001:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed364454685:s0.002:sign1",
+                "seed348810271:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed199192970:s0.001:sign1",
+                "seed1919145344:s0.001:sign1",
+                "seed1729064507:s0.002:sign1",
+                "seed1686084785:s0.0005:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed147046182:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed1112709546:s0.002:sign1",
+                "seed1105967110:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed987894309:s0.001:sign1"
+              ]
+            }
+          ],
+          "score_key": "reordered_exact",
+          "spearman": -0.03813098512301293
+        },
+        "valid_max_lift": {
+          "candidates": 64,
+          "dense_best_rank": 34,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": -0.11507152645919216,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed837787327:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 8,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 4,
+              "k": 16,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1171715071:s0.001:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed364454685:s0.002:sign1",
+                "seed348810271:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 17,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1920188830:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1171715071:s0.001:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed364454685:s0.002:sign1",
+                "seed348810271:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed199192970:s0.001:sign1",
+                "seed1919145344:s0.001:sign1",
+                "seed1729064507:s0.002:sign1",
+                "seed1686084785:s0.0005:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed147046182:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed1112709546:s0.002:sign1",
+                "seed1105967110:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed987894309:s0.001:sign1"
+              ]
+            }
+          ],
+          "score_key": "valid_max_lift",
+          "spearman": -0.04775106211188741
+        },
+        "valid_mean_exact": {
+          "candidates": 64,
+          "dense_best_rank": 33,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": 0.03172877450710859,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 1,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1489214902:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 16,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed1729064507:s0.002:sign1",
+                "seed1686084785:s0.0005:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed147046182:s0.0005:sign1",
+                "seed1225314396:s0.0005:sign1",
+                "seed1171715071:s0.001:sign1",
+                "seed1105967110:s0.002:sign1",
+                "seed1012140481:s0.001:sign1"
+              ]
+            }
+          ],
+          "score_key": "valid_mean_exact",
+          "spearman": 0.07151685611169337
+        },
+        "valid_mean_lift": {
+          "candidates": 64,
+          "dense_best_rank": 33,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": 0.03172877450710859,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.046875,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.046875,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.03125,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.0625,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 1,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 5,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1489214902:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 16,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed246147040:s0.002:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1278353962:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed1729064507:s0.002:sign1",
+                "seed1686084785:s0.0005:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed147046182:s0.0005:sign1",
+                "seed1225314396:s0.0005:sign1",
+                "seed1171715071:s0.001:sign1",
+                "seed1105967110:s0.002:sign1",
+                "seed1012140481:s0.001:sign1"
+              ]
+            }
+          ],
+          "score_key": "valid_mean_lift",
+          "spearman": 0.07151685611169337
+        },
+        "valid_min_lift": {
+          "candidates": 64,
+          "dense_best_rank": 26,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": 0.16326559546193128,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 4,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 3,
+              "k": 8,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 7,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2135912827:s0.002:sign1",
+                "seed2091464267:s0.0005:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": true,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 19,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed1278353962:s0.001:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed246147040:s0.002:sign1",
+                "seed1306350613:s0.0005:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1019436086:s0.0005:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed976484927:s0.002:sign1",
+                "seed62519474:s0.0005:sign1",
+                "seed618254012:s0.001:sign1",
+                "seed576868863:s0.0005:sign1",
+                "seed379122577:s0.001:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed243384290:s0.001:sign1",
+                "seed2135912827:s0.002:sign1",
+                "seed2091464267:s0.0005:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1225314396:s0.0005:sign1",
+                "seed117003261:s0.0005:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1062333723:s0.0005:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed931683830:s0.001:sign1",
+                "seed808065183:s0.002:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed1972524579:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1841606524:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "valid_min_lift",
+          "spearman": 0.1811329364343035
+        },
+        "xml_exact": {
+          "candidates": 64,
+          "dense_best_rank": 13,
+          "dense_best_score": 0.09375,
+          "dense_best_spec": "seed931683830:s0.001:sign1",
+          "pearson": 0.14896760300993922,
+          "rows": [
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 1,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed976484927:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 2,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed976484927:s0.002:sign1",
+                "seed472897520:s0.001:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 0,
+              "k": 4,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed976484927:s0.002:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed837787327:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": false,
+              "dense_regret": 0.015625,
+              "dense_topk_overlap": 1,
+              "k": 8,
+              "selected_best_dense": 0.078125,
+              "selected_specs": [
+                "seed976484927:s0.002:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed348810271:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1252368710:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": true,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 6,
+              "k": 16,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed976484927:s0.002:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed348810271:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1252368710:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed931683830:s0.001:sign1",
+                "seed364454685:s0.002:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed236815619:s0.002:sign1"
+              ]
+            },
+            {
+              "contains_dense_best": true,
+              "dense_regret": 0.0,
+              "dense_topk_overlap": 17,
+              "k": 32,
+              "selected_best_dense": 0.09375,
+              "selected_specs": [
+                "seed976484927:s0.002:sign1",
+                "seed472897520:s0.001:sign1",
+                "seed1491988516:s0.001:sign1",
+                "seed837787327:s0.002:sign1",
+                "seed348810271:s0.002:sign1",
+                "seed1924852974:s0.001:sign1",
+                "seed1920188830:s0.002:sign1",
+                "seed1252368710:s0.002:sign1",
+                "seed1091126466:s0.001:sign1",
+                "seed1018167784:s0.001:sign1",
+                "seed1012140481:s0.001:sign1",
+                "seed987894309:s0.001:sign1",
+                "seed931683830:s0.001:sign1",
+                "seed364454685:s0.002:sign1",
+                "seed320056936:s0.0005:sign1",
+                "seed236815619:s0.002:sign1",
+                "seed2072422341:s0.001:sign1",
+                "seed199192970:s0.001:sign1",
+                "seed1989327004:s0.001:sign1",
+                "seed1972524579:s0.002:sign1",
+                "seed1686084785:s0.0005:sign1",
+                "seed1602141324:s0.002:sign1",
+                "seed1559858878:s0.002:sign1",
+                "seed1548206410:s0.002:sign1",
+                "seed1548096458:s0.001:sign1",
+                "seed1489214902:s0.002:sign1",
+                "seed1318822822:s0.002:sign1",
+                "seed1090660478:s0.001:sign1",
+                "seed1081082032:s0.002:sign1",
+                "seed990718095:s0.002:sign1",
+                "seed808065183:s0.002:sign1",
+                "seed576868863:s0.0005:sign1"
+              ]
+            }
+          ],
+          "score_key": "xml_exact",
+          "spearman": 0.11816453158775303
+        }
+      }
+    }
+  },
+  "runs": [
+    "results/qproj_c2_vllm_shortlist_p64",
+    "results/qproj_c2_vllm_shortlist_p64_seed20260508"
+  ],
+  "select_k": 8,
+  "verdict": {
+    "fixed_selector_pass_count": 0,
+    "fixed_selector_recovers_dense_best_all_folds": false,
+    "fold_count": 2,
+    "interpretation": "A selector calibration is promising only if a rule chosen on training runs recovers the dense best within the configured k on every held-out run.",
+    "linear_pass_count": 0,
+    "linear_recovers_dense_best_all_folds": false,
+    "pass": false
+  }
+}
