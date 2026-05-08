@@ -41,7 +41,7 @@ def write_run(
     )
 
 
-def test_write_shortlist_sorts_by_score_then_candidate_key(tmp_path: Path):
+def test_write_shortlist_sorts_by_score(tmp_path: Path):
     run = tmp_path / "proposal"
     write_run(run, "sparse_low_rank_lora_d0p125", [0.1, 0.3, 0.2])
 
@@ -52,6 +52,28 @@ def test_write_shortlist_sorts_by_score_then_candidate_key(tmp_path: Path):
     assert [row["candidate"] for row in rows] == [
         "sparse_low_rank_lora_d0p125:seed2:s0.001:sign1",
         "sparse_low_rank_lora_d0p125:seed3:s0.001:sign1",
+    ]
+
+
+def test_write_shortlist_preserves_adapter_order_for_score_ties(tmp_path: Path):
+    run = tmp_path / "proposal"
+    write_json(run / "summary.json", {"population": 3, "candidate_sec": 1.0})
+    write_jsonl(
+        run / "candidate_summary.jsonl",
+        [
+            {"candidate": "family:seed3:s0.001:sign1", "exact_mean": 0.1, "adapter_index": 0},
+            {"candidate": "family:seed2:s0.001:sign1", "exact_mean": 0.1, "adapter_index": 1},
+            {"candidate": "family:seed1:s0.001:sign1", "exact_mean": 0.1, "adapter_index": 2},
+        ],
+    )
+
+    write_shortlist(run, tmp_path / "shortlist.jsonl", k=3)
+
+    rows = [json.loads(line) for line in (tmp_path / "shortlist.jsonl").read_text().splitlines()]
+    assert [row["candidate"] for row in rows] == [
+        "family:seed3:s0.001:sign1",
+        "family:seed2:s0.001:sign1",
+        "family:seed1:s0.001:sign1",
     ]
 
 

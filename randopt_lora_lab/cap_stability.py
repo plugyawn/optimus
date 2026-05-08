@@ -48,9 +48,10 @@ def evaluate_with_prompt_fn(
     cap_hits = []
     answer_closed = []
     output_token_counts = []
-    for ex, text, output_tokens in zip(examples, result.texts, result.token_counts):
+    raw_token_counts = result.raw_token_counts or result.token_counts
+    for ex, text, output_tokens, raw_output_tokens in zip(examples, result.texts, result.token_counts, raw_token_counts):
         score = score_completion(text, ex)
-        cap_hit = float(output_tokens >= backend.max_new_tokens)
+        cap_hit = float(raw_output_tokens >= backend.max_new_tokens)
         closed = float("</answer>" in text)
         exact.append(score["exact"])
         malformed.append(float(score["malformed"]))
@@ -65,6 +66,8 @@ def evaluate_with_prompt_fn(
                 "target": ex.target,
                 "text": text,
                 "output_tokens": int(output_tokens),
+                "raw_output_tokens": int(raw_output_tokens),
+                "hidden_after_answer_tokens": max(int(raw_output_tokens) - int(output_tokens), 0),
                 "cap_hit": cap_hit,
                 "answer_closed": closed,
                 **score,
@@ -77,6 +80,7 @@ def evaluate_with_prompt_fn(
         "cap_hit_mean": float(np.mean(cap_hits)),
         "answer_closed_mean": float(np.mean(answer_closed)),
         "output_tokens": int(result.output_tokens),
+        "raw_output_tokens": int(result.raw_output_tokens if result.raw_output_tokens is not None else result.output_tokens),
         "output_token_mean": float(np.mean(output_token_counts)),
         "output_token_p95": float(np.quantile(output_token_counts, 0.95)),
         "elapsed_s": float(result.elapsed_s),
@@ -99,6 +103,7 @@ def metric_row(ev: dict, *, cap: int, prompt_variant: str, split: str, candidate
             "cap_hit_mean": ev["cap_hit_mean"],
             "answer_closed_mean": ev["answer_closed_mean"],
             "output_tokens": ev["output_tokens"],
+            "raw_output_tokens": ev.get("raw_output_tokens"),
             "output_token_mean": ev["output_token_mean"],
             "output_token_p95": ev["output_token_p95"],
             "elapsed_s": ev["elapsed_s"],

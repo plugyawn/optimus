@@ -12,8 +12,22 @@ def candidate_key(row: dict) -> str:
     return str(row["candidate"])
 
 
+def _stable_index(row: dict, fallback: int) -> int:
+    for key in ("adapter_index", "index", "rank"):
+        if key in row:
+            return int(row[key])
+    return fallback
+
+
 def sorted_rows(rows: list[dict], score_col: str) -> list[dict]:
-    return sorted(rows, key=lambda row: (score(row, score_col), candidate_key(row)), reverse=True)
+    indexed = list(enumerate(rows))
+    return [
+        row
+        for fallback, row in sorted(
+            indexed,
+            key=lambda item: (-score(item[1], score_col), _stable_index(item[1], item[0]), candidate_key(item[1])),
+        )
+    ]
 
 
 def write_shortlist(run_dir: Path, out: Path, *, k: int, score_col: str = "exact_mean") -> dict:

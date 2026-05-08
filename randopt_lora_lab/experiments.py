@@ -65,11 +65,12 @@ def evaluate_candidate(backend, candidate: Candidate | None, examples, args, fam
     malformed = []
     cap_hits = []
     answer_closed = []
-    for ex, text, output_tokens in zip(examples, result.texts, result.token_counts):
+    raw_token_counts = result.raw_token_counts or result.token_counts
+    for ex, text, output_tokens, raw_output_tokens in zip(examples, result.texts, result.token_counts, raw_token_counts):
         score = score_completion(text, ex)
         exact.append(score["exact"])
         malformed.append(float(score["malformed"]))
-        cap_hit = float(output_tokens >= backend.max_new_tokens)
+        cap_hit = float(raw_output_tokens >= backend.max_new_tokens)
         closed = float("</answer>" in text)
         cap_hits.append(cap_hit)
         answer_closed.append(closed)
@@ -81,6 +82,8 @@ def evaluate_candidate(backend, candidate: Candidate | None, examples, args, fam
                 "target": ex.target,
                 "text": text,
                 "output_tokens": output_tokens,
+                "raw_output_tokens": raw_output_tokens,
+                "hidden_after_answer_tokens": max(int(raw_output_tokens) - int(output_tokens), 0),
                 "cap_hit": cap_hit,
                 "answer_closed": closed,
                 **score,
@@ -93,6 +96,7 @@ def evaluate_candidate(backend, candidate: Candidate | None, examples, args, fam
         "cap_hit_mean": float(np.mean(cap_hits)),
         "answer_closed_mean": float(np.mean(answer_closed)),
         "output_tokens": result.output_tokens,
+        "raw_output_tokens": result.raw_output_tokens if result.raw_output_tokens is not None else result.output_tokens,
         "elapsed_s": result.elapsed_s,
         "mutation_s": mutation_s,
         "rows": rows,
