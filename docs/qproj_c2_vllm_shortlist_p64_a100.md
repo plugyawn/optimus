@@ -108,6 +108,60 @@ aligned enough with the trusted PEFT screen. The top vLLM proposal score was
 only 1.5625% under the robust selection score, while PEFT confirmed several of
 those shortlisted candidates at 7.8125% screen exact.
 
+## Alignment Audit
+
+After the run, `randopt_lora_lab.shortlist_alignment_audit` was added to split
+the failure into dense-family mismatch, prompt-variant mismatch, and backend
+drift. The audit result is:
+
+```text
+out: results/qproj_c2_vllm_shortlist_p64/shortlist_alignment_audit
+```
+
+The dense-vs-vLLM proposal scores do not agree over the full P64 panel:
+
+| comparison | common | Spearman | mean abs delta |
+| --- | ---: | ---: | ---: |
+| dense exact vs vLLM selection score | 64 | 0.003 | 0.0886 |
+| dense exact vs vLLM exact mean | 64 | -0.027 | 0.0264 |
+| dense exact vs vLLM default exact | 64 | 0.140 | 0.0146 |
+| dense exact vs vLLM reordered exact | 64 | -0.247 | 0.0464 |
+
+This is not a small top-k accident. Dense's best candidate spec was ranked
+`60/64` by vLLM robust selection and `64/64` by vLLM default exact:
+
+```text
+dense best spec: seed1267011527:s0.002:sign1
+dense score: 10.9375%
+vLLM selection rank: 60
+vLLM default-exact rank: 64
+```
+
+On the eight PEFT-confirmed shortlisted candidates, default-prompt vLLM was
+only weakly aligned with PEFT, and the reordered prompt was anti-aligned:
+
+| comparison | common | Spearman | mean abs delta |
+| --- | ---: | ---: | ---: |
+| PEFT exact vs vLLM selection score | 8 | 0.060 | 0.0518 |
+| PEFT exact vs vLLM proposal exact | 8 | 0.060 | 0.0264 |
+| PEFT exact vs vLLM default exact | 8 | 0.357 | 0.0156 |
+| PEFT exact vs vLLM reordered exact | 8 | -0.535 | 0.0410 |
+
+The default backend disagreement is not catastrophic row-by-row, but it is large
+enough to break ranking:
+
+```text
+default vLLM-vs-PEFT common rows: 512
+exact-label agreement: 96.4844%
+text equality: 63.6719%
+vLLM exact mean: 7.4219%
+PEFT exact mean: 6.25%
+```
+
+The prompt-robust selector is therefore doing the wrong thing for this backend:
+the reordered condition changes the candidate ordering substantially, and the
+vLLM/PEFT default condition is not rank-stable enough to repair it.
+
 ## Verdict
 
 This run supports only the systems half of the claim:
@@ -124,6 +178,7 @@ Not supported:
 ```
 
 The next highest-leverage fix is not to scale P. It is to debug ranking
-alignment: compare PEFT and vLLM outputs for the same q-only candidates across
-the same prompt variants, then select using a PEFT-calibrated proposal score or
-increase shortlist size only if the dense-best recall curve justifies it.
+alignment: use PEFT-calibrated prompt conditions for shortlist scoring, and do
+not include prompt variants whose vLLM rankings are anti-aligned with PEFT. A
+larger shortlist is not justified by this run alone because dense-best recall
+would still have needed `k > 32` under the current vLLM selection score.
