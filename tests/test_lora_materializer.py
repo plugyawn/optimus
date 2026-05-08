@@ -10,6 +10,8 @@ from randopt_lora_lab.dense_space import dense_noise_tensor
 from randopt_lora_lab.gaussian_parity import best_rank_projection, lora_update
 from randopt_lora_lab.lora_space import (
     Candidate,
+    activation_spectral_scale,
+    activation_spectral_uses_singular_values,
     canonical_module_name,
     lora_noise_tensors,
     sparse_lora_density,
@@ -108,6 +110,106 @@ class LoraMaterializerTests(unittest.TestCase):
 
         self.assertEqual(spectral_projected_scale(scaled.family), 2.0)
         self.assertGreater(torch.linalg.norm(lora_update(a_scaled, b_scaled)), torch.linalg.norm(lora_update(a_base, b_base)))
+
+    def test_activation_spectral_lora_uses_activation_basis(self):
+        rank = 3
+        module = "base_model.model.model.layers.0.self_attn.q_proj"
+        candidate = Candidate("activation_spectral_lora_c2", seed=456, sigma=0.01, sign=1)
+        basis = torch.eye(8)[:rank].contiguous()
+
+        a1, b1 = lora_noise_tensors(
+            module,
+            (rank, 8),
+            (7, rank),
+            candidate,
+            rank,
+            family_state={module: basis},
+            state_key=module,
+        )
+        a2, b2 = lora_noise_tensors(
+            module,
+            (rank, 8),
+            (7, rank),
+            candidate,
+            rank,
+            family_state={module: basis},
+            state_key=module,
+        )
+        update = lora_update(a1.double(), b1.double())
+
+        self.assertEqual(activation_spectral_scale(candidate.family), 2.0)
+        self.assertEqual(tuple(a1.shape), (rank, 8))
+        self.assertEqual(tuple(b1.shape), (7, rank))
+        self.assertTrue(torch.equal(a1, a2))
+        self.assertTrue(torch.equal(b1, b2))
+        self.assertLessEqual(int(torch.linalg.matrix_rank(update, atol=1e-6).item()), rank)
+        self.assertTrue(torch.isfinite(update).all())
+        self.assertTrue(torch.allclose(a1[:, rank:], torch.zeros_like(a1[:, rank:])))
+
+    def test_activation_spectral_lora_requires_state(self):
+        candidate = Candidate("activation_spectral_lora", seed=456, sigma=0.01, sign=1)
+        with self.assertRaisesRegex(ValueError, "requires an activation basis"):
+            lora_noise_tensors("model.layers.0.self_attn.q_proj", (3, 8), (7, 3), candidate, 3)
+
+    def test_activation_spectral_adapter_materialization_uses_peft_state_key(self):
+        candidate = Candidate("activation_spectral_lora", seed=456, sigma=0.01, sign=1)
+        rank = 3
+        hidden = 8
+        module = "model.layers.0.self_attn.q_proj"
+        peft_module = f"base_model.model.{module}"
+        family_state = {peft_module: torch.eye(hidden)[:rank].contiguous()}
+        config = types.SimpleNamespace(
+            hidden_size=hidden,
+            intermediate_size=16,
+            num_hidden_layers=1,
+            num_attention_heads=2,
+            num_key_value_heads=2,
+        )
+        expected_a, expected_b = lora_noise_tensors(
+            module,
+            (rank, hidden),
+            (hidden, rank),
+            candidate,
+            rank,
+            family_state=family_state,
+            state_key=module,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            save_seed_adapter(
+                Path(tmp),
+                model="Qwen/Qwen2.5-3B-Instruct",
+                candidate=candidate,
+                rank=rank,
+                targets=["q_proj"],
+                config=config,
+                tensor_dtype="float32",
+                family_state=family_state,
+            )
+            tensors = load_file(str(Path(tmp) / "adapter_model.safetensors"))
+        prefix = f"base_model.model.{module}"
+        self.assertTrue(torch.equal(tensors[f"{prefix}.lora_A.weight"], expected_a))
+        self.assertTrue(torch.equal(tensors[f"{prefix}.lora_B.weight"], expected_b))
+
+    def test_activation_spectral_sv_uses_singular_value_weights(self):
+        rank = 3
+        module = "model.layers.0.self_attn.q_proj"
+        basis = torch.eye(8)[:rank].contiguous()
+        family_state = {
+            module: {
+                "basis": basis,
+                "singular_values": torch.tensor([9.0, 4.0, 1.0]),
+            }
+        }
+        flat = Candidate("activation_spectral_lora", seed=456, sigma=0.01, sign=1)
+        weighted = Candidate("activation_spectral_lora_sv", seed=456, sigma=0.01, sign=1)
+
+        flat_a, _ = lora_noise_tensors(module, (rank, 8), (7, rank), flat, rank, family_state=family_state)
+        weighted_a, _ = lora_noise_tensors(module, (rank, 8), (7, rank), weighted, rank, family_state=family_state)
+
+        self.assertFalse(activation_spectral_uses_singular_values(flat.family))
+        self.assertTrue(activation_spectral_uses_singular_values(weighted.family))
+        self.assertTrue(torch.allclose(flat_a.norm(dim=1), flat_a.norm(dim=1).mean().expand(rank)))
+        self.assertGreater(float(weighted_a.norm(dim=1).max() - weighted_a.norm(dim=1).min()), 0.0)
 
     def test_sparse_low_rank_lora_materializes_sparse_scaled_factors(self):
         candidate = Candidate("sparse_low_rank_lora_d0p25", seed=789, sigma=0.01, sign=1)

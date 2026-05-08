@@ -134,6 +134,7 @@ def save_seed_adapter(
     targets: list[str],
     config,
     tensor_dtype: str,
+    family_state: dict | None = None,
 ) -> None:
     import torch
     from safetensors.torch import save_file
@@ -151,6 +152,8 @@ def save_seed_adapter(
             (out_features, rank),
             candidate,
             rank,
+            family_state=family_state,
+            state_key=module,
         )
         prefix = f"base_model.model.{module}"
         tensors[f"{prefix}.lora_A.weight"] = a.to(dtype).contiguous()

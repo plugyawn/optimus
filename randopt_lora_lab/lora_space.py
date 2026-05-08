@@ -63,6 +63,87 @@ def spectral_projected_scale(family: str) -> float:
     return scale
 
 
+def activation_spectral_scale(family: str) -> float:
+    if family in {"activation_spectral_lora", "activation_spectral_lora_sv"}:
+        return 1.0
+    match = re.fullmatch(r"activation_spectral_lora(?:_sv)?_c([0-9]+(?:p[0-9]+)?)", family)
+    if not match:
+        raise ValueError(f"not an activation spectral LoRA family: {family}")
+    scale = float(match.group(1).replace("p", "."))
+    if scale <= 0.0:
+        raise ValueError(f"activation spectral scale must be positive, got {scale}")
+    return scale
+
+
+def activation_spectral_uses_singular_values(family: str) -> bool:
+    return family.startswith("activation_spectral_lora_sv")
+
+
+def activation_spectral_lora_factors(
+    module_name: str,
+    out_features: int,
+    in_features: int,
+    rank: int,
+    basis: torch.Tensor,
+    candidate: Candidate,
+    singular_values: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Use task/anchor activation right-singular vectors as LoRA A directions."""
+
+    if basis.ndim != 2:
+        raise ValueError(f"activation basis for {module_name} must be 2D, got shape {tuple(basis.shape)}")
+    if rank < 0:
+        raise ValueError("rank must be nonnegative")
+    if rank == 0:
+        return torch.zeros((0, in_features), dtype=torch.float32), torch.zeros((out_features, 0), dtype=torch.float32)
+    k = min(rank, out_features, in_features, int(basis.shape[0]), int(basis.shape[1]))
+    if k == 0:
+        return torch.zeros((rank, in_features), dtype=torch.float32), torch.zeros((out_features, rank), dtype=torch.float32)
+
+    v_rows = basis[:k, :in_features].cpu().float().contiguous()
+    # Re-orthogonalize after truncation/padding so singular scales are meaningful.
+    v, _ = torch.linalg.qr(v_rows.T, mode="reduced")
+    v_rows = v[:, :k].T.contiguous()
+
+    canonical_name = canonical_module_name(module_name)
+    gen_u = torch.Generator(device="cpu")
+    gen_u.manual_seed((candidate.seed + stable_int(canonical_name + ":activation_spectral_left")) % (2**63 - 1))
+    u_raw = torch.randn((out_features, k), generator=gen_u, dtype=torch.float32)
+    u, _ = torch.linalg.qr(u_raw, mode="reduced")
+
+    scale = activation_spectral_scale(candidate.family)
+    edge = abs(float(candidate.sigma)) * scale * (math.sqrt(float(out_features)) + math.sqrt(float(in_features)))
+    singulars = torch.full((k,), edge, dtype=torch.float32)
+    if activation_spectral_uses_singular_values(candidate.family) and singular_values is not None:
+        values = singular_values[:k].cpu().float().abs()
+        if values.shape[0] < k:
+            values = F.pad(values, (0, k - values.shape[0]), value=0.0)
+        if bool(torch.isfinite(values).all()) and float(values.sum().item()) > 0.0:
+            weights = torch.sqrt(values.clamp_min(1e-12) / values.mean().clamp_min(1e-12))
+            weights = weights.clamp(0.25, 4.0)
+            singulars = edge * weights / weights.mean().clamp_min(1e-12)
+    root_s = torch.sqrt(singulars)
+    b = float(candidate.sign) * u[:, :k] * root_s.unsqueeze(0)
+    a = root_s.unsqueeze(1) * v_rows
+    if k < rank:
+        a = torch.cat([a, torch.zeros((rank - k, in_features), dtype=a.dtype)], dim=0)
+        b = torch.cat([b, torch.zeros((out_features, rank - k), dtype=b.dtype)], dim=1)
+    return a.contiguous(), b.contiguous()
+
+
+def lookup_family_state_spec(family_state: dict | None, lookup_key: str, canonical_name: str):
+    if not family_state:
+        return None
+    if lookup_key in family_state:
+        return family_state[lookup_key]
+    if canonical_name in family_state:
+        return family_state[canonical_name]
+    for key, value in family_state.items():
+        if canonical_module_name(str(key)) == canonical_name:
+            return value
+    return None
+
+
 def lora_noise_tensors(
     module_name: str,
     a_shape: torch.Size | tuple[int, ...],
@@ -83,8 +164,9 @@ def lora_noise_tensors(
     family_state = family_state or {}
     canonical_name = canonical_module_name(module_name)
     lookup_key = state_key or module_name
-    if lookup_key in family_state and isinstance(family_state[lookup_key], dict):
-        spec = family_state[lookup_key]
+    family_spec = lookup_family_state_spec(family_state, lookup_key, canonical_name)
+    if isinstance(family_spec, dict):
+        spec = family_spec
         if "fixed_a" in spec and "fixed_b" in spec:
             return spec["fixed_a"].cpu().float().contiguous(), spec["fixed_b"].cpu().float().contiguous()
     if candidate.family == "projected_gaussian_rank_r":
@@ -112,6 +194,22 @@ def lora_noise_tensors(
             seed=spectral_seed,
             dtype=torch.float32,
         )
+    if candidate.family.startswith("activation_spectral_lora"):
+        if family_spec is None:
+            raise ValueError(f"{candidate.family} requires an activation basis for {lookup_key}")
+        basis = family_spec.get("basis") if isinstance(family_spec, dict) else family_spec
+        singular_values = family_spec.get("singular_values") if isinstance(family_spec, dict) else None
+        if basis is None:
+            raise ValueError(f"{candidate.family} requires a non-empty activation basis for {lookup_key}")
+        return activation_spectral_lora_factors(
+            canonical_name,
+            int(b_shape[0]),
+            int(a_shape[1]),
+            rank,
+            basis,
+            candidate,
+            singular_values=singular_values,
+        )
     gen = torch.Generator(device="cpu")
     gen.manual_seed((candidate.seed + stable_int(canonical_name)) % (2**63 - 1))
     a_noise = torch.randn(tuple(a_shape), generator=gen, dtype=torch.float32)
@@ -124,13 +222,14 @@ def lora_noise_tensors(
         scale = math.sqrt(sparse_density)
         a_noise = a_noise * a_mask / scale
         b_noise = b_noise * b_mask / scale
-    if candidate.family in {"anzo", "target_svd", "random_ortho", "anzo_random_target"} and lookup_key in family_state:
-        basis = family_state[lookup_key].cpu().float()
+    if candidate.family in {"anzo", "target_svd", "random_ortho", "anzo_random_target"} and family_spec is not None:
+        basis = family_spec.get("basis") if isinstance(family_spec, dict) else family_spec
+        basis = basis.cpu().float()
         rows = min(a_noise.shape[0], basis.shape[0])
         cols = min(a_noise.shape[1], basis.shape[1])
         a_noise[:rows, :cols] = basis[:rows, :cols]
-    elif lookup_key in family_state and isinstance(family_state[lookup_key], dict):
-        spec = family_state[lookup_key]
+    elif isinstance(family_spec, dict):
+        spec = family_spec
         mode = spec.get("mode", "elite_basis")
         if "col_scale" in spec:
             col_scale = spec["col_scale"].cpu().float()
@@ -206,6 +305,7 @@ def build_anzo_state(
     rank: int,
     *,
     subtract_anchor: bool = True,
+    return_metadata: bool = False,
 ) -> dict:
     """Build a cheap target-active/anchor-quiet input basis for LoRA A matrices.
 
@@ -264,11 +364,23 @@ def build_anzo_state(
             _, _, vh_a = torch.linalg.svd(anchor, full_matrices=False)
             anchor_basis = vh_a[:q].T
             target = target - (target @ anchor_basis) @ anchor_basis.T
-        _, _, vh_t = torch.linalg.svd(target, full_matrices=False)
+        _, singular_values, vh_t = torch.linalg.svd(target, full_matrices=False)
         basis = vh_t[:rank]
         if basis.shape[0] < rank:
             basis = F.pad(basis, (0, 0, 0, rank - basis.shape[0]))
-        state[name] = basis.contiguous()
+        if singular_values.shape[0] < rank:
+            singular_values = F.pad(singular_values, (0, rank - singular_values.shape[0]))
+        if return_metadata:
+            state[name] = {
+                "basis": basis.contiguous(),
+                "singular_values": singular_values[:rank].contiguous(),
+                "anchor_rank": int(q),
+                "subtract_anchor": bool(subtract_anchor),
+                "target_rows": int(target.shape[0]),
+                "anchor_rows": int(anchor.shape[0]),
+            }
+        else:
+            state[name] = basis.contiguous()
     return state
 
 

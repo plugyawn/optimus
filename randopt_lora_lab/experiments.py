@@ -346,6 +346,13 @@ def maybe_build_family_state(args, backend, screen):
         return None
     if args.family.startswith("sparse_low_rank_lora"):
         return None
+    if args.family.startswith("activation_spectral_lora_sv"):
+        return backend.build_activation_spectral_state(
+            make_prompts_for_backend(backend, args, screen[: min(16, len(screen))]),
+            anzo_anchor_prompts(),
+        )
+    if args.family.startswith("activation_spectral_lora"):
+        return backend.build_anzo_state(make_prompts_for_backend(backend, args, screen[: min(16, len(screen))]), anzo_anchor_prompts())
     if args.family == "random_ortho":
         return backend.build_random_orthonormal_state(args.seed)
     if args.family == "target_svd":
@@ -680,6 +687,19 @@ def main():
                 "spectral_projected_gaussian_rank_r_c1p25",
                 "spectral_projected_gaussian_rank_r_c1p5",
                 "spectral_projected_gaussian_rank_r_c2",
+                "activation_spectral_lora",
+                "activation_spectral_lora_c0p5",
+                "activation_spectral_lora_c0p75",
+                "activation_spectral_lora_c1p25",
+                "activation_spectral_lora_c1p5",
+                "activation_spectral_lora_c2",
+                "activation_spectral_lora_c3",
+                "activation_spectral_lora_c4",
+                "activation_spectral_lora_sv",
+                "activation_spectral_lora_sv_c0p75",
+                "activation_spectral_lora_sv_c1p25",
+                "activation_spectral_lora_sv_c1p5",
+                "activation_spectral_lora_sv_c2",
                 "sparse_low_rank_lora",
                 "sparse_low_rank_lora_d0p125",
                 "sparse_low_rank_lora_d0p25",

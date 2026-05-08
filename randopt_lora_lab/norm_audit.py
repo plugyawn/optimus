@@ -97,7 +97,24 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--family",
         default="isotropic",
-        choices=["isotropic", "anzo", "target_svd", "random_ortho", "anzo_random_target"],
+        choices=[
+            "isotropic",
+            "anzo",
+            "target_svd",
+            "random_ortho",
+            "anzo_random_target",
+            "activation_spectral_lora",
+            "activation_spectral_lora_c0p5",
+            "activation_spectral_lora_c0p75",
+            "activation_spectral_lora_c1p25",
+            "activation_spectral_lora_c1p5",
+            "activation_spectral_lora_c2",
+            "activation_spectral_lora_sv",
+            "activation_spectral_lora_sv_c0p75",
+            "activation_spectral_lora_sv_c1p25",
+            "activation_spectral_lora_sv_c1p5",
+            "activation_spectral_lora_sv_c2",
+        ],
     )
     p.add_argument("--antithetic", action="store_true")
     p.add_argument("--allow-repeat-data", action="store_true")

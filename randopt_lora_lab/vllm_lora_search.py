@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import os
 import platform
@@ -16,7 +17,7 @@ import numpy as np
 
 from .backend_contract import backend_contract, vllm_tokenizer_contract
 from .countdown import load_examples, unique_example_count, unique_semantic_example_count
-from .experiments import ensemble_ks_from_values, majority_vote_evaluation, parse_float_list, parse_ratio_list
+from .experiments import anzo_anchor_prompts, ensemble_ks_from_values, majority_vote_evaluation, parse_float_list, parse_ratio_list
 from .prompt_variants import make_variant_prompts
 from .selection_score import (
     combine_candidate_conditions,
@@ -96,7 +97,14 @@ def safe_name(candidate: Candidate) -> str:
     return f"randopt_seed{candidate.seed}_s{candidate.sigma:g}_{sign}"
 
 
-def make_adapter_specs(args, out: Path, targets: list[str], candidates: list[Candidate]) -> list[AdapterSpec]:
+def make_adapter_specs(
+    args,
+    out: Path,
+    targets: list[str],
+    candidates: list[Candidate],
+    *,
+    family_state: dict | None = None,
+) -> list[AdapterSpec]:
     from transformers import AutoConfig
 
     config = AutoConfig.from_pretrained(
@@ -124,6 +132,7 @@ def make_adapter_specs(args, out: Path, targets: list[str], candidates: list[Can
             targets=targets,
             config=config,
             tensor_dtype=args.adapter_dtype,
+            family_state=family_state,
         )
         specs.append(
             AdapterSpec(
@@ -138,6 +147,65 @@ def make_adapter_specs(args, out: Path, targets: list[str], candidates: list[Can
             )
         )
     return specs
+
+
+def build_activation_family_state(args, out: Path, screen, prompt_variants: list[str]) -> dict | None:
+    if not args.family.startswith("activation_spectral_lora"):
+        return None
+
+    import torch
+
+    from .backends import TransformersLoraBackend
+
+    state_start = time.time()
+    backend = TransformersLoraBackend(
+        args.model,
+        rank=args.rank,
+        target_suffixes=tuple(args.targets.split(",")),
+        max_new_tokens=args.max_new_tokens,
+        batch_size=args.activation_state_batch_size,
+        dtype="bf16" if args.dtype in {"bfloat16", "bf16"} else "fp16",
+        stop_at_answer=args.stop_at_answer,
+    )
+    target_examples = screen[: min(args.activation_state_prompts, len(screen))]
+    target_prompts = []
+    for variant in prompt_variants:
+        target_prompts.extend(
+            make_variant_prompts(
+                target_examples,
+                variant,
+                tokenizer=backend.tokenizer,
+                use_chat_template=args.use_chat_template,
+            )
+        )
+    build_state = backend.build_activation_spectral_state if args.family.startswith("activation_spectral_lora_sv") else backend.build_anzo_state
+    family_state = build_state(
+        target_prompts,
+        anzo_anchor_prompts(),
+        subtract_anchor=not args.activation_state_no_anchor_subtract,
+    )
+    state_s = time.time() - state_start
+    torch.save(family_state, out / "family_state.pt")
+    write_json(
+        out / "family_state_summary.json",
+        {
+            "kind": "activation_spectral_family_state",
+            "family": args.family,
+            "activation_state_prompts": len(target_examples),
+            "activation_state_prompt_variants": prompt_variants,
+            "activation_state_target_prompt_count": len(target_prompts),
+            "activation_state_anchor_prompt_count": len(anzo_anchor_prompts()),
+            "activation_state_no_anchor_subtract": args.activation_state_no_anchor_subtract,
+            "modules": len(family_state),
+            "rank": args.rank,
+            "elapsed_s": state_s,
+        },
+    )
+    backend.clear_candidate()
+    del backend
+    gc.collect()
+    torch.cuda.empty_cache()
+    return family_state
 
 
 def reset_outputs(out: Path) -> None:
@@ -319,8 +387,9 @@ def run_search(args) -> dict:
     else:
         candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
 
+    family_state = build_activation_family_state(args, out, screen, prompt_variants)
     adapter_start = time.time()
-    specs = make_adapter_specs(args, out, targets, candidates)
+    specs = make_adapter_specs(args, out, targets, candidates, family_state=family_state)
     adapter_build_s = time.time() - adapter_start
     write_jsonl(out / "adapters.jsonl", [asdict(spec) for spec in specs])
 
@@ -499,6 +568,7 @@ def run_search(args) -> dict:
         "family": args.family,
         "candidate_file": args.candidate_file,
         "candidate_families": sorted({candidate.family for candidate in candidates}),
+        "family_state": "family_state.pt" if family_state is not None else None,
         "population": len(specs),
         "rank": args.rank,
         "sigma": args.sigma,
@@ -631,6 +701,19 @@ def build_parser() -> argparse.ArgumentParser:
             "spectral_projected_gaussian_rank_r_c1p25",
             "spectral_projected_gaussian_rank_r_c1p5",
             "spectral_projected_gaussian_rank_r_c2",
+            "activation_spectral_lora",
+            "activation_spectral_lora_c0p5",
+            "activation_spectral_lora_c0p75",
+            "activation_spectral_lora_c1p25",
+            "activation_spectral_lora_c1p5",
+            "activation_spectral_lora_c2",
+            "activation_spectral_lora_c3",
+            "activation_spectral_lora_c4",
+            "activation_spectral_lora_sv",
+            "activation_spectral_lora_sv_c0p75",
+            "activation_spectral_lora_sv_c1p25",
+            "activation_spectral_lora_sv_c1p5",
+            "activation_spectral_lora_sv_c2",
             "sparse_low_rank_lora",
             "sparse_low_rank_lora_d0p125",
             "sparse_low_rank_lora_d0p25",
@@ -652,6 +735,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--chunk-adapters", type=int, default=32)
     p.add_argument("--adapter-dir", default=None)
     p.add_argument("--keep-adapters", action="store_true")
+    p.add_argument("--activation-state-prompts", type=int, default=16)
+    p.add_argument("--activation-state-batch-size", type=int, default=16)
+    p.add_argument("--activation-state-no-anchor-subtract", action="store_true")
     p.add_argument("--local-files-only", action="store_true")
     p.add_argument("--allow-repeat-data", action="store_true")
     return p

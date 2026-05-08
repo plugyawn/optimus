@@ -6,6 +6,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import torch
+
 from .compare_backends import compare, parse_ks, read_jsonl, write_csv
 
 
@@ -171,7 +173,6 @@ def check_adapter_tensors(
             "reason": "no sampled adapter files found",
         }
 
-    import torch
     from safetensors.torch import load_file
     from transformers import AutoConfig
 
@@ -180,6 +181,8 @@ def check_adapter_tensors(
 
     config = AutoConfig.from_pretrained(model, trust_remote_code=True, local_files_only=local_files_only)
     shapes = qwen_lora_shapes(config, targets)
+    family_state_path = candidate_dir / "family_state.pt"
+    family_state = torch.load(family_state_path, map_location="cpu") if family_state_path.exists() else None
     for spec, adapter_path in existing_specs:
         candidate = parse_candidate_key(spec["candidate"])
         tensors = load_file(str(adapter_path))
@@ -192,6 +195,8 @@ def check_adapter_tensors(
                 (out_features, rank),
                 candidate,
                 rank,
+                family_state=family_state,
+                state_key=module,
             )
             for tensor_key, expected in [(a_key, expected_a), (b_key, expected_b)]:
                 got = tensors.get(tensor_key)
