@@ -83,10 +83,20 @@ def analyze(
     reference_shape = by_name[reference_target]
     reference_ratio = flat_spectral_lora_dense_ratio(scale=reference_scale, rank=rank, shape=reference_shape)
     rows = []
+    reference_update_norm_unit_sigma = (
+        reference_scale
+        * (math.sqrt(reference_shape.out_features) + math.sqrt(reference_shape.in_features))
+        * math.sqrt(effective_rank(rank, reference_shape))
+    )
     for shape in shapes:
         same_scale_ratio = flat_spectral_lora_dense_ratio(scale=reference_scale, rank=rank, shape=shape)
         scale_match_reference = scale_for_dense_ratio(target_ratio=reference_ratio, rank=rank, shape=shape)
         scale_match_dense = scale_for_dense_ratio(target_ratio=1.0, rank=rank, shape=shape)
+        matched_update_norm_unit_sigma = (
+            scale_match_reference
+            * (math.sqrt(shape.out_features) + math.sqrt(shape.in_features))
+            * math.sqrt(effective_rank(rank, shape))
+        )
         rows.append(
             {
                 **asdict(shape),
@@ -95,10 +105,17 @@ def analyze(
                 "same_scale_lora_over_dense": same_scale_ratio,
                 "scale_for_reference_ratio": scale_match_reference,
                 "scale_for_lora_over_dense_1": scale_match_dense,
+                "matched_update_norm_unit_sigma": matched_update_norm_unit_sigma,
             }
         )
     matched_tokens = [
         f"{target_key(row['name'])}{family_float(row['scale_for_reference_ratio'])}"
+        for row in rows
+    ]
+    total_matched_update_norm = math.sqrt(sum(float(row["matched_update_norm_unit_sigma"]) ** 2 for row in rows))
+    global_budget_multiplier = reference_update_norm_unit_sigma / total_matched_update_norm
+    global_budget_tokens = [
+        f"{target_key(row['name'])}{family_float(row['scale_for_reference_ratio'] * global_budget_multiplier)}"
         for row in rows
     ]
     return {
@@ -107,9 +124,14 @@ def analyze(
         "reference_target": reference_target,
         "reference_scale": reference_scale,
         "reference_lora_over_dense": reference_ratio,
+        "reference_update_norm_unit_sigma": reference_update_norm_unit_sigma,
+        "matched_total_update_norm_unit_sigma": total_matched_update_norm,
+        "matched_total_over_reference_update_norm": total_matched_update_norm / reference_update_norm_unit_sigma,
+        "global_budget_multiplier": global_budget_multiplier,
         "shapes": [asdict(shape) for shape in shapes],
         "rows": rows,
         "matched_reference_family": "activation_spectral_lora_tscale_" + "_".join(matched_tokens),
+        "global_budget_family": "activation_spectral_lora_tscale_" + "_".join(global_budget_tokens),
     }
 
 
@@ -143,6 +165,16 @@ def render_report(summary: dict) -> str:
             "```text",
             summary["matched_reference_family"],
             "```",
+            "",
+            "Global-budget matched family:",
+            "",
+            "```text",
+            summary["global_budget_family"],
+            "```",
+            "",
+            f"Matched-reference total/update norm is `{fmt(summary['matched_total_over_reference_update_norm'])}`x "
+            "the single-reference target. The global-budget family scales all listed targets down by "
+            f"`{fmt(summary['global_budget_multiplier'])}` to keep total update Frobenius matched to the reference arm.",
             "",
             "The current flat activation-spectral rule is shape-dependent. A single c value is not a "
             "fair comparison across q/k/v/o when key/value projections have smaller output width.",

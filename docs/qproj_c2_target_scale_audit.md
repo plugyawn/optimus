@@ -53,6 +53,17 @@ The matched-reference q/k/v/o family emitted by the audit is:
 activation_spectral_lora_tscale_q2_k1p045_v1p045_o2
 ```
 
+This equalizes each target's LoRA/dense Frobenius ratio, but it does not keep
+the total update budget equal to q-only. The matched-reference q+v arm has
+`1.061x` the q-only total Frobenius; the q+k+v+o arm has `1.5x`.
+
+The audit therefore also emits global-budget-matched families:
+
+```text
+activation_spectral_lora_tscale_q1p886_v0p985
+activation_spectral_lora_tscale_q1p333_k0p697_v0p697_o1p333
+```
+
 ## Next Test
 
 The next GPU experiment should compare q-only c2 against shape-normalized mixed
@@ -67,8 +78,16 @@ q + v matched relative norm:
   family=activation_spectral_lora_tscale_q2_v1p045
   targets=q_proj,v_proj
 
+q + v matched total norm:
+  family=activation_spectral_lora_tscale_q1p886_v0p985
+  targets=q_proj,v_proj
+
 q + k + v + o matched relative norm:
   family=activation_spectral_lora_tscale_q2_k1p045_v1p045_o2
+  targets=q_proj,k_proj,v_proj,o_proj
+
+q + k + v + o matched total norm:
+  family=activation_spectral_lora_tscale_q1p333_k0p697_v0p697_o1p333
   targets=q_proj,k_proj,v_proj,o_proj
 ```
 

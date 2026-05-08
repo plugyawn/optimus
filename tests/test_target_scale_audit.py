@@ -42,3 +42,5 @@ def test_analyze_emits_target_scaled_family():
     assert math.isclose(summary["reference_lora_over_dense"], 0.5, rel_tol=1e-12)
     assert summary["matched_reference_family"].startswith("activation_spectral_lora_tscale_q2_")
     assert "_v1p045_" in summary["matched_reference_family"]
+    assert math.isclose(summary["matched_total_over_reference_update_norm"], 1.5, rel_tol=1e-12)
+    assert summary["global_budget_family"] == "activation_spectral_lora_tscale_q1p333_k0p697_v0p697_o1p333"
