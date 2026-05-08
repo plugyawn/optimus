@@ -150,7 +150,10 @@ def make_adapter_specs(
 
 
 def build_activation_family_state(args, out: Path, screen, prompt_variants: list[str]) -> dict | None:
-    if not args.family.startswith("activation_spectral_lora"):
+    if not (
+        args.family.startswith("activation_spectral_lora")
+        or args.family.startswith("activation_projected_gaussian_rank_r")
+    ):
         return None
 
     import torch
@@ -528,16 +531,28 @@ def run_search(args) -> dict:
     by_candidate_holdout = {row["candidate"]: row for row in holdout_candidate_rows}
     top_holdout = [by_candidate_holdout[row["candidate"]] for row in top if row["candidate"] in by_candidate_holdout]
     ensemble_holdout = []
+    strict_ensemble_holdout = []
     if ensemble_ks:
         by_k: dict[int, list[dict]] = {k: [] for k in ensemble_ks}
+        strict_by_k: dict[int, list[dict]] = {k: [] for k in ensemble_ks}
         ensemble_per_prompt = []
         candidate_order = [str(row["candidate"]) for row in top]
         for variant in holdout_selection_variants:
             variant_rows = [row for row in holdout_rows if str(row.get("prompt_variant", "default")) == variant]
             variant_summary, variant_per_prompt = majority_vote_evaluation(candidate_order, variant_rows, holdout, ensemble_ks)
+            strict_variant_summary, strict_variant_per_prompt = majority_vote_evaluation(
+                candidate_order,
+                variant_rows,
+                holdout,
+                ensemble_ks,
+                strict_rows=True,
+            )
             for row in variant_summary:
                 by_k[int(row["k"])].append(dict(row, prompt_variant=variant))
-            ensemble_per_prompt.extend(dict(row, prompt_variant=variant) for row in variant_per_prompt)
+            for row in strict_variant_summary:
+                strict_by_k[int(row["k"])].append(dict(row, prompt_variant=variant))
+            ensemble_per_prompt.extend(dict(row, prompt_variant=variant, vote_filter="numeric") for row in variant_per_prompt)
+            ensemble_per_prompt.extend(dict(row, prompt_variant=variant, vote_filter="strict_numeric") for row in strict_variant_per_prompt)
         for k in ensemble_ks:
             rows = by_k[k]
             ensemble_holdout.append(
@@ -550,6 +565,19 @@ def run_search(args) -> dict:
                     "coverage_mean": float(np.mean([float(row["coverage_mean"]) for row in rows])) if rows else 0.0,
                     "valid_votes_per_prompt": float(np.mean([float(row["valid_votes_per_prompt"]) for row in rows])) if rows else 0.0,
                     "conditions": rows,
+                }
+            )
+            strict_rows = strict_by_k[k]
+            strict_ensemble_holdout.append(
+                {
+                    "k": k,
+                    "prompt_variants": sorted(str(row["prompt_variant"]) for row in strict_rows),
+                    "condition_count": len(strict_rows),
+                    "exact_mean": float(np.mean([float(row["exact_mean"]) for row in strict_rows])) if strict_rows else 0.0,
+                    "min_exact_mean": min((float(row["exact_mean"]) for row in strict_rows), default=0.0),
+                    "coverage_mean": float(np.mean([float(row["coverage_mean"]) for row in strict_rows])) if strict_rows else 0.0,
+                    "valid_votes_per_prompt": float(np.mean([float(row["valid_votes_per_prompt"]) for row in strict_rows])) if strict_rows else 0.0,
+                    "conditions": strict_rows,
                 }
             )
         write_jsonl(out / "ensemble_per_prompt.jsonl", ensemble_per_prompt)
@@ -585,6 +613,7 @@ def run_search(args) -> dict:
         "holdout_stress_prompt_variants": holdout_stress_variants,
         "candidate_score_metric": "exact_answer",
         "ensemble_vote_metric": "valid_numeric_majority_vote",
+        "strict_ensemble_vote_metric": "strict_parser_then_valid_numeric_majority_vote",
         "score_mode": args.score_mode,
         "malformed_penalty": args.malformed_penalty,
         "cap_hit_penalty": args.cap_hit_penalty,
@@ -629,6 +658,8 @@ def run_search(args) -> dict:
         "top_holdout": top_holdout,
         "ensemble_holdout": ensemble_holdout,
         "best_ensemble_holdout_exact": max((row["exact_mean"] for row in ensemble_holdout), default=None),
+        "strict_ensemble_holdout": strict_ensemble_holdout,
+        "best_strict_ensemble_holdout_exact": max((row["exact_mean"] for row in strict_ensemble_holdout), default=None),
     }
     write_json(out / "summary.json", summary)
     print(json.dumps(summary, indent=2, sort_keys=True))
@@ -701,6 +732,12 @@ def build_parser() -> argparse.ArgumentParser:
             "spectral_projected_gaussian_rank_r_c1p25",
             "spectral_projected_gaussian_rank_r_c1p5",
             "spectral_projected_gaussian_rank_r_c2",
+            "activation_projected_gaussian_rank_r",
+            "activation_projected_gaussian_rank_r_c0p5",
+            "activation_projected_gaussian_rank_r_c0p75",
+            "activation_projected_gaussian_rank_r_c1p25",
+            "activation_projected_gaussian_rank_r_c1p5",
+            "activation_projected_gaussian_rank_r_c2",
             "activation_spectral_lora",
             "activation_spectral_lora_c0p5",
             "activation_spectral_lora_c0p75",

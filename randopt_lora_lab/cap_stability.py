@@ -10,7 +10,7 @@ import torch
 
 from .aggregate_lora import build_aggregate_state, top_candidate_rows
 from .countdown import CountdownExample, load_examples, score_completion
-from .experiments import make_backend, parse_candidate_key, reset_outputs, tag_rows, write_jsonl
+from .experiments import anzo_anchor_prompts, make_backend, parse_candidate_key, reset_outputs, tag_rows, write_jsonl
 from .lora_space import Candidate
 from .prompt_variants import (
     PromptFn,
@@ -21,6 +21,65 @@ from .prompt_variants import (
     tight_tagged_prompt,
     xml_tagged_prompt,
 )
+
+
+def infer_activation_state_prompt_variants(source_run: Path, override: str) -> list[str]:
+    if override:
+        return [item.strip() for item in override.split(",") if item.strip()]
+    family_state_summary = source_run / "family_state_summary.json"
+    if family_state_summary.exists():
+        summary = json.loads(family_state_summary.read_text())
+        variants = summary.get("activation_state_prompt_variants")
+        if variants:
+            return [str(item) for item in variants]
+    summary_path = source_run / "summary.json"
+    if summary_path.exists():
+        summary = json.loads(summary_path.read_text())
+        variants = summary.get("activation_state_prompt_variants") or summary.get("prompt_variants")
+        if variants:
+            return [str(item) for item in variants]
+        variant = summary.get("prompt_variant")
+        if variant:
+            return [str(variant)]
+    return ["default"]
+
+
+def build_family_states(
+    backend,
+    candidates: list[Candidate],
+    screen: list[CountdownExample],
+    *,
+    source_run: Path,
+    activation_state_prompt_variants: list[str],
+) -> tuple[dict[str, dict], dict]:
+    states = {}
+    saved_state = source_run / "family_state.pt"
+    activation_families = {
+        candidate.family
+        for candidate in candidates
+        if candidate.family.startswith("activation_spectral_lora")
+        or candidate.family.startswith("activation_projected_gaussian_rank_r")
+    }
+    if saved_state.exists() and activation_families:
+        loaded = torch.load(saved_state, map_location="cpu")
+        return {family: loaded for family in activation_families}, {
+            "activation_state_source": str(saved_state),
+            "activation_state_prompt_variants": activation_state_prompt_variants,
+            "activation_state_modules": len(loaded),
+        }
+    target_examples = screen[: min(16, len(screen))]
+    target_prompts = [prompt_fn(variant)(ex) for variant in activation_state_prompt_variants for ex in target_examples]
+    for family in sorted({candidate.family for candidate in candidates}):
+        if family.startswith("activation_spectral_lora_sv"):
+            states[family] = backend.build_activation_spectral_state(target_prompts, anzo_anchor_prompts())
+        elif family.startswith("activation_spectral_lora") or family.startswith("activation_projected_gaussian_rank_r"):
+            states[family] = backend.build_anzo_state(target_prompts, anzo_anchor_prompts())
+    return states, {
+        "activation_state_source": "rebuilt",
+        "activation_state_prompt_variants": activation_state_prompt_variants,
+        "activation_state_target_prompt_count": len(target_prompts),
+        "activation_state_modules": len(next(iter(states.values()), {})),
+    }
 
 
 def evaluate_with_prompt_fn(
@@ -186,10 +245,19 @@ def run_audit(args) -> None:
     elite_args = argparse.Namespace(**common)
     elite_args.rank = args.base_rank
     elite_backend = make_backend(elite_args)
+    elite_candidate_objs = [parse_candidate_key(row["candidate"]) for row in elite_rows]
+    activation_state_prompt_variants = infer_activation_state_prompt_variants(Path(args.source_run), args.activation_state_prompt_variants)
+    family_states, family_state_summary = build_family_states(
+        elite_backend,
+        elite_candidate_objs,
+        screen,
+        source_run=Path(args.source_run),
+        activation_state_prompt_variants=activation_state_prompt_variants,
+    )
     elite_candidates = [("base", None, None)]
     elite_candidates.extend(
-        (f"elite_{idx}", parse_candidate_key(row["candidate"]), None)
-        for idx, row in enumerate(elite_rows)
+        (f"elite_{idx}", candidate, family_states.get(candidate.family))
+        for idx, candidate in enumerate(elite_candidate_objs)
     )
 
     summaries = []
@@ -211,29 +279,31 @@ def run_audit(args) -> None:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    aggregate_args = argparse.Namespace(**common)
-    aggregate_args.rank = args.base_rank * len(elite_rows)
-    aggregate_backend = make_backend(aggregate_args)
-    aggregate_state, aggregate_summary = build_aggregate_state(
-        aggregate_backend.model,
-        elite_rows,
-        args.base_rank,
-        args.weight_mode,
-    )
-    aggregate_candidate = Candidate("elite_aggregate_lora", args.seed, 1.0, 1)
-    aggregate_candidates = [("aggregate", aggregate_candidate, aggregate_state)]
-    for split, examples in splits:
-        summaries.extend(
-            run_conditions(
-                out,
-                aggregate_backend,
-                aggregate_candidates,
-                examples,
-                split=split,
-                caps=caps,
-                prompt_variants=variants,
-            )
+    aggregate_summary = None
+    if not args.skip_aggregate:
+        aggregate_args = argparse.Namespace(**common)
+        aggregate_args.rank = args.base_rank * len(elite_rows)
+        aggregate_backend = make_backend(aggregate_args)
+        aggregate_state, aggregate_summary = build_aggregate_state(
+            aggregate_backend.model,
+            elite_rows,
+            args.base_rank,
+            args.weight_mode,
         )
+        aggregate_candidate = Candidate("elite_aggregate_lora", args.seed, 1.0, 1)
+        aggregate_candidates = [("aggregate", aggregate_candidate, aggregate_state)]
+        for split, examples in splits:
+            summaries.extend(
+                run_conditions(
+                    out,
+                    aggregate_backend,
+                    aggregate_candidates,
+                    examples,
+                    split=split,
+                    caps=caps,
+                    prompt_variants=variants,
+                )
+            )
 
     write_jsonl(out / "summary_rows.jsonl", summaries)
     summary = {
@@ -246,7 +316,9 @@ def run_audit(args) -> None:
         "weight_mode": args.weight_mode,
         "caps": caps,
         "prompt_variants": variants,
+        **family_state_summary,
         "include_screen": bool(args.include_screen),
+        "skip_aggregate": bool(args.skip_aggregate),
         "screen_prompts": len(screen),
         "holdout_prompts": len(holdout),
         "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
@@ -277,6 +349,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
     parser.add_argument("--stop-at-answer", action="store_true")
     parser.add_argument("--include-screen", action="store_true")
+    parser.add_argument("--skip-aggregate", action="store_true")
+    parser.add_argument("--activation-state-prompt-variants", default="")
     parser.add_argument("--allow-repeat-data", action="store_true")
     parser.add_argument("--perturbation-backend", choices=["lora"], default="lora")
     parser.add_argument("--dense-snapshot-device", default="model")

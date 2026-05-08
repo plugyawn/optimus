@@ -250,6 +250,12 @@ def build_parser() -> argparse.ArgumentParser:
             "spectral_projected_gaussian_rank_r_c1p25",
             "spectral_projected_gaussian_rank_r_c1p5",
             "spectral_projected_gaussian_rank_r_c2",
+            "activation_projected_gaussian_rank_r",
+            "activation_projected_gaussian_rank_r_c0p5",
+            "activation_projected_gaussian_rank_r_c0p75",
+            "activation_projected_gaussian_rank_r_c1p25",
+            "activation_projected_gaussian_rank_r_c1p5",
+            "activation_projected_gaussian_rank_r_c2",
         ],
     )
     p.add_argument("--antithetic", action="store_true")

@@ -1,7 +1,10 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from randopt_lora_lab.countdown import CountdownExample
 from randopt_lora_lab.experiments import candidate_panel, ensemble_ks_from_values, majority_vote_evaluation, parse_k_list, read_candidate_file as read_peft_candidate_file
+from randopt_lora_lab.strict_ensemble_replay import replay
 from randopt_lora_lab.vllm_lora_search import candidate_panel as vllm_candidate_panel, read_candidate_file
 
 
@@ -106,6 +109,39 @@ class ExperimentEnsembleTests(unittest.TestCase):
         self.assertEqual(summary[0]["exact_mean"], 0.0)
         self.assertEqual(summary[0]["coverage_mean"], 0.0)
         self.assertEqual(per_prompt[0]["reject_counts"], {"wrong_numbers": 1, "missing_answer": 1})
+
+    def test_strict_majority_vote_rejects_malformed_rows_before_voting(self):
+        example = CountdownExample(1, (1, 2, 3), 6)
+        rows = [
+            {"candidate": "c1", "example_id": 1, "text": "reasoning <answer>1+2+3</answer>"},
+            {"candidate": "c2", "example_id": 1, "text": "<answer>1+2+3</answer>"},
+        ]
+
+        lax, _ = majority_vote_evaluation(["c1", "c2"], rows, [example], [2])
+        strict, per_prompt = majority_vote_evaluation(["c1", "c2"], rows, [example], [2], strict_rows=True)
+
+        self.assertEqual(lax[0]["valid_votes_per_prompt"], 2.0)
+        self.assertEqual(strict[0]["valid_votes_per_prompt"], 1.0)
+        self.assertEqual(strict[0]["exact_mean"], 1.0)
+        self.assertTrue(strict[0]["strict_rows"])
+        self.assertEqual(per_prompt[0]["reject_counts"], {"strict_malformed": 1})
+
+    def test_strict_ensemble_replay_reads_saved_run_rows(self):
+        with TemporaryDirectory() as td:
+            run = Path(td)
+            (run / "summary.json").write_text(
+                '{"ensemble_ks":[2],"top_screen":[{"candidate":"c1"},{"candidate":"c2"}]}\n'
+            )
+            (run / "holdout_per_prompt.jsonl").write_text(
+                '{"candidate":"c1","example_id":1,"numbers":[1,2,3],"target":6,"text":"reasoning <answer>1+2+3</answer>"}\n'
+                '{"candidate":"c2","example_id":1,"numbers":[1,2,3],"target":6,"text":"<answer>1+2+3</answer>"}\n'
+            )
+
+            payload = replay(run)
+
+        self.assertEqual(payload["best_numeric_ensemble_holdout_exact"], 1.0)
+        self.assertEqual(payload["best_strict_ensemble_holdout_exact"], 1.0)
+        self.assertEqual(payload["strict_ensemble_holdout"][0]["valid_votes_per_prompt"], 1.0)
 
 
 if __name__ == "__main__":

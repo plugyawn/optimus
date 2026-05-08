@@ -10,6 +10,7 @@ from randopt_lora_lab.dense_space import dense_noise_tensor
 from randopt_lora_lab.gaussian_parity import best_rank_projection, lora_update
 from randopt_lora_lab.lora_space import (
     Candidate,
+    activation_projected_scale,
     activation_spectral_scale,
     activation_spectral_uses_singular_values,
     canonical_module_name,
@@ -110,6 +111,34 @@ class LoraMaterializerTests(unittest.TestCase):
 
         self.assertEqual(spectral_projected_scale(scaled.family), 2.0)
         self.assertGreater(torch.linalg.norm(lora_update(a_scaled, b_scaled)), torch.linalg.norm(lora_update(a_base, b_base)))
+
+    def test_activation_projected_gaussian_preserves_dense_seed_in_right_basis(self):
+        rank = 3
+        module = "base_model.model.model.layers.0.self_attn.q_proj"
+        candidate = Candidate("activation_projected_gaussian_rank_r_c2", seed=456, sigma=0.01, sign=-1)
+        basis = torch.eye(8)[:rank].contiguous()
+
+        a, b = lora_noise_tensors(
+            module,
+            (rank, 8),
+            (7, rank),
+            candidate,
+            rank,
+            family_state={module: basis},
+            state_key=module,
+        )
+        dense = dense_noise_tensor(
+            "model.layers.0.self_attn.q_proj",
+            (7, 8),
+            Candidate("dense_gaussian", seed=456, sigma=0.02, sign=-1),
+        )
+        expected = torch.zeros_like(dense)
+        expected[:, :rank] = dense[:, :rank]
+
+        self.assertEqual(activation_projected_scale(candidate.family), 2.0)
+        self.assertEqual(tuple(a.shape), (rank, 8))
+        self.assertEqual(tuple(b.shape), (7, rank))
+        self.assertTrue(torch.allclose(lora_update(a, b), expected, atol=1e-6, rtol=1e-6))
 
     def test_activation_spectral_lora_uses_activation_basis(self):
         rank = 3

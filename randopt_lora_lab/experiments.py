@@ -242,7 +242,14 @@ def rows_by_candidate_and_example(rows: list[dict]) -> dict[str, dict[int, dict]
     return out
 
 
-def majority_vote_evaluation(candidate_order: list[str], rows: list[dict], examples, k_values: list[int]) -> tuple[list[dict], list[dict]]:
+def majority_vote_evaluation(
+    candidate_order: list[str],
+    rows: list[dict],
+    examples,
+    k_values: list[int],
+    *,
+    strict_rows: bool = False,
+) -> tuple[list[dict], list[dict]]:
     by_candidate = rows_by_candidate_and_example(rows)
     result_rows = []
     per_prompt_rows = []
@@ -257,6 +264,9 @@ def majority_vote_evaluation(candidate_order: list[str], rows: list[dict], examp
             for candidate in active:
                 row = by_candidate.get(candidate, {}).get(ex.id)
                 if not row:
+                    continue
+                if strict_rows and score_completion(str(row.get("text", "")), ex, strict=True)["malformed"]:
+                    rejects["strict_malformed"] += 1
                     continue
                 vote = extract_numeric_vote(str(row.get("text", "")), ex)
                 if vote["valid_vote"]:
@@ -279,6 +289,7 @@ def majority_vote_evaluation(candidate_order: list[str], rows: list[dict], examp
                     "exact": exact,
                     "valid_vote_count": len(votes),
                     "missing_vote_count": max(len(active) - len(votes), 0),
+                    "strict_rows": strict_rows,
                     "vote_counts": dict(counter),
                     "reject_counts": dict(rejects),
                 }
@@ -293,6 +304,7 @@ def majority_vote_evaluation(candidate_order: list[str], rows: list[dict], examp
                 "valid_votes_per_prompt": float(np.mean(valid_vote_counts)) if valid_vote_counts else 0.0,
                 "correct": int(sum(exact_values)),
                 "total": denom,
+                "strict_rows": strict_rows,
             }
         )
     return result_rows, per_prompt_rows
@@ -346,6 +358,8 @@ def maybe_build_family_state(args, backend, screen):
         return None
     if args.family.startswith("sparse_low_rank_lora"):
         return None
+    if args.family.startswith("activation_projected_gaussian_rank_r"):
+        return backend.build_anzo_state(make_prompts_for_backend(backend, args, screen[: min(16, len(screen))]), anzo_anchor_prompts())
     if args.family.startswith("activation_spectral_lora_sv"):
         return backend.build_activation_spectral_state(
             make_prompts_for_backend(backend, args, screen[: min(16, len(screen))]),
@@ -414,6 +428,7 @@ def run_search(args):
         holdout_per_candidate_rows.extend(tagged)
         write_jsonl(out / "holdout_per_prompt.jsonl", tagged)
     ensemble_rows = []
+    strict_ensemble_rows = []
     if ensemble_ks:
         ensemble_rows, ensemble_per_prompt = majority_vote_evaluation(
             [str(row["candidate"]) for row in top],
@@ -421,7 +436,15 @@ def run_search(args):
             holdout,
             ensemble_ks,
         )
-        write_jsonl(out / "ensemble_per_prompt.jsonl", ensemble_per_prompt)
+        strict_ensemble_rows, strict_ensemble_per_prompt = majority_vote_evaluation(
+            [str(row["candidate"]) for row in top],
+            holdout_per_candidate_rows,
+            holdout,
+            ensemble_ks,
+            strict_rows=True,
+        )
+        write_jsonl(out / "ensemble_per_prompt.jsonl", tag_rows(ensemble_per_prompt, vote_filter="numeric"))
+        write_jsonl(out / "ensemble_per_prompt.jsonl", tag_rows(strict_ensemble_per_prompt, vote_filter="strict_numeric"))
     total_s = time.time() - start
     summary = {
         "kind": "search",
@@ -436,6 +459,7 @@ def run_search(args):
         "use_chat_template": args.use_chat_template,
         "candidate_score_metric": "exact_answer",
         "ensemble_vote_metric": "valid_numeric_majority_vote",
+        "strict_ensemble_vote_metric": "strict_parser_then_valid_numeric_majority_vote",
         "seed": args.seed,
         "targets": args.targets,
         "perturbation_backend": args.perturbation_backend,
@@ -462,6 +486,8 @@ def run_search(args):
         "ensemble_ratios": parse_ratio_list(args.ensemble_ratios) if args.ensemble_ratios else [],
         "ensemble_holdout": ensemble_rows,
         "best_ensemble_holdout_exact": max((row["exact_mean"] for row in ensemble_rows), default=None),
+        "strict_ensemble_holdout": strict_ensemble_rows,
+        "best_strict_ensemble_holdout_exact": max((row["exact_mean"] for row in strict_ensemble_rows), default=None),
         "top_screen": top,
         "top_holdout": holdout_rows,
     }
@@ -687,6 +713,12 @@ def main():
                 "spectral_projected_gaussian_rank_r_c1p25",
                 "spectral_projected_gaussian_rank_r_c1p5",
                 "spectral_projected_gaussian_rank_r_c2",
+                "activation_projected_gaussian_rank_r",
+                "activation_projected_gaussian_rank_r_c0p5",
+                "activation_projected_gaussian_rank_r_c0p75",
+                "activation_projected_gaussian_rank_r_c1p25",
+                "activation_projected_gaussian_rank_r_c1p5",
+                "activation_projected_gaussian_rank_r_c2",
                 "activation_spectral_lora",
                 "activation_spectral_lora_c0p5",
                 "activation_spectral_lora_c0p75",

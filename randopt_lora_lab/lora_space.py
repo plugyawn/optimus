@@ -79,6 +79,61 @@ def activation_spectral_uses_singular_values(family: str) -> bool:
     return family.startswith("activation_spectral_lora_sv")
 
 
+def activation_projected_scale(family: str) -> float:
+    if family == "activation_projected_gaussian_rank_r":
+        return 1.0
+    match = re.fullmatch(r"activation_projected_gaussian_rank_r_c([0-9]+(?:p[0-9]+)?)", family)
+    if not match:
+        raise ValueError(f"not an activation projected Gaussian family: {family}")
+    scale = float(match.group(1).replace("p", "."))
+    if scale <= 0.0:
+        raise ValueError(f"activation projected scale must be positive, got {scale}")
+    return scale
+
+
+def activation_projected_gaussian_factors(
+    module_name: str,
+    out_features: int,
+    in_features: int,
+    rank: int,
+    basis: torch.Tensor,
+    candidate: Candidate,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Project the same dense Gaussian seed into a task-activation right basis.
+
+    This preserves dense candidate identity: sample the canonical dense Gaussian
+    update `G`, then use the right-subspace projection `G V V.T`.  LoRA factors
+    are `B = G V` and `A = V.T`.
+    """
+
+    if basis.ndim != 2:
+        raise ValueError(f"activation basis for {module_name} must be 2D, got shape {tuple(basis.shape)}")
+    if rank < 0:
+        raise ValueError("rank must be nonnegative")
+    if rank == 0:
+        return torch.zeros((0, in_features), dtype=torch.float32), torch.zeros((out_features, 0), dtype=torch.float32)
+    k = min(rank, out_features, in_features, int(basis.shape[0]), int(basis.shape[1]))
+    if k == 0:
+        return torch.zeros((rank, in_features), dtype=torch.float32), torch.zeros((out_features, rank), dtype=torch.float32)
+
+    rows = basis[:k, :in_features].cpu().float().contiguous()
+    v, _ = torch.linalg.qr(rows.T, mode="reduced")
+    v = v[:, :k].contiguous()
+
+    canonical_name = canonical_module_name(module_name)
+    gen = torch.Generator(device="cpu")
+    gen.manual_seed((candidate.seed + stable_int(canonical_name + ":dense_gaussian")) % (2**63 - 1))
+    scale = activation_projected_scale(candidate.family)
+    dense = torch.randn((out_features, in_features), generator=gen, dtype=torch.float32)
+    dense.mul_(float(candidate.sign) * float(candidate.sigma) * scale)
+    b = dense @ v
+    a = v.T.contiguous()
+    if k < rank:
+        a = torch.cat([a, torch.zeros((rank - k, in_features), dtype=a.dtype)], dim=0)
+        b = torch.cat([b, torch.zeros((out_features, rank - k), dtype=b.dtype)], dim=1)
+    return a.contiguous(), b.contiguous()
+
+
 def activation_spectral_lora_factors(
     module_name: str,
     out_features: int,
@@ -193,6 +248,20 @@ def lora_noise_tensors(
             sign=candidate.sign,
             seed=spectral_seed,
             dtype=torch.float32,
+        )
+    if candidate.family.startswith("activation_projected_gaussian_rank_r"):
+        if family_spec is None:
+            raise ValueError(f"{candidate.family} requires an activation basis for {lookup_key}")
+        basis = family_spec.get("basis") if isinstance(family_spec, dict) else family_spec
+        if basis is None:
+            raise ValueError(f"{candidate.family} requires a non-empty activation basis for {lookup_key}")
+        return activation_projected_gaussian_factors(
+            canonical_name,
+            int(b_shape[0]),
+            int(a_shape[1]),
+            rank,
+            basis,
+            candidate,
         )
     if candidate.family.startswith("activation_spectral_lora"):
         if family_spec is None:
