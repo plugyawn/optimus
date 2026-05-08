@@ -72,6 +72,7 @@ CONFIRM_MAX_K=${CONFIRM_MAX_K:-8}
 CONFIRM_MAX_DENSE_REGRET=${CONFIRM_MAX_DENSE_REGRET:-0.0}
 CONFIRM_MIN_FULL_SPEEDUP=${CONFIRM_MIN_FULL_SPEEDUP:-1.0}
 PROPOSAL_SCORE_COL=${PROPOSAL_SCORE_COL:-selection_score}
+SHORTLIST_POLICY=${SHORTLIST_POLICY:-}
 
 export PYTHONUNBUFFERED=1
 export VLLM_USAGE_STATS_ENABLED=${VLLM_USAGE_STATS_ENABLED:-0}
@@ -158,11 +159,19 @@ if [[ "$RUN_VLLM" == "1" ]]; then
     "${extra_vllm_args[@]}"
 fi
 
-"$PYTHON" -m randopt_lora_lab.shortlist_from_run \
-  --run "$OUT_ROOT/vllm" \
-  --out "$OUT_ROOT/shortlist_top${SHORTLIST_K}.jsonl" \
-  --k "$SHORTLIST_K" \
-  --score-col "$PROPOSAL_SCORE_COL"
+if [[ -n "$SHORTLIST_POLICY" ]]; then
+  "$PYTHON" -m randopt_lora_lab.selector_union_audit shortlist \
+    --run "$OUT_ROOT" \
+    --out "$OUT_ROOT/shortlist_top${SHORTLIST_K}.jsonl" \
+    --policy "$SHORTLIST_POLICY" \
+    --k "$SHORTLIST_K"
+else
+  "$PYTHON" -m randopt_lora_lab.shortlist_from_run \
+    --run "$OUT_ROOT/vllm" \
+    --out "$OUT_ROOT/shortlist_top${SHORTLIST_K}.jsonl" \
+    --k "$SHORTLIST_K" \
+    --score-col "$PROPOSAL_SCORE_COL"
+fi
 
 if [[ "$RUN_CONFIRM" == "1" ]]; then
   "$PYTHON" -m randopt_lora_lab.experiments search \
