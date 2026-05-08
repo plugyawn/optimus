@@ -95,7 +95,53 @@ def activation_generalized_spectral_uses_singular_values(family: str) -> bool:
     return family.startswith("activation_generalized_spectral_lora_sv")
 
 
-def activation_basis_spectral_scale(family: str) -> float:
+def _scale_value(text: str) -> float:
+    scale = float(text.replace("p", "."))
+    if scale <= 0.0:
+        raise ValueError(f"activation spectral scale must be positive, got {scale}")
+    return scale
+
+
+def activation_target_key(module_name: str) -> str:
+    base = canonical_module_name(module_name).split(".")[-1]
+    return {
+        "q_proj": "q",
+        "k_proj": "k",
+        "v_proj": "v",
+        "o_proj": "o",
+        "gate_proj": "gate",
+        "up_proj": "up",
+        "down_proj": "down",
+    }.get(base, base)
+
+
+def activation_basis_target_scales(family: str) -> dict[str, float] | None:
+    match = re.fullmatch(
+        r"(?:activation_spectral_lora|activation_generalized_spectral_lora)(?:_sv)?_tscale_([a-z0-9p_]+)",
+        family,
+    )
+    if not match:
+        return None
+    out: dict[str, float] = {}
+    for token in match.group(1).split("_"):
+        token_match = re.fullmatch(r"(q|k|v|o|gate|up|down)([0-9]+(?:p[0-9]+)?)", token)
+        if not token_match:
+            raise ValueError(f"bad activation target-scale token {token!r} in {family}")
+        out[token_match.group(1)] = _scale_value(token_match.group(2))
+    if not out:
+        raise ValueError(f"target-scaled activation spectral family has no target scales: {family}")
+    return out
+
+
+def activation_basis_spectral_scale(family: str, module_name: str | None = None) -> float:
+    target_scales = activation_basis_target_scales(family)
+    if target_scales is not None:
+        if module_name is None:
+            raise ValueError(f"{family} requires a module name to choose its target scale")
+        target = activation_target_key(module_name)
+        if target not in target_scales:
+            raise ValueError(f"{family} has no target scale for {target} ({module_name})")
+        return target_scales[target]
     if family.startswith("activation_generalized_spectral_lora"):
         return activation_generalized_spectral_scale(family)
     return activation_spectral_scale(family)
@@ -290,7 +336,7 @@ def activation_spectral_lora_factors(
     u_raw = torch.randn((out_features, k), generator=gen_u, dtype=torch.float32)
     u, _ = torch.linalg.qr(u_raw, mode="reduced")
 
-    scale = activation_basis_spectral_scale(candidate.family)
+    scale = activation_basis_spectral_scale(candidate.family, canonical_name)
     edge = abs(float(candidate.sigma)) * scale * (math.sqrt(float(out_features)) + math.sqrt(float(in_features)))
     singulars = torch.full((k,), edge, dtype=torch.float32)
     if activation_basis_spectral_uses_singular_values(candidate.family) and singular_values is not None:

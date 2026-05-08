@@ -3,6 +3,7 @@ import types
 import unittest
 from pathlib import Path
 
+import math
 import torch
 from safetensors.torch import load_file
 
@@ -10,6 +11,7 @@ from randopt_lora_lab.dense_space import dense_noise_tensor
 from randopt_lora_lab.gaussian_parity import best_rank_projection, lora_update
 from randopt_lora_lab.lora_space import (
     Candidate,
+    activation_basis_spectral_scale,
     activation_generalized_spectral_scale,
     activation_generalized_projected_scale,
     activation_projected_scale,
@@ -328,6 +330,52 @@ class LoraMaterializerTests(unittest.TestCase):
         self.assertTrue(activation_spectral_uses_singular_values(weighted.family))
         self.assertTrue(torch.allclose(flat_a.norm(dim=1), flat_a.norm(dim=1).mean().expand(rank)))
         self.assertGreater(float(weighted_a.norm(dim=1).max() - weighted_a.norm(dim=1).min()), 0.0)
+
+    def test_activation_spectral_target_scale_family_uses_module_specific_scale(self):
+        rank = 3
+        family = "activation_spectral_lora_tscale_q2_v1p5"
+        candidate = Candidate(family, seed=456, sigma=0.01, sign=1)
+        family_state = {
+            "model.layers.0.self_attn.q_proj": torch.eye(8)[:rank].contiguous(),
+            "model.layers.0.self_attn.v_proj": torch.eye(8)[:rank].contiguous(),
+        }
+
+        q_a, q_b = lora_noise_tensors(
+            "model.layers.0.self_attn.q_proj",
+            (rank, 8),
+            (8, rank),
+            candidate,
+            rank,
+            family_state=family_state,
+        )
+        v_a, v_b = lora_noise_tensors(
+            "model.layers.0.self_attn.v_proj",
+            (rank, 8),
+            (4, rank),
+            candidate,
+            rank,
+            family_state=family_state,
+        )
+
+        self.assertEqual(activation_basis_spectral_scale(family, "model.layers.0.self_attn.q_proj"), 2.0)
+        self.assertEqual(activation_basis_spectral_scale(family, "model.layers.0.self_attn.v_proj"), 1.5)
+        q_expected = 0.01 * 2.0 * (math.sqrt(8.0) + math.sqrt(8.0)) * math.sqrt(rank)
+        v_expected = 0.01 * 1.5 * (math.sqrt(4.0) + math.sqrt(8.0)) * math.sqrt(rank)
+        self.assertTrue(torch.allclose(lora_update(q_a.double(), q_b.double()).norm(), torch.tensor(q_expected, dtype=torch.float64), rtol=1e-5))
+        self.assertTrue(torch.allclose(lora_update(v_a.double(), v_b.double()).norm(), torch.tensor(v_expected, dtype=torch.float64), rtol=1e-5))
+
+    def test_activation_spectral_target_scale_family_errors_for_unconfigured_target(self):
+        candidate = Candidate("activation_spectral_lora_tscale_q2_v1p5", seed=456, sigma=0.01, sign=1)
+        family_state = {"model.layers.0.self_attn.k_proj": torch.eye(8)[:3].contiguous()}
+        with self.assertRaisesRegex(ValueError, "no target scale for k"):
+            lora_noise_tensors(
+                "model.layers.0.self_attn.k_proj",
+                (3, 8),
+                (4, 3),
+                candidate,
+                3,
+                family_state=family_state,
+            )
 
     def test_sparse_low_rank_lora_materializes_sparse_scaled_factors(self):
         candidate = Candidate("sparse_low_rank_lora_d0p25", seed=789, sigma=0.01, sign=1)
