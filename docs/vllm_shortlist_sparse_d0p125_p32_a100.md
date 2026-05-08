@@ -179,3 +179,53 @@ Use the A100 for proposal-quality diagnostics, not larger population search:
   - test a same-seed structured family that is explicitly fitted to match dense q/v perturbation effects;
   - keep dense reference as the authority and require zero dense regret or dense-best recovery at small k.
 ```
+
+## Stable Tie-Break Recheck
+
+After the first report, shortlist tie-breaking was patched to preserve original
+adapter order on score ties instead of reverse lexicographic candidate order.
+This matters because the vLLM scores are coarse and many candidates tie.
+
+Recomputed shortlists from the same vLLM artifacts:
+
+```text
+stable selection top candidate: sparse_low_rank_lora_d0p125:seed1219141227:s0.002:sign1
+exact-mean top candidate: sparse_low_rank_lora_d0p125:seed414161978:s0.001:sign1
+```
+
+The corrected stable-selection top-8 included dense-good seed specs earlier, so
+we reran PEFT confirmation only for that shortlist:
+
+```text
+results/vllm_shortlist_sparse_d0p125_p32_probe/confirmed_stable_selection
+results/vllm_shortlist_sparse_d0p125_p32_probe/shortlist_dense_confirmation_stable_selection
+```
+
+Result:
+
+```text
+zero dense-regret k: none
+dense best recovered k: none
+```
+
+Stable confirmation table:
+
+| k | confirmed pick | confirmed screen | dense score at pick | dense regret | speedup excl. dense load |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 1 | `sparse_low_rank_lora_d0p125:seed414161978:s0.001:sign1` | 6.25% | 4.6875% | 4.6875 pp | 6.75x |
+| 2 | `sparse_low_rank_lora_d0p125:seed414161978:s0.001:sign1` | 6.25% | 4.6875% | 4.6875 pp | 6.31x |
+| 4 | `sparse_low_rank_lora_d0p125:seed2020458541:s0.001:sign1` | 7.8125% | 4.6875% | 4.6875 pp | 4.73x |
+| 8 | `sparse_low_rank_lora_d0p125:seed2020458541:s0.001:sign1` | 7.8125% | 4.6875% | 4.6875 pp | 3.72x |
+
+This sharpens the interpretation. The earlier shortlist ordering was partly a
+tie-break artifact, but correcting it does not rescue sparse d0p125. Even when a
+dense-good seed/sigma appears early, the sparse-LoRA perturbation with that same
+seed/sigma is not the same perturbation and does not preserve dense behavior.
+
+The remaining failure is structural:
+
+```text
+same seed/sigma in sparse LoRA != dense Gaussian perturbation
+vLLM sparse scores are tie-heavy and weakly correlated with dense scores
+PEFT confirmation selects sparse-family winners, not dense-family winners
+```
