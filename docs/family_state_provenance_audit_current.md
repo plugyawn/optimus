@@ -1,0 +1,80 @@
+# Family State Provenance Audit
+
+## Verdict
+
+The current activation-spectral q-only c2 P64 confirmations are not valid adapter-identity confirmations.
+
+Both runs have `vllm/family_state.pt`, but neither confirmed PEFT run copied or recorded that state. Since `activation_spectral_lora*` directions depend on the activation basis, the candidate key alone is not enough to identify the adapter direction.
+
+This means the existing confirmations are useful as rough evidence about the family, but they should not be used for strict vLLM-to-PEFT selector parity or dense-regret claims.
+
+## Command
+
+```bash
+PYTHONPATH=. python -m randopt_lora_lab.family_state_provenance_audit \
+  --results-root results \
+  --out results/family_state_provenance_audit_current \
+  --no-fail
+```
+
+## Result
+
+```text
+Gate: FAIL
+
+failed runs:
+  results/qproj_c2_vllm_shortlist_p64
+  results/qproj_c2_vllm_shortlist_p64_seed20260508
+```
+
+For both failed runs:
+
+```text
+confirmed_summary_family_state_file_present: false
+confirmed_family_state_present: false
+confirmed_family_state_matches_vllm: false
+confirmed_family_state_summary_present: false
+confirmed_family_state_summary_loaded: false
+confirmed_family_state_summary_points_to_state: false
+```
+
+The vLLM state hashes were:
+
+```text
+qproj_c2_vllm_shortlist_p64:
+  cdf619d779c3d092a4520a78ba28353471809641a64e0ef3e4d0215361e532f1
+
+qproj_c2_vllm_shortlist_p64_seed20260508:
+  6e1cb42fb261d6d3128b200e56d678de7346660443f7ef54ac89bc82267ee235
+```
+
+## Fix Landed
+
+`experiments search` and `experiments halving` now accept:
+
+```bash
+--family-state-file path/to/family_state.pt
+```
+
+`scripts/run_vllm_shortlist_confirmation.sh` now auto-passes:
+
+```text
+$OUT_ROOT/vllm/family_state.pt
+```
+
+to PEFT confirmation when it exists, records a copied `confirmed/family_state.pt`, and runs this provenance audit by default.
+
+## Consequence
+
+The next GPU run should not scale population. It should first rerun the small PEFT confirmation for the selected q-only c2 shortlist using the saved vLLM basis, then regenerate:
+
+```text
+confirmed/summary.json
+confirmed/family_state.pt
+confirmed/family_state_summary.json
+family_state_provenance_audit/summary.json
+shortlist_dense_confirmation/summary.json
+search_quality_confirmation/summary.json
+```
+
+Only after that passes should the old q-only c2 speed/quality claims be considered live again.

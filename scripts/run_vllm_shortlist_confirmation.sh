@@ -51,6 +51,7 @@ RUN_DENSE=${RUN_DENSE:-1}
 RUN_VLLM=${RUN_VLLM:-1}
 RUN_CONFIRM=${RUN_CONFIRM:-1}
 RUN_REPORT=${RUN_REPORT:-1}
+RUN_PROVENANCE_AUDIT=${RUN_PROVENANCE_AUDIT:-1}
 
 VLLM_PROMPT_INPUT=${VLLM_PROMPT_INPUT:-token_ids}
 VLLM_PROMPT_VARIANTS=${VLLM_PROMPT_VARIANTS:-${PROMPT_VARIANTS:-default,reordered,xml}}
@@ -220,4 +221,10 @@ if [[ "$RUN_REPORT" == "1" ]]; then
     --max-confirm-k "$CONFIRM_MAX_K" \
     --max-dense-regret "$CONFIRM_MAX_DENSE_REGRET" \
     --min-full-without-dense-load-speedup "$CONFIRM_MIN_FULL_SPEEDUP"
+fi
+
+if [[ "$RUN_PROVENANCE_AUDIT" == "1" ]]; then
+  "$PYTHON" -m randopt_lora_lab.family_state_provenance_audit \
+    --root "$OUT_ROOT" \
+    --out "$OUT_ROOT/family_state_provenance_audit"
 fi
