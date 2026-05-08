@@ -40,11 +40,18 @@ def validity_pass(run_dir: Path) -> bool:
     return bool(summary and summary.get("pass"))
 
 
+def arm_run_dir(root: Path, arm: str, *, baseline_arm: str, baseline_dir: str) -> Path:
+    if arm == baseline_arm:
+        return root / baseline_dir
+    return root / arm
+
+
 def collect_variant(
     variant: str,
     root: Path,
     *,
     baseline_arm: str,
+    baseline_dir: str,
     min_improvement_examples: int,
     max_cap_hit_delta: float,
     max_malformed_delta: float,
@@ -56,7 +63,7 @@ def collect_variant(
         raise ValueError(f"baseline arm {baseline_arm!r} missing from {root / 'parity' / 'summary.json'}")
     baseline = comparisons[baseline_arm]
     dense_valid = validity_pass(root / "dense")
-    baseline_valid = validity_pass(root / baseline_arm)
+    baseline_valid = validity_pass(root / baseline_dir)
     total = holdout_total(root / "dense")
     baseline_ensemble = baseline.get("lora_best_ensemble_holdout_exact")
     baseline_cap = baseline.get("lora_pick_cap_hit_mean")
@@ -64,7 +71,7 @@ def collect_variant(
 
     rows = []
     for arm, comparison in sorted(comparisons.items()):
-        arm_valid = validity_pass(root / arm)
+        arm_valid = validity_pass(arm_run_dir(root, arm, baseline_arm=baseline_arm, baseline_dir=baseline_dir))
         arm_ensemble = comparison.get("lora_best_ensemble_holdout_exact")
         delta = None
         delta_examples = None
@@ -137,6 +144,7 @@ def aggregate(
     variant_roots: list[tuple[str, Path]],
     *,
     baseline_arm: str = "factor",
+    baseline_dir: str = "factor",
     min_variants: int = 2,
     min_improvement_examples: int = 2,
     max_cap_hit_delta: float = 0.02,
@@ -148,6 +156,7 @@ def aggregate(
             name,
             path,
             baseline_arm=baseline_arm,
+            baseline_dir=baseline_dir,
             min_improvement_examples=min_improvement_examples,
             max_cap_hit_delta=max_cap_hit_delta,
             max_malformed_delta=max_malformed_delta,
@@ -175,6 +184,7 @@ def aggregate(
         "failed": failed,
         "thresholds": {
             "baseline_arm": baseline_arm,
+            "baseline_dir": baseline_dir,
             "min_variants": min_variants,
             "min_improvement_examples": min_improvement_examples,
             "max_cap_hit_delta": max_cap_hit_delta,
@@ -248,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--variant-root", action="append", type=parse_variant_root, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--baseline-arm", default="factor")
+    parser.add_argument("--baseline-dir", default="factor")
     parser.add_argument("--min-variants", type=int, default=2)
     parser.add_argument("--min-improvement-examples", type=int, default=2)
     parser.add_argument("--max-cap-hit-delta", type=float, default=0.02)
@@ -258,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = aggregate(
         args.variant_root,
         baseline_arm=args.baseline_arm,
+        baseline_dir=args.baseline_dir,
         min_variants=args.min_variants,
         min_improvement_examples=args.min_improvement_examples,
         max_cap_hit_delta=args.max_cap_hit_delta,

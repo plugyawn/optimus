@@ -161,6 +161,7 @@ done
   "${variant_args[@]}" \
   --out "$OUT_ROOT/report" \
   --baseline-arm "$BASELINE_ARM" \
+  --baseline-dir "$(family_slug "$BASELINE_FAMILY")" \
   --min-variants "$MIN_VARIANTS" \
   --min-improvement-examples "$MIN_IMPROVEMENT_EXAMPLES" \
   --max-cap-hit-delta "$MAX_CAP_HIT_DELTA" \

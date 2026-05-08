@@ -1,0 +1,216 @@
+{
+  "checks": [
+    {
+      "check": "summary_screen_unique_prompts_matches_total",
+      "detail": {
+        "screen_prompts": 64,
+        "screen_unique_prompts": 64
+      },
+      "passed": true
+    },
+    {
+      "check": "summary_holdout_unique_prompts_matches_total",
+      "detail": {
+        "holdout_prompts": 128,
+        "holdout_unique_prompts": 128
+      },
+      "passed": true
+    },
+    {
+      "check": "summary_screen_unique_semantic_prompts_matches_total",
+      "detail": {
+        "screen_prompts": 64,
+        "screen_unique_semantic_prompts": 64
+      },
+      "passed": true
+    },
+    {
+      "check": "summary_holdout_unique_semantic_prompts_matches_total",
+      "detail": {
+        "holdout_prompts": 128,
+        "holdout_unique_semantic_prompts": 128
+      },
+      "passed": true
+    },
+    {
+      "check": "summary_screen_holdout_overlap_zero",
+      "detail": {
+        "screen_holdout_overlap": 0
+      },
+      "passed": true
+    },
+    {
+      "check": "base_screen_rows_present",
+      "detail": {
+        "rows": 64
+      },
+      "passed": true
+    },
+    {
+      "check": "base_holdout_rows_present",
+      "detail": {
+        "rows": 128
+      },
+      "passed": true
+    },
+    {
+      "check": "screen_base_ids_unique[default]",
+      "detail": {
+        "prompt_variant": "default",
+        "rows": 64,
+        "unique": 64
+      },
+      "passed": true
+    },
+    {
+      "check": "screen_base_semantics_unique[default]",
+      "detail": {
+        "prompt_variant": "default",
+        "rows": 64,
+        "unique": 64
+      },
+      "passed": true
+    },
+    {
+      "check": "holdout_base_ids_unique[default]",
+      "detail": {
+        "prompt_variant": "default",
+        "rows": 128,
+        "unique": 128
+      },
+      "passed": true
+    },
+    {
+      "check": "holdout_base_semantics_unique[default]",
+      "detail": {
+        "prompt_variant": "default",
+        "rows": 128,
+        "unique": 128
+      },
+      "passed": true
+    },
+    {
+      "check": "screen_holdout_ids_disjoint",
+      "detail": {
+        "overlap": 0
+      },
+      "passed": true
+    },
+    {
+      "check": "screen_holdout_semantics_disjoint",
+      "detail": {
+        "overlap": 0
+      },
+      "passed": true
+    },
+    {
+      "check": "candidate_score_metric_exact_answer",
+      "detail": {
+        "candidate_score_metric": "exact_answer"
+      },
+      "passed": true
+    },
+    {
+      "check": "ensemble_vote_metric_numeric",
+      "detail": {
+        "ensemble_vote_metric": "valid_numeric_majority_vote"
+      },
+      "passed": true
+    },
+    {
+      "check": "ensemble_per_prompt_rows_present",
+      "detail": {
+        "expected_ks": [
+          1,
+          4,
+          8
+        ],
+        "present_ks": [
+          1,
+          4,
+          8
+        ]
+      },
+      "passed": true
+    },
+    {
+      "check": "candidate_holdout_rows_present",
+      "detail": {
+        "holdout_mode_counts": {
+          "base_holdout": 128,
+          "holdout": 1024
+        }
+      },
+      "passed": true
+    },
+    {
+      "check": "stored_rows_match_current_strict_parser",
+      "detail": {
+        "mismatches": 0,
+        "sample": []
+      },
+      "passed": true
+    },
+    {
+      "check": "selected_candidate_cap_hit_below_threshold",
+      "detail": {
+        "by_candidate": {
+          "factor_gaussian_lora:seed1219141227:s0.002:sign1": 0.0,
+          "factor_gaussian_lora:seed1283028042:s0.002:sign1": 0.0,
+          "factor_gaussian_lora:seed1532350378:s0.002:sign1": 0.0,
+          "factor_gaussian_lora:seed1617523:s0.002:sign1": 0.0,
+          "factor_gaussian_lora:seed2113567481:s0.001:sign1": 0.0,
+          "factor_gaussian_lora:seed414161978:s0.0005:sign1": 0.0,
+          "factor_gaussian_lora:seed591259173:s0.002:sign1": 0.0,
+          "factor_gaussian_lora:seed723039624:s0.002:sign1": 0.0
+        },
+        "max": 0.0,
+        "threshold": 0.1
+      },
+      "passed": true
+    },
+    {
+      "check": "selected_candidate_malformed_below_threshold",
+      "detail": {
+        "by_candidate": {
+          "factor_gaussian_lora:seed1219141227:s0.002:sign1": 0.0,
+          "factor_gaussian_lora:seed1283028042:s0.002:sign1": 0.0,
+          "factor_gaussian_lora:seed1532350378:s0.002:sign1": 0.0078125,
+          "factor_gaussian_lora:seed1617523:s0.002:sign1": 0.0,
+          "factor_gaussian_lora:seed2113567481:s0.001:sign1": 0.0,
+          "factor_gaussian_lora:seed414161978:s0.0005:sign1": 0.015625,
+          "factor_gaussian_lora:seed591259173:s0.002:sign1": 0.0078125,
+          "factor_gaussian_lora:seed723039624:s0.002:sign1": 0.0078125
+        },
+        "max": 0.015625,
+        "threshold": 0.1
+      },
+      "passed": true
+    },
+    {
+      "check": "summary_top_holdout_cap_hit_below_threshold",
+      "detail": {
+        "max": 0.0,
+        "threshold": 0.1
+      },
+      "passed": true
+    },
+    {
+      "check": "summary_top_holdout_malformed_below_threshold",
+      "detail": {
+        "max": 0.015625,
+        "threshold": 0.1
+      },
+      "passed": true
+    }
+  ],
+  "failed": [],
+  "kind": "result_validity_audit",
+  "pass": true,
+  "run_dir": "results/lora_family_sweep_rank32_p16_probe/default/factor",
+  "thresholds": {
+    "max_rescore_mismatches": 0,
+    "max_selected_cap_hit": 0.1,
+    "max_selected_malformed": 0.1
+  }
+}
