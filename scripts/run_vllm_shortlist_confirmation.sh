@@ -73,6 +73,7 @@ CONFIRM_MAX_DENSE_REGRET=${CONFIRM_MAX_DENSE_REGRET:-0.0}
 CONFIRM_MIN_FULL_SPEEDUP=${CONFIRM_MIN_FULL_SPEEDUP:-1.0}
 PROPOSAL_SCORE_COL=${PROPOSAL_SCORE_COL:-selection_score}
 SHORTLIST_POLICY=${SHORTLIST_POLICY:-}
+CONFIRM_FAMILY_STATE_FILE=${CONFIRM_FAMILY_STATE_FILE:-}
 SHORTLIST_REPORT_ARGS=()
 
 export PYTHONUNBUFFERED=1
@@ -87,6 +88,10 @@ if [[ -n "$SIGMA_VALUES" ]]; then
 fi
 if [[ -n "$ENSEMBLE_KS" ]]; then
   extra_search_args+=(--ensemble-ks "$ENSEMBLE_KS")
+fi
+extra_confirm_args=("${extra_search_args[@]}")
+if [[ -n "$CONFIRM_FAMILY_STATE_FILE" ]]; then
+  extra_confirm_args+=(--family-state-file "$CONFIRM_FAMILY_STATE_FILE")
 fi
 
 extra_vllm_args=()
@@ -176,6 +181,9 @@ else
 fi
 
 if [[ "$RUN_CONFIRM" == "1" ]]; then
+  if [[ -z "$CONFIRM_FAMILY_STATE_FILE" && -f "$OUT_ROOT/vllm/family_state.pt" ]]; then
+    extra_confirm_args+=(--family-state-file "$OUT_ROOT/vllm/family_state.pt")
+  fi
   "$PYTHON" -m randopt_lora_lab.experiments search \
     --out "$OUT_ROOT/confirmed" \
     --model "$MODEL" \
@@ -194,7 +202,7 @@ if [[ "$RUN_CONFIRM" == "1" ]]; then
     --batch-size "$HF_BATCH_SIZE" \
     --max-new-tokens "$MAX_NEW_TOKENS" \
     --stop-at-answer \
-    "${extra_search_args[@]}"
+    "${extra_confirm_args[@]}"
   "$PYTHON" -m randopt_lora_lab.result_validity \
     --run "$OUT_ROOT/confirmed" \
     --out "$OUT_ROOT/confirmed/validity"

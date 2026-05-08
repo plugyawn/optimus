@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import time
 from collections import Counter
 from pathlib import Path
@@ -38,6 +39,27 @@ def reset_outputs(out: Path, names: list[str]) -> None:
 
 def tag_rows(rows: list[dict], **extra) -> list[dict]:
     return [dict(row, **extra) for row in rows]
+
+
+def record_loaded_family_state(source: str, out: Path, args) -> None:
+    source_path = Path(source)
+    if not source_path.exists():
+        raise FileNotFoundError(f"missing family state file: {source_path}")
+    out.mkdir(parents=True, exist_ok=True)
+    dest = out / "family_state.pt"
+    if source_path.resolve() != dest.resolve():
+        shutil.copy2(source_path, dest)
+    source_summary_path = source_path.with_name("family_state_summary.json")
+    source_summary = json.loads(source_summary_path.read_text()) if source_summary_path.exists() else None
+    summary = {
+        "kind": "loaded_family_state",
+        "source": str(source_path),
+        "family": args.family,
+        "rank": args.rank,
+        "targets": args.targets,
+        "source_summary": source_summary,
+    }
+    (out / "family_state_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
 
 
 def make_prompts_for_backend(backend, args, examples) -> list[str]:
@@ -346,6 +368,8 @@ def anzo_random_target_prompts(seed: int, n: int) -> list[str]:
 
 
 def maybe_build_family_state(args, backend, screen):
+    if getattr(args, "family_state_file", ""):
+        return torch.load(args.family_state_file, map_location="cpu")
     if args.family in {
         "isotropic",
         "dense_gaussian",
@@ -413,6 +437,8 @@ def run_search(args):
     write_jsonl(out / "per_prompt.jsonl", tag_rows(base_screen["rows"], mode="base_screen"))
     write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
     family_state = maybe_build_family_state(args, backend, screen)
+    if args.family_state_file:
+        record_loaded_family_state(args.family_state_file, out, args)
     sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
     candidates = (
         read_candidate_file(args.candidate_file)
@@ -477,6 +503,7 @@ def run_search(args):
         "batch_size": args.batch_size,
         "allow_repeat_data": args.allow_repeat_data,
         "candidate_file": args.candidate_file,
+        "family_state_file": args.family_state_file,
         "antithetic": args.antithetic,
         "promote": args.promote,
         "screen_prompts": len(screen),
@@ -536,6 +563,8 @@ def run_halving(args):
     write_jsonl(out / "full_per_prompt.jsonl", tag_rows(base_screen["rows"], mode="base_screen"))
     write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(base_holdout["rows"], mode="base_holdout"))
     family_state = maybe_build_family_state(args, backend, screen)
+    if args.family_state_file:
+        record_loaded_family_state(args.family_state_file, out, args)
     sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
     candidates = (
         read_candidate_file(args.candidate_file)
@@ -587,6 +616,7 @@ def run_halving(args):
         "batch_size": args.batch_size,
         "allow_repeat_data": args.allow_repeat_data,
         "candidate_file": args.candidate_file,
+        "family_state_file": args.family_state_file,
         "antithetic": args.antithetic,
         "promote": args.promote,
         "stage_prompts": len(stage),
@@ -778,6 +808,7 @@ def main():
         )
         sp.add_argument("--population", type=int, default=32)
         sp.add_argument("--candidate-file", default="", help="Optional JSONL/list of exact candidate keys to evaluate.")
+        sp.add_argument("--family-state-file", default="", help="Optional saved activation family_state.pt to reuse.")
         sp.add_argument("--promote", type=int, default=4)
         sp.add_argument("--ensemble-ks", default="")
         sp.add_argument("--ensemble-ratios", default="")

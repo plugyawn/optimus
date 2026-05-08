@@ -3,7 +3,15 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from randopt_lora_lab.countdown import CountdownExample
-from randopt_lora_lab.experiments import candidate_panel, ensemble_ks_from_values, majority_vote_evaluation, parse_k_list, read_candidate_file as read_peft_candidate_file
+from randopt_lora_lab.experiments import (
+    candidate_panel,
+    ensemble_ks_from_values,
+    majority_vote_evaluation,
+    maybe_build_family_state,
+    parse_k_list,
+    read_candidate_file as read_peft_candidate_file,
+    record_loaded_family_state,
+)
 from randopt_lora_lab.strict_ensemble_replay import replay
 from randopt_lora_lab.vllm_lora_search import candidate_panel as vllm_candidate_panel, read_candidate_file
 
@@ -82,6 +90,34 @@ class ExperimentEnsembleTests(unittest.TestCase):
         self.assertEqual([c.seed for c in candidates], [7, 8])
         self.assertEqual([c.sign for c in candidates], [1, -1])
         self.assertEqual([c.sigma for c in candidates], [0.001, 0.002])
+
+    def test_peft_search_can_load_and_record_saved_family_state(self):
+        import argparse
+        import json
+        import tempfile
+
+        import torch
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state_path = root / "family_state.pt"
+            summary_path = root / "family_state_summary.json"
+            torch.save({"module": torch.eye(2)}, state_path)
+            summary_path.write_text(json.dumps({"activation_state_prompt_variants": ["default", "xml"]}))
+            args = argparse.Namespace(
+                family_state_file=str(state_path),
+                family="activation_spectral_lora_c2",
+                rank=32,
+                targets="q_proj",
+            )
+
+            loaded = maybe_build_family_state(args, backend=None, screen=[])
+            record_loaded_family_state(str(state_path), root / "confirmed", args)
+            recorded = json.loads((root / "confirmed" / "family_state_summary.json").read_text())
+
+        self.assertTrue(torch.equal(loaded["module"], torch.eye(2)))
+        self.assertEqual(recorded["kind"], "loaded_family_state")
+        self.assertEqual(recorded["source_summary"]["activation_state_prompt_variants"], ["default", "xml"])
 
     def test_majority_vote_uses_numeric_answers_not_formula_strings(self):
         example = CountdownExample(1, (1, 2, 3), 6)
