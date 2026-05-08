@@ -8,7 +8,7 @@ PYTHON=${PYTHON:-python}
 
 FAMILIES=${FAMILIES:-factor_gaussian_lora,sparse_low_rank_lora_d0p25,sparse_low_rank_lora_d0p125}
 BASELINE_FAMILY=${BASELINE_FAMILY:-factor_gaussian_lora}
-BASELINE_ARM=${BASELINE_ARM:-factor}
+BASELINE_ARM=${BASELINE_ARM:-lora}
 PROMPT_VARIANTS=${PROMPT_VARIANTS:-default,reordered}
 POPULATION=${POPULATION:-64}
 PROMPTS=${PROMPTS:-64}
