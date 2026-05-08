@@ -105,3 +105,25 @@ validity fails:
 
 The first scale-up should require multi-seed replication. A single P64 pass is
 only permission for a larger diagnostic, not a project-level claim.
+
+## P16 A100 Update
+
+The first A100 P16 run is recorded in
+`docs/spectral_vllm_confirmation_p16_a100.md` and
+`results/spectral_vllm_confirmation_rank32_c1p5_p16_default`.
+
+It found a systems positive but quality negative:
+
+```text
+confirmation gate: pass
+zero-regret k: 2
+eval-only speedup at k=2: 26.39x
+full-without-PEFT-load speedup at k=2: 8.87x
+spectral dense-parity gate: fail
+spectral Spearman vs dense: 0.300
+spectral selected regret: 1.5625 percentage points
+```
+
+The old default `ENSEMBLE_KS=1,4,8,16` made a P16 smoke run promote the whole
+candidate panel on holdout. The script now defaults to `1,4,8`; use
+`ENSEMBLE_KS=1,4,8,16` explicitly when full-panel P16 holdout is intended.

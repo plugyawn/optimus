@@ -1,0 +1,19 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.46it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.94it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.84it/s]
+The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+1/16 dense_gaussian:seed1283028042:s0.002:sign1 exact=0.0781 elapsed=19.77
+2/16 dense_gaussian:seed591259173:s0.002:sign1 exact=0.0625 elapsed=22.98
+3/16 dense_gaussian:seed1907982355:s0.0005:sign1 exact=0.0625 elapsed=23.74
+4/16 dense_gaussian:seed1973132888:s0.001:sign1 exact=0.0625 elapsed=23.30
+5/16 dense_gaussian:seed414161978:s0.0005:sign1 exact=0.0469 elapsed=23.85
+6/16 dense_gaussian:seed1474485656:s0.002:sign1 exact=0.0625 elapsed=24.37
+7/16 dense_gaussian:seed1617523:s0.002:sign1 exact=0.0312 elapsed=18.93
+8/16 dense_gaussian:seed1267011527:s0.002:sign1 exact=0.0781 elapsed=19.75
+9/16 dense_gaussian:seed1532350378:s0.002:sign1 exact=0.0312 elapsed=8.76
+10/16 dense_gaussian:seed2113567481:s0.001:sign1 exact=0.0312 elapsed=18.74
+11/16 dense_gaussian:seed723039624:s0.002:sign1 exact=0.0781 elapsed=13.65
+12/16 dense_gaussian:seed1219141227:s0.002:sign1 exact=0.0938 elapsed=19.27
+13/16 dense_gaussian:seed1884135719:s0.0005:sign1 exact=0.0312 elapsed=19.73
+14/16 dense_gaussian:seed2103302888:s0.0005:sign1 exact=0.0312 elapsed=24.22
+15/16 dense_gaussian:seed1245646949:s0.0005:sign1 exact=0.0469 elapsed=19.98
+16/16 dense_gaussian:seed765487669:s0.001:sign1 exact=0.0469 elapsed=19.28
