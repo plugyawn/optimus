@@ -15,6 +15,7 @@ from pathlib import Path
 from .countdown import load_examples, unique_example_count, unique_semantic_example_count
 from .vllm_lora_search import (
     base_eval,
+    build_activation_family_state,
     candidate_panel,
     import_vllm_lora_request,
     make_adapter_specs,
@@ -58,8 +59,9 @@ def run_halving(args) -> dict:
     )
     candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic)
 
+    family_state = build_activation_family_state(args, out, screen, ["default"])
     adapter_start = time.time()
-    specs = make_adapter_specs(args, out, targets, candidates)
+    specs = make_adapter_specs(args, out, targets, candidates, family_state=family_state)
     adapter_build_s = time.time() - adapter_start
     write_jsonl(out / "adapters.jsonl", [asdict(spec) for spec in specs])
 
@@ -168,6 +170,7 @@ def run_halving(args) -> dict:
         "max_new_tokens": args.max_new_tokens,
         "stop_at_answer": args.stop_at_answer,
         "adapter_build_s": adapter_build_s,
+        "family_state": "family_state.pt" if family_state is not None else None,
         "adapters_kept": adapters_kept,
         "load_s": load_s,
         "base_stage_exact": base_stage["exact_mean"],
@@ -256,10 +259,17 @@ def build_parser() -> argparse.ArgumentParser:
             "activation_projected_gaussian_rank_r_c1p25",
             "activation_projected_gaussian_rank_r_c1p5",
             "activation_projected_gaussian_rank_r_c2",
+            "activation_generalized_projected_gaussian_rank_r",
+            "activation_generalized_projected_gaussian_rank_r_c0p5",
+            "activation_generalized_projected_gaussian_rank_r_c0p75",
+            "activation_generalized_projected_gaussian_rank_r_c1p25",
+            "activation_generalized_projected_gaussian_rank_r_c1p5",
+            "activation_generalized_projected_gaussian_rank_r_c2",
         ],
     )
     p.add_argument("--antithetic", action="store_true")
     p.add_argument("--max-new-tokens", type=int, default=32)
+    p.add_argument("--prompt-input", default="text", choices=["text", "token_ids"])
     p.add_argument("--stop-at-answer", action="store_true")
     p.add_argument("--dtype", default="bfloat16")
     p.add_argument("--adapter-dtype", default="bfloat16", choices=["float16", "bfloat16", "float32"])
@@ -274,6 +284,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--keep-adapters", action="store_true")
     p.add_argument("--local-files-only", action="store_true")
     p.add_argument("--allow-repeat-data", action="store_true")
+    p.add_argument("--use-chat-template", action="store_true")
+    p.add_argument("--activation-state-prompts", type=int, default=16)
+    p.add_argument("--activation-state-batch-size", type=int, default=16)
+    p.add_argument("--activation-state-no-anchor-subtract", action="store_true")
     return p
 
 

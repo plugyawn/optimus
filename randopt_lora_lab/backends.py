@@ -185,6 +185,18 @@ class TransformersLoraBackend:
             return_metadata=True,
         )
 
+    def build_activation_generalized_state(self, target_prompts: list[str], anchor_prompts: list[str], *, subtract_anchor: bool = True):
+        return build_anzo_state(
+            self.model,
+            self.tokenizer,
+            target_prompts,
+            anchor_prompts,
+            self.rank,
+            subtract_anchor=subtract_anchor,
+            return_metadata=True,
+            mode="generalized_target_anchor",
+        )
+
     def build_random_orthonormal_state(self, seed: int):
         return build_random_orthonormal_state(self.model, self.rank, seed)
 

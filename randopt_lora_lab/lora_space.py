@@ -91,6 +91,102 @@ def activation_projected_scale(family: str) -> float:
     return scale
 
 
+def activation_generalized_projected_scale(family: str) -> float:
+    if family == "activation_generalized_projected_gaussian_rank_r":
+        return 1.0
+    match = re.fullmatch(r"activation_generalized_projected_gaussian_rank_r_c([0-9]+(?:p[0-9]+)?)", family)
+    if not match:
+        raise ValueError(f"not an activation generalized projected Gaussian family: {family}")
+    scale = float(match.group(1).replace("p", "."))
+    if scale <= 0.0:
+        raise ValueError(f"activation generalized projected scale must be positive, got {scale}")
+    return scale
+
+
+def activation_right_projected_scale(family: str) -> float:
+    if family.startswith("activation_generalized_projected_gaussian_rank_r"):
+        return activation_generalized_projected_scale(family)
+    return activation_projected_scale(family)
+
+
+def _cholesky_with_jitter(matrix: torch.Tensor) -> torch.Tensor:
+    eye = torch.eye(matrix.shape[0], dtype=matrix.dtype, device=matrix.device)
+    jitter = 0.0
+    for _ in range(6):
+        try:
+            return torch.linalg.cholesky(matrix + jitter * eye)
+        except torch.linalg.LinAlgError:
+            jitter = 1e-6 if jitter == 0.0 else jitter * 10.0
+    return torch.linalg.cholesky(matrix + jitter * eye)
+
+
+def generalized_activation_basis(
+    target: torch.Tensor,
+    anchor: torch.Tensor,
+    rank: int,
+    *,
+    oversample: int = 4,
+    eps_scale: float = 0.05,
+    use_anchor: bool = True,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return target-vs-anchor generalized directions in activation space.
+
+    The expensive full generalized eigenproblem is restricted to the top target
+    activation subspace.  Inside that small subspace, directions maximize
+    target covariance subject to anchor covariance plus a ridge.  This is a
+    cheap power-method-like basis for "target active, anchor quiet" directions
+    without letting the anchor nullspace dominate.
+    """
+
+    if target.ndim != 2 or anchor.ndim != 2:
+        raise ValueError("target and anchor activations must be 2D")
+    if target.shape[1] != anchor.shape[1]:
+        raise ValueError(f"activation width mismatch: target={target.shape[1]} anchor={anchor.shape[1]}")
+    width = int(target.shape[1])
+    if rank < 0:
+        raise ValueError("rank must be nonnegative")
+    if rank == 0 or width == 0 or target.shape[0] == 0:
+        return torch.zeros((rank, width), dtype=torch.float32), torch.zeros((rank,), dtype=torch.float32)
+
+    target = target.cpu().float()
+    anchor = anchor.cpu().float()
+    target = target - target.mean(dim=0, keepdim=True)
+    anchor = anchor - anchor.mean(dim=0, keepdim=True)
+    subspace_rank = min(max(rank, rank * oversample), target.shape[0], width)
+    if subspace_rank <= 0:
+        return torch.zeros((rank, width), dtype=torch.float32), torch.zeros((rank,), dtype=torch.float32)
+
+    _, _, vh_t = torch.linalg.svd(target, full_matrices=False)
+    target_basis = vh_t[:subspace_rank].contiguous()
+    target_small = target @ target_basis.T
+    denom_t = max(int(target_small.shape[0]), 1)
+    cov_t = (target_small.T @ target_small) / float(denom_t)
+    if use_anchor:
+        anchor_small = anchor @ target_basis.T
+        denom_a = max(int(anchor_small.shape[0]), 1)
+        cov_a = (anchor_small.T @ anchor_small) / float(denom_a)
+        ridge = float(torch.diag(cov_a).mean().clamp_min(1e-6).item()) * float(eps_scale)
+        cov_a = cov_a + ridge * torch.eye(cov_a.shape[0], dtype=cov_a.dtype)
+    else:
+        cov_a = torch.eye(cov_t.shape[0], dtype=cov_t.dtype)
+    chol = _cholesky_with_jitter(cov_a.double())
+    left = torch.linalg.solve_triangular(chol, cov_t.double(), upper=False)
+    whitened = torch.linalg.solve_triangular(chol, left.T, upper=False).T
+    whitened = 0.5 * (whitened + whitened.T)
+    eigvals, eigvecs = torch.linalg.eigh(whitened)
+    order = torch.argsort(eigvals, descending=True)
+    take = min(rank, int(order.numel()))
+    generalized_vecs = torch.linalg.solve_triangular(chol.T, eigvecs[:, order[:take]], upper=True)
+    small_vecs = generalized_vecs.T.float()
+    basis = small_vecs @ target_basis
+    basis = F.normalize(basis, dim=1, eps=1e-6)
+    scores = eigvals[order[:take]].float()
+    if take < rank:
+        basis = F.pad(basis, (0, 0, 0, rank - take))
+        scores = F.pad(scores, (0, rank - take))
+    return basis.contiguous(), scores.contiguous()
+
+
 def activation_projected_gaussian_factors(
     module_name: str,
     out_features: int,
@@ -123,7 +219,7 @@ def activation_projected_gaussian_factors(
     canonical_name = canonical_module_name(module_name)
     gen = torch.Generator(device="cpu")
     gen.manual_seed((candidate.seed + stable_int(canonical_name + ":dense_gaussian")) % (2**63 - 1))
-    scale = activation_projected_scale(candidate.family)
+    scale = activation_right_projected_scale(candidate.family)
     dense = torch.randn((out_features, in_features), generator=gen, dtype=torch.float32)
     dense.mul_(float(candidate.sign) * float(candidate.sigma) * scale)
     b = dense @ v
@@ -249,7 +345,9 @@ def lora_noise_tensors(
             seed=spectral_seed,
             dtype=torch.float32,
         )
-    if candidate.family.startswith("activation_projected_gaussian_rank_r"):
+    if candidate.family.startswith("activation_projected_gaussian_rank_r") or candidate.family.startswith(
+        "activation_generalized_projected_gaussian_rank_r"
+    ):
         if family_spec is None:
             raise ValueError(f"{candidate.family} requires an activation basis for {lookup_key}")
         basis = family_spec.get("basis") if isinstance(family_spec, dict) else family_spec
@@ -375,15 +473,18 @@ def build_anzo_state(
     *,
     subtract_anchor: bool = True,
     return_metadata: bool = False,
+    mode: str = "target_residual_svd",
 ) -> dict:
     """Build a cheap target-active/anchor-quiet input basis for LoRA A matrices.
 
     For each LoRA target module, collect input activations on target and anchor
-    prompts, then use the top right singular vectors of target residual energy:
+    prompts, then use either the top right singular vectors of target residual
+    energy:
 
         X_target - projection_on_anchor_subspace(X_target)
 
-    The returned tensors have shape [rank, in_features], matching LoRA A.
+    or a small generalized target-vs-anchor basis.  The returned tensors have
+    shape [rank, in_features], matching LoRA A.
     """
 
     device = model.device
@@ -393,7 +494,12 @@ def build_anzo_state(
     def make_hook(name: str):
         def hook(_module, inputs, _output):
             x = inputs[0].detach().float()
-            x = x.reshape(-1, x.shape[-1]).cpu()
+            mask = getattr(model, "_anzo_attention_mask", None)
+            if mask is not None and mask.shape[:2] == x.shape[:2]:
+                x = x[mask.to(device=x.device, dtype=torch.bool)]
+            else:
+                x = x.reshape(-1, x.shape[-1])
+            x = x.cpu()
             if x.shape[0] > 512:
                 stride = max(1, x.shape[0] // 512)
                 x = x[::stride][:512]
@@ -410,6 +516,7 @@ def build_anzo_state(
     def run(prompts: list[str], phase: str):
         model._anzo_phase = phase
         inputs = tokenizer(prompts, return_tensors="pt", padding=True, truncation=True, max_length=256).to(device)
+        model._anzo_attention_mask = inputs.get("attention_mask")
         _ = model(**inputs)
 
     try:
@@ -420,11 +527,30 @@ def build_anzo_state(
             h.remove()
         if hasattr(model, "_anzo_phase"):
             delattr(model, "_anzo_phase")
+        if hasattr(model, "_anzo_attention_mask"):
+            delattr(model, "_anzo_attention_mask")
 
     state = {}
     for name, by_phase in acts.items():
         target = torch.cat(by_phase.get("target", []), dim=0)
         anchor = torch.cat(by_phase.get("anchor", []), dim=0)
+        if mode == "generalized_target_anchor":
+            basis, scores = generalized_activation_basis(target, anchor, rank, use_anchor=subtract_anchor)
+            if return_metadata:
+                state[name] = {
+                    "basis": basis.contiguous(),
+                    "singular_values": scores.contiguous(),
+                    "anchor_rank": 0,
+                    "subtract_anchor": bool(subtract_anchor),
+                    "target_rows": int(target.shape[0]),
+                    "anchor_rows": int(anchor.shape[0]),
+                    "mode": mode,
+                }
+            else:
+                state[name] = basis.contiguous()
+            continue
+        if mode != "target_residual_svd":
+            raise ValueError(f"unknown activation basis mode: {mode}")
         target = target - target.mean(dim=0, keepdim=True)
         anchor = anchor - anchor.mean(dim=0, keepdim=True)
         # Anchor subspace from a small SVD. Keep it modest so target signal can survive.

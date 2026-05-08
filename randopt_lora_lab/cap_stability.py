@@ -59,6 +59,7 @@ def build_family_states(
         for candidate in candidates
         if candidate.family.startswith("activation_spectral_lora")
         or candidate.family.startswith("activation_projected_gaussian_rank_r")
+        or candidate.family.startswith("activation_generalized_projected_gaussian_rank_r")
     }
     if saved_state.exists() and activation_families:
         loaded = torch.load(saved_state, map_location="cpu")
@@ -72,6 +73,8 @@ def build_family_states(
     for family in sorted({candidate.family for candidate in candidates}):
         if family.startswith("activation_spectral_lora_sv"):
             states[family] = backend.build_activation_spectral_state(target_prompts, anzo_anchor_prompts())
+        elif family.startswith("activation_generalized_projected_gaussian_rank_r"):
+            states[family] = backend.build_activation_generalized_state(target_prompts, anzo_anchor_prompts())
         elif family.startswith("activation_spectral_lora") or family.startswith("activation_projected_gaussian_rank_r"):
             states[family] = backend.build_anzo_state(target_prompts, anzo_anchor_prompts())
     return states, {

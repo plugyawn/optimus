@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from randopt_lora_lab.compare_halving import compare_halving
+from randopt_lora_lab.vllm_lora_halving import build_parser
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
@@ -13,6 +14,11 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 class CompareHalvingTests(unittest.TestCase):
+    def test_vllm_halving_parser_has_shared_prompt_input_arg(self):
+        args = build_parser().parse_args(["--out", "tmp"])
+
+        self.assertEqual(args.prompt_input, "text")
+
     def test_reports_survivor_recall_and_regret(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
