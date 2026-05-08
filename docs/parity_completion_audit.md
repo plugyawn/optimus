@@ -60,6 +60,20 @@ python -m randopt_lora_lab.multirun_gate \
 The multi-run gate is intentionally strict: single-seed, default-prompt-only, or
 parity-negative runs fail even if their confirmation economics pass.
 
+For new spectral-vLLM runs, prefer:
+
+```bash
+OUT_ROOT=results/spectral_vllm_multirun_rank32_c1p5_p64 \
+RUN_SEEDS=20260507,20260508 \
+POPULATION=64 \
+PROMPTS=64 \
+HOLDOUT_PROMPTS=256 \
+scripts/run_spectral_vllm_multirun_gate.sh
+```
+
+The wrapper runs the vLLM prompt-validity/proposal stage before the expensive
+PEFT arms by default.
+
 Drift evidence should be task-conditioned, not only a parameter-norm proxy:
 
 ```bash

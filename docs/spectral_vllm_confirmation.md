@@ -109,19 +109,22 @@ only permission for a larger diagnostic, not a project-level claim.
 Use the multi-run gate before interpreting repeated runs:
 
 ```bash
-python -m randopt_lora_lab.multirun_gate \
-  --run results/spectral_vllm_confirmation_rank32_c1p5_seed1 \
-  --run results/spectral_vllm_confirmation_rank32_c1p5_seed2 \
-  --parity-arm lora \
-  --min-runs 2 \
-  --min-prompt-variants 2 \
-  --max-zero-regret-k 8 \
-  --out results/spectral_vllm_multirun_gate
+OUT_ROOT=results/spectral_vllm_multirun_rank32_c1p5_p64 \
+RUN_SEEDS=20260507,20260508 \
+POPULATION=64 \
+PROMPTS=64 \
+HOLDOUT_PROMPTS=256 \
+VLLM_HOLDOUT_PROMPTS=8 \
+scripts/run_spectral_vllm_multirun_gate.sh
 ```
 
 This gate keeps systems confirmation, dense parity, validity, and prompt
 robustness separate. It should fail a default-prompt-only run even if vLLM
 shortlisting is fast.
+
+The wrapper sets `RUN_VLLM_FIRST=1` by default. That makes the robust vLLM
+prompt-validity check run before the expensive PEFT dense/control/spectral arms,
+so a prompt-protocol failure is cheap.
 
 ## P16 A100 Update
 

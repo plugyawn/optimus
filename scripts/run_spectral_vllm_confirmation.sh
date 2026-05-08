@@ -27,6 +27,7 @@ RUN_DENSE=${RUN_DENSE:-1}
 RUN_CONTROL=${RUN_CONTROL:-1}
 RUN_SPECTRAL=${RUN_SPECTRAL:-1}
 RUN_VLLM=${RUN_VLLM:-1}
+RUN_VLLM_FIRST=${RUN_VLLM_FIRST:-0}
 RUN_CONFIRMATION=${RUN_CONFIRMATION:-1}
 RUN_VALIDITY=${RUN_VALIDITY:-1}
 RUN_PARITY=${RUN_PARITY:-1}
@@ -108,38 +109,7 @@ run_peft_search() {
   fi
 }
 
-if [[ ! -f "$DATA" ]]; then
-  "$PYTHON" -m randopt_lora_lab.make_countdown_data \
-    --out "$DATA" \
-    --count 1200 \
-    --seed 20260507
-fi
-
-if [[ "$RUN_DENSE" == "1" ]]; then
-  run_peft_search dense dense dense_gaussian
-fi
-
-if [[ "$RUN_CONTROL" == "1" ]]; then
-  run_peft_search control lora "$CONTROL_FAMILY"
-fi
-
-if [[ "$RUN_SPECTRAL" == "1" ]]; then
-  run_peft_search spectral lora "$FAMILY"
-fi
-
-if [[ "$RUN_PARITY" == "1" ]]; then
-  extra_candidates=()
-  if [[ -f "$OUT_ROOT/control/summary.json" ]]; then
-    extra_candidates+=(--candidate "control=$OUT_ROOT/control")
-  fi
-  "$PYTHON" -m randopt_lora_lab.parity_report \
-    --dense "$OUT_ROOT/dense" \
-    --lora "$OUT_ROOT/spectral" \
-    "${extra_candidates[@]}" \
-    --out "$OUT_ROOT/parity"
-fi
-
-if [[ "$RUN_VLLM" == "1" ]]; then
+run_vllm_search() {
   "$PYTHON" -m randopt_lora_lab.vllm_lora_search \
     --out "$OUT_ROOT/vllm_spectral" \
     --model "$MODEL" \
@@ -172,6 +142,45 @@ if [[ "$RUN_VLLM" == "1" ]]; then
     --stop-at-answer \
     --keep-adapters \
     "${extra_vllm_args[@]}"
+}
+
+if [[ ! -f "$DATA" ]]; then
+  "$PYTHON" -m randopt_lora_lab.make_countdown_data \
+    --out "$DATA" \
+    --count 1200 \
+    --seed 20260507
+fi
+
+if [[ "$RUN_VLLM" == "1" && "$RUN_VLLM_FIRST" == "1" ]]; then
+  run_vllm_search
+fi
+
+if [[ "$RUN_DENSE" == "1" ]]; then
+  run_peft_search dense dense dense_gaussian
+fi
+
+if [[ "$RUN_CONTROL" == "1" ]]; then
+  run_peft_search control lora "$CONTROL_FAMILY"
+fi
+
+if [[ "$RUN_SPECTRAL" == "1" ]]; then
+  run_peft_search spectral lora "$FAMILY"
+fi
+
+if [[ "$RUN_PARITY" == "1" ]]; then
+  extra_candidates=()
+  if [[ -f "$OUT_ROOT/control/summary.json" ]]; then
+    extra_candidates+=(--candidate "control=$OUT_ROOT/control")
+  fi
+  "$PYTHON" -m randopt_lora_lab.parity_report \
+    --dense "$OUT_ROOT/dense" \
+    --lora "$OUT_ROOT/spectral" \
+    "${extra_candidates[@]}" \
+    --out "$OUT_ROOT/parity"
+fi
+
+if [[ "$RUN_VLLM" == "1" && "$RUN_VLLM_FIRST" != "1" ]]; then
+  run_vllm_search
 fi
 
 if [[ "$RUN_CONFIRMATION" == "1" ]]; then
