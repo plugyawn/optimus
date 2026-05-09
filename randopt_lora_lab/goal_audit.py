@@ -15,6 +15,54 @@ class GoalCheck:
     detail: Any
 
 
+NEXT_ACTIONS = {
+    "official full-Gaussian baseline validity": {
+        "action": "rerun a dense Gaussian reference with current reproduction metadata before using it as the paper-style baseline",
+        "command": "scripts/run_gaussian_parity_baseline.sh",
+    },
+    "quality parity": {
+        "action": "produce a current-valid LoRA-family parity report whose holdout quality matches or beats dense Gaussian",
+        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+    },
+    "stability parity": {
+        "action": "rerun parity on a shared candidate panel until Spearman, top-k overlap, and selected-regret gates pass across seeds",
+        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+    },
+    "speed parity": {
+        "action": "measure quality-coupled accelerated search speed against the dense full-screen reference, not same-family speed alone",
+        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+    },
+    "accelerated evaluation route": {
+        "action": "run the dense-referenced shortlist confirmation path or fix direct accelerated-backend selector parity",
+        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+    },
+    "adapter identity provenance": {
+        "action": "rerun activation-spectral PEFT confirmation with the saved vLLM family_state.pt copied and audited",
+        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+    },
+    "multi-run prompt-robust confirmation": {
+        "action": "aggregate at least two prompt-valid runs after the dense-referenced confirmation path passes",
+        "command": "python -m randopt_lora_lab.multirun_gate --run RUN1 --run RUN2 --parity-arm lora --out results/spectral_vllm_multirun_gate",
+    },
+    "prompt robustness": {
+        "action": "prove nonnegative lift and no cap/malformed regression on multiple base-valid prompt variants",
+        "command": "python -m randopt_lora_lab.prompt_robustness --help",
+    },
+    "drift parity": {
+        "action": "run true nonnegative full-vocab next-token KL drift parity against dense Gaussian",
+        "command": "python -m randopt_lora_lab.drift_parity --help",
+    },
+    "eval validity": {
+        "action": "run strict parser, semantic split, cap-hit, malformed, and ensemble-row validity on the claim artifact",
+        "command": "python -m randopt_lora_lab.result_validity --run RUN --out RUN/validity",
+    },
+    "adapter convenience": {
+        "action": "materialize and keep portable LoRA adapters plus replay metadata for the selected family",
+        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+    },
+}
+
+
 def read_json(path: Path | None) -> dict | None:
     if path is None:
         return None
@@ -307,10 +355,15 @@ def run_goal_audit(args) -> dict:
     checks.append(check_eval_validity(args.eval_validity, eval_validity))
     checks.append(check_adapter_convenience(args.adapter_run))
     rows = [asdict(check) for check in checks]
+    failed = [row["requirement"] for row in rows if not row["passed"]]
     return {
         "pass": all(row["passed"] for row in rows),
-        "failed": [row["requirement"] for row in rows if not row["passed"]],
+        "failed": failed,
         "checks": rows,
+        "next_actions": [
+            {"requirement": requirement, **NEXT_ACTIONS.get(requirement, {"action": "inspect failed gate detail", "command": ""})}
+            for requirement in failed
+        ],
     }
 
 
@@ -328,6 +381,18 @@ def render_markdown(summary: dict) -> str:
             f"| {row['requirement']} | {str(row['passed']).lower()} | "
             f"`{row['evidence']}` | `{json.dumps(row['detail'], sort_keys=True)}` |"
         )
+    if summary.get("next_actions"):
+        lines.extend(
+            [
+                "",
+                "## Next Actions",
+                "",
+                "| requirement | action | command |",
+                "| --- | --- | --- |",
+            ]
+        )
+        for row in summary["next_actions"]:
+            lines.append(f"| {row['requirement']} | {row['action']} | `{row['command']}` |")
     lines.append("")
     return "\n".join(lines)
 

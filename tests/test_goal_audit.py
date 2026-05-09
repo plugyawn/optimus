@@ -39,6 +39,15 @@ class GoalAuditTests(unittest.TestCase):
         self.assertIn("multi-run prompt-robust confirmation", summary["failed"])
         self.assertIn("drift parity", summary["failed"])
         self.assertIn("eval validity", summary["failed"])
+        action_by_requirement = {row["requirement"]: row for row in summary["next_actions"]}
+        self.assertEqual(
+            action_by_requirement["accelerated evaluation route"]["command"],
+            "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+        )
+        self.assertEqual(
+            action_by_requirement["adapter identity provenance"]["command"],
+            "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+        )
 
     def test_full_evidence_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -96,6 +105,7 @@ class GoalAuditTests(unittest.TestCase):
 
             self.assertTrue(summary["pass"])
             self.assertEqual(summary["failed"], [])
+            self.assertEqual(summary["next_actions"], [])
 
     def test_parity_report_must_pass_stability_and_speed_gates(self):
         with tempfile.TemporaryDirectory() as tmp:
