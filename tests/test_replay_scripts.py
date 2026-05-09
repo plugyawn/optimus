@@ -1,4 +1,8 @@
+import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 
 def test_qproj_c2_replay_defaults_to_preflight_mode():
@@ -36,7 +40,38 @@ def test_qproj_c2_corrected_confirmation_is_guarded_and_uses_healthy_prompts():
     assert "SHORTLIST_POLICY=${SHORTLIST_POLICY:-default_exact}" in text
     assert "VLLM_PROMPT_VARIANTS=${VLLM_PROMPT_VARIANTS:-default,reordered}" in text
     assert "VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID=${VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID:-1}" in text
+    assert "qproj_c2_corrected_confirmation_preflight" in text
+    assert "preflight_summary.json" in text
     assert 'QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh' in text
+    assert "current goal audit failed; continuing to replay manifest" in text
+    assert "randopt_lora_lab.replay_manifest" in text
+
+
+def test_qproj_c2_corrected_preflight_writes_summary(tmp_path):
+    out_root = tmp_path / "qproj_preflight"
+    env = os.environ.copy()
+    env.update({
+        "MODE": "preflight",
+        "OUT_ROOT": str(out_root),
+        "PYTHON": sys.executable,
+    })
+
+    result = subprocess.run(
+        ["bash", "scripts/run_qproj_c2_corrected_confirmation.sh"],
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    summary_path = out_root / "preflight_summary.json"
+    summary = json.loads(summary_path.read_text())
+    assert "preflight complete:" in result.stdout
+    assert summary["kind"] == "qproj_c2_corrected_confirmation_preflight"
+    assert summary["pass"] is True
+    assert summary["mode"] == "preflight"
+    assert summary["config"]["OUT_ROOT"] == str(out_root)
+    assert summary["config"]["VLLM_PROMPT_VARIANTS"] == "default,reordered"
 
 
 def test_current_goal_audit_script_is_non_gpu_and_dense_referenced():

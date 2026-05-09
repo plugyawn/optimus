@@ -59,11 +59,17 @@ export RUN_SCORE_SANITY=${RUN_SCORE_SANITY:-1}
 export RUN_SEARCH_QUALITY=${RUN_SEARCH_QUALITY:-1}
 RUN_GOAL_AUDIT=${RUN_GOAL_AUDIT:-1}
 GOAL_AUDIT_OUT=${GOAL_AUDIT_OUT:-$OUT_ROOT/current_goal_audit}
+PREFLIGHT_SUMMARY_OUT=${PREFLIGHT_SUMMARY_OUT:-$OUT_ROOT/preflight_summary.json}
+REPLAY_MANIFEST_OUT=${REPLAY_MANIFEST_OUT:-$OUT_ROOT/replay_manifest}
 
-if [[ "$MODE" == "preflight" ]]; then
+write_preflight_summary() {
+  mkdir -p "$OUT_ROOT"
+  QPROJ_CONFIRMATION_MODE="$MODE" \
+  PREFLIGHT_SUMMARY_OUT="$PREFLIGHT_SUMMARY_OUT" \
   "$PYTHON" - <<'PY'
 import json
 import os
+from pathlib import Path
 
 keys = [
     "OUT_ROOT",
@@ -83,14 +89,40 @@ keys = [
     "RUN_SCORE_SANITY",
     "RUN_SEARCH_QUALITY",
 ]
-print(json.dumps({key: os.environ.get(key) for key in keys}, indent=2, sort_keys=True))
+summary = {
+    "kind": "qproj_c2_corrected_confirmation_preflight",
+    "pass": True,
+    "mode": os.environ.get("QPROJ_CONFIRMATION_MODE"),
+    "config": {key: os.environ.get(key) for key in keys},
+}
+Path(os.environ["PREFLIGHT_SUMMARY_OUT"]).write_text(
+    json.dumps(summary, indent=2, sort_keys=True) + "\n"
+)
+print(json.dumps(summary, indent=2, sort_keys=True))
 PY
+}
+
+write_preflight_summary
+
+if [[ "$MODE" == "preflight" ]]; then
+  echo "preflight complete: $PREFLIGHT_SUMMARY_OUT"
   echo "preflight complete; run with MODE=confirm to launch the GPU confirmation"
   exit 0
 fi
 
 scripts/run_vllm_shortlist_confirmation.sh
 
+goal_audit_status=0
 if [[ "$RUN_GOAL_AUDIT" == "1" ]]; then
-  QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh
+  if ! QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh; then
+    goal_audit_status=1
+    echo "current goal audit failed; continuing to replay manifest" >&2
+  fi
 fi
+
+"$PYTHON" -m randopt_lora_lab.replay_manifest \
+  --root "$OUT_ROOT" \
+  --out "$REPLAY_MANIFEST_OUT" \
+  --mode confirm
+
+exit "$goal_audit_status"
