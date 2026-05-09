@@ -147,3 +147,9 @@ source_family_state_sha256:
 vllm_family_state_sha256:
   cdf619d779c3d092a4520a78ba28353471809641a64e0ef3e4d0215361e532f1
 ```
+
+After PEFT confirmation, validity and provenance gates are non-fatal inside
+the wrapper: they still write their `summary.json` files, and downstream dense
+confirmation, search-quality confirmation, and current goal audit still run.
+This is intentional, because negative or invalid runs must preserve forensic
+evidence instead of stopping at the first red gate.

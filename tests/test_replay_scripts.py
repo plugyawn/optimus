@@ -36,3 +36,13 @@ def test_current_goal_audit_script_is_non_gpu_and_dense_referenced():
     assert "--search-quality-confirmation \"$SEARCH_QUALITY_CONFIRMATION\"" in text
     assert "MODE=confirm" not in text
     assert "experiments search" not in text
+
+
+def test_existing_replay_keeps_diagnostics_after_gate_failures():
+    text = Path("scripts/run_existing_vllm_shortlist_confirmation.sh").read_text()
+
+    assert "confirmed validity gate failed; continuing to write downstream diagnostics" in text
+    assert "family-state provenance audit failed unexpectedly; continuing to search-quality diagnostics" in text
+    assert "--no-fail" in text
+    assert "randopt_lora_lab.shortlist_dense_confirmation" in text
+    assert "randopt_lora_lab.search_quality_confirmation" in text

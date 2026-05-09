@@ -131,9 +131,11 @@ fi
   --stop-at-answer \
   "${search_args[@]}"
 
-"$PYTHON" -m randopt_lora_lab.result_validity \
+if ! "$PYTHON" -m randopt_lora_lab.result_validity \
   --run "$OUT_ROOT/confirmed" \
-  --out "$OUT_ROOT/confirmed/validity"
+  --out "$OUT_ROOT/confirmed/validity"; then
+  echo "confirmed validity gate failed; continuing to write downstream diagnostics" >&2
+fi
 
 "$PYTHON" -m randopt_lora_lab.shortlist_dense_confirmation \
   --dense "$OUT_ROOT/dense" \
@@ -147,9 +149,12 @@ fi
   --max-dense-regret "$CONFIRM_MAX_DENSE_REGRET" \
   --min-full-without-dense-load-speedup "$CONFIRM_MIN_FULL_SPEEDUP"
 
-"$PYTHON" -m randopt_lora_lab.family_state_provenance_audit \
+if ! "$PYTHON" -m randopt_lora_lab.family_state_provenance_audit \
   --root "$OUT_ROOT" \
-  --out "$OUT_ROOT/family_state_provenance_audit"
+  --out "$OUT_ROOT/family_state_provenance_audit" \
+  --no-fail; then
+  echo "family-state provenance audit failed unexpectedly; continuing to search-quality diagnostics" >&2
+fi
 
 "$PYTHON" -m randopt_lora_lab.search_quality_confirmation \
   --root "$OUT_ROOT" \
