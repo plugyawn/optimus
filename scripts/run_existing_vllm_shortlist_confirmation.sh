@@ -89,80 +89,13 @@ cp -a "$SOURCE_ROOT/vllm" "$OUT_ROOT/vllm"
   --policy "$SHORTLIST_POLICY" \
   --k "$SHORTLIST_K"
 
-"$PYTHON" - "$SOURCE_ROOT" "$OUT_ROOT" "$FAMILY" "$SHORTLIST_K" <<'PY'
-import hashlib
-import json
-import sys
-from pathlib import Path
-
-source = Path(sys.argv[1])
-out = Path(sys.argv[2])
-family = sys.argv[3]
-shortlist_k = int(sys.argv[4])
-
-def read_json(path: Path) -> dict:
-    return json.loads(path.read_text()) if path.exists() else {}
-
-def read_jsonl(path: Path) -> list[dict]:
-    rows = []
-    with path.open() as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
-
-def digest(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-shortlist = read_jsonl(out / f"shortlist_top{shortlist_k}.jsonl")
-vllm_rows = read_jsonl(out / "vllm" / "candidate_summary.jsonl")
-vllm_candidates = {str(row.get("candidate")) for row in vllm_rows}
-missing = [row.get("candidate") for row in shortlist if str(row.get("candidate")) not in vllm_candidates]
-wrong_family = [row.get("candidate") for row in shortlist if not str(row.get("candidate", "")).startswith(family + ":")]
-source_state = source / "vllm" / "family_state.pt"
-copied_state = out / "vllm" / "family_state.pt"
-summary = {
-    "kind": "existing_vllm_shortlist_confirmation_preflight",
-    "source_root": str(source),
-    "out_root": str(out),
-    "family": family,
-    "shortlist_k": shortlist_k,
-    "shortlist_rows": len(shortlist),
-    "shortlist_policy": shortlist[0].get("selector_union_policy") if shortlist else None,
-    "vllm_candidates": len(vllm_rows),
-    "missing_shortlist_candidates": missing,
-    "wrong_family_candidates": wrong_family,
-    "source_vllm_summary": read_json(source / "vllm" / "summary.json"),
-    "out_vllm_summary": read_json(out / "vllm" / "summary.json"),
-    "dense_summary_present": (out / "dense" / "summary.json").exists(),
-    "vllm_family_state_sha256": digest(copied_state) if copied_state.exists() else None,
-    "source_family_state_sha256": digest(source_state) if source_state.exists() else None,
-}
-checks = [
-    ("shortlist_count_matches", len(shortlist) == shortlist_k),
-    ("shortlist_candidates_in_vllm_panel", not missing),
-    ("shortlist_candidates_match_family", not wrong_family),
-    ("dense_summary_present", summary["dense_summary_present"]),
-    ("source_family_state_present", source_state.exists()),
-    ("copied_family_state_present", copied_state.exists()),
-    (
-        "copied_family_state_matches_source",
-        source_state.exists() and copied_state.exists() and summary["source_family_state_sha256"] == summary["vllm_family_state_sha256"],
-    ),
-]
-summary["checks"] = [{"check": name, "passed": bool(passed)} for name, passed in checks]
-summary["pass"] = all(passed for _, passed in checks)
-summary["failed"] = [name for name, passed in checks if not passed]
-(out / "preflight_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
-print(json.dumps(summary, indent=2, sort_keys=True))
-if not summary["pass"]:
-    raise SystemExit(1)
-PY
+"$PYTHON" -m randopt_lora_lab.family_state_provenance_audit \
+  --out "$OUT_ROOT/preflight" \
+  --preflight-source-root "$SOURCE_ROOT" \
+  --preflight-out-root "$OUT_ROOT" \
+  --preflight-family "$FAMILY" \
+  --preflight-shortlist-k "$SHORTLIST_K"
+cp "$OUT_ROOT/preflight/summary.json" "$OUT_ROOT/preflight_summary.json"
 
 if [[ "$PREFLIGHT_ONLY" == "1" ]]; then
   echo "preflight complete: $OUT_ROOT/preflight_summary.json"

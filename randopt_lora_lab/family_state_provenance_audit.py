@@ -107,6 +107,62 @@ def audit_run(root: Path) -> dict[str, Any]:
     }
 
 
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows = []
+    with path.open() as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
+
+
+def preflight_existing_panel(source: Path, out: Path, *, family: str, shortlist_k: int) -> dict[str, Any]:
+    shortlist_path = out / f"shortlist_top{shortlist_k}.jsonl"
+    shortlist = read_jsonl(shortlist_path)
+    vllm_rows = read_jsonl(out / "vllm" / "candidate_summary.jsonl")
+    vllm_candidates = {str(row.get("candidate")) for row in vllm_rows}
+    missing = [row.get("candidate") for row in shortlist if str(row.get("candidate")) not in vllm_candidates]
+    wrong_family = [row.get("candidate") for row in shortlist if not str(row.get("candidate", "")).startswith(family + ":")]
+    source_state = source / "vllm" / "family_state.pt"
+    copied_state = out / "vllm" / "family_state.pt"
+    summary = {
+        "kind": "existing_vllm_shortlist_confirmation_preflight",
+        "source_root": str(source),
+        "out_root": str(out),
+        "family": family,
+        "shortlist_k": shortlist_k,
+        "shortlist_rows": len(shortlist),
+        "shortlist_policy": shortlist[0].get("selector_union_policy") if shortlist else None,
+        "vllm_candidates": len(vllm_rows),
+        "missing_shortlist_candidates": missing,
+        "wrong_family_candidates": wrong_family,
+        "source_vllm_summary": read_json(source / "vllm" / "summary.json"),
+        "out_vllm_summary": read_json(out / "vllm" / "summary.json"),
+        "dense_summary_present": (out / "dense" / "summary.json").exists(),
+        "vllm_family_state_sha256": sha256(copied_state),
+        "source_family_state_sha256": sha256(source_state),
+    }
+    checks = [
+        ("shortlist_count_matches", len(shortlist) == shortlist_k),
+        ("shortlist_candidates_in_vllm_panel", not missing),
+        ("shortlist_candidates_match_family", not wrong_family),
+        ("dense_summary_present", summary["dense_summary_present"]),
+        ("source_family_state_present", source_state.exists()),
+        ("copied_family_state_present", copied_state.exists()),
+        (
+            "copied_family_state_matches_source",
+            source_state.exists()
+            and copied_state.exists()
+            and summary["source_family_state_sha256"] == summary["vllm_family_state_sha256"],
+        ),
+    ]
+    summary["checks"] = [{"check": name, "passed": bool(passed)} for name, passed in checks]
+    summary["pass"] = all(passed for _, passed in checks)
+    summary["failed"] = [name for name, passed in checks if not passed]
+    return summary
+
+
 def render_report(summary: dict[str, Any]) -> str:
     lines = [
         "# Family State Provenance Audit",
@@ -157,14 +213,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, action="append", default=[])
     parser.add_argument("--results-root", type=Path, default=Path("results"))
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--preflight-source-root", type=Path)
+    parser.add_argument("--preflight-out-root", type=Path)
+    parser.add_argument("--preflight-family", default="")
+    parser.add_argument("--preflight-shortlist-k", type=int, default=0)
     parser.add_argument("--no-fail", action="store_true")
     args = parser.parse_args(argv)
 
-    roots = args.root or discover_roots(args.results_root)
-    summary = run_audit(roots)
     args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
-    (args.out / "report.md").write_text(render_report(summary))
+    if args.preflight_source_root or args.preflight_out_root:
+        if not (args.preflight_source_root and args.preflight_out_root and args.preflight_family and args.preflight_shortlist_k):
+            raise SystemExit("preflight requires --preflight-source-root, --preflight-out-root, --preflight-family, and --preflight-shortlist-k")
+        summary = preflight_existing_panel(
+            args.preflight_source_root,
+            args.preflight_out_root,
+            family=args.preflight_family,
+            shortlist_k=args.preflight_shortlist_k,
+        )
+        (args.out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+    else:
+        roots = args.root or discover_roots(args.results_root)
+        summary = run_audit(roots)
+        (args.out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+        (args.out / "report.md").write_text(render_report(summary))
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0 if summary["pass"] or args.no_fail else 1
 
