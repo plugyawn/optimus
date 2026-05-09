@@ -14,6 +14,9 @@ Run the actual confirmation on a GPU only when explicitly requested:
 
   MODE=confirm scripts/run_qproj_c2_exact_replay.sh
 
+Confirmation mode automatically runs the current non-GPU goal audit against
+OUT_ROOT when the replay finishes. Disable with RUN_GOAL_AUDIT=0.
+
 Useful overrides:
 
   SOURCE_ROOT=results/qproj_c2_vllm_shortlist_p64
@@ -60,5 +63,11 @@ export CONFIRM_KS=${CONFIRM_KS:-1,2,4}
 export CONFIRM_MAX_K=${CONFIRM_MAX_K:-$SHORTLIST_K}
 export CONFIRM_MAX_DENSE_REGRET=${CONFIRM_MAX_DENSE_REGRET:-0.015625}
 export CONFIRM_MIN_FULL_SPEEDUP=${CONFIRM_MIN_FULL_SPEEDUP:-1.0}
+RUN_GOAL_AUDIT=${RUN_GOAL_AUDIT:-1}
+GOAL_AUDIT_OUT=${GOAL_AUDIT_OUT:-$OUT_ROOT/current_goal_audit}
 
-exec scripts/run_existing_vllm_shortlist_confirmation.sh
+scripts/run_existing_vllm_shortlist_confirmation.sh
+
+if [[ "$MODE" == "confirm" && "$RUN_GOAL_AUDIT" == "1" ]]; then
+  QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh
+fi

@@ -7,7 +7,9 @@ def test_qproj_c2_replay_defaults_to_preflight_mode():
     assert "MODE=${MODE:-preflight}" in text
     assert "export PREFLIGHT_ONLY=1" in text
     assert "MODE=confirm" in text
-    assert "exec scripts/run_existing_vllm_shortlist_confirmation.sh" in text
+    assert "scripts/run_existing_vllm_shortlist_confirmation.sh" in text
+    assert 'if [[ "$MODE" == "confirm" && "$RUN_GOAL_AUDIT" == "1" ]]' in text
+    assert 'QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh' in text
 
 
 def test_qproj_c2_replay_targets_saved_basis_shortlist():

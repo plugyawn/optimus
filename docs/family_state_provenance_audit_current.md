@@ -109,6 +109,12 @@ When a GPU is intentionally available:
 MODE=confirm scripts/run_qproj_c2_exact_replay.sh
 ```
 
+Confirmation mode also writes a current completion audit to:
+
+```text
+results/qproj_c2_vllm_shortlist_p64_default_exact_k4/current_goal_audit
+```
+
 That wrapper copies `SOURCE_ROOT/dense` and `SOURCE_ROOT/vllm` into `OUT_ROOT`,
 writes a selector-union shortlist, then runs PEFT confirmation with:
 
