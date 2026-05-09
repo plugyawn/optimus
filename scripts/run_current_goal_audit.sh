@@ -43,6 +43,7 @@ DENSE_CONFIRMATION_GATE=${DENSE_CONFIRMATION_GATE:-$QPROJ_REPLAY_ROOT/shortlist_
 SEARCH_QUALITY_CONFIRMATION=${SEARCH_QUALITY_CONFIRMATION:-$QPROJ_REPLAY_ROOT/search_quality_confirmation/summary.json}
 FAMILY_STATE_PROVENANCE=${FAMILY_STATE_PROVENANCE:-$QPROJ_REPLAY_ROOT/family_state_provenance_audit/summary.json}
 MULTIRUN_GATE=${MULTIRUN_GATE:-results/spectral_vllm_multirun_gate_p16_default/summary.json}
+DENSE_REFERENCED_MULTIRUN_GATE=${DENSE_REFERENCED_MULTIRUN_GATE:-results/qproj_c2_dense_referenced_multirun_gate/summary.json}
 PROMPT_ROBUSTNESS=${PROMPT_ROBUSTNESS:-results/prompt_robustness_rank32_top4/summary.json}
 DRIFT_REPORT=${DRIFT_REPORT:-results/drift_parity_dense_vs_lora_rank8_p32_sigma001/summary.json}
 EVAL_VALIDITY=${EVAL_VALIDITY:-$QPROJ_REPLAY_ROOT/confirmed/validity/summary.json}
@@ -67,6 +68,7 @@ ADAPTER_RUN=${ADAPTER_RUN:-$QPROJ_REPLAY_ROOT/vllm}
   --search-quality-confirmation "$SEARCH_QUALITY_CONFIRMATION" \
   --family-state-provenance "$FAMILY_STATE_PROVENANCE" \
   --multirun-gate "$MULTIRUN_GATE" \
+  --dense-referenced-multirun-gate "$DENSE_REFERENCED_MULTIRUN_GATE" \
   --prompt-robustness "$PROMPT_ROBUSTNESS" \
   --drift-report "$DRIFT_REPORT" \
   --eval-validity "$EVAL_VALIDITY" \

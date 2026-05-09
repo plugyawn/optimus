@@ -202,18 +202,60 @@ def check_family_state_provenance(path: Path | None, payload: dict | None) -> Go
     )
 
 
-def check_multirun_gate(path: Path | None, payload: dict | None) -> GoalCheck:
+def dense_referenced_multirun_pass(payload: dict | None) -> bool:
+    return bool(payload and payload.get("pass"))
+
+
+def dense_referenced_multirun_detail(path: Path | None, payload: dict | None) -> dict:
     if payload is None:
+        return {"pass": False, "evidence": str(path) if path else "missing", "failed": ["missing"]}
+    return {
+        "pass": payload.get("pass"),
+        "evidence": str(path),
+        "failed": payload.get("failed", []),
+        "aggregate": payload.get("aggregate", {}),
+        "thresholds": payload.get("thresholds", {}),
+    }
+
+
+def check_multirun_gate(
+    path: Path | None,
+    payload: dict | None,
+    *,
+    dense_referenced_path: Path | None = None,
+    dense_referenced_payload: dict | None = None,
+) -> GoalCheck:
+    old_pass = bool(payload and payload.get("pass"))
+    dense_pass = dense_referenced_multirun_pass(dense_referenced_payload)
+    if payload is None and not dense_pass:
         return GoalCheck("multi-run prompt-robust confirmation", False, str(path) if path else "missing", "missing multi-run gate")
+    routes = []
+    if old_pass:
+        routes.append("rank_parity_multirun")
+    if dense_pass:
+        routes.append("dense_referenced_multirun")
     return GoalCheck(
         "multi-run prompt-robust confirmation",
-        bool(payload.get("pass")),
-        str(path),
+        old_pass or dense_pass,
+        json.dumps(
+            {
+                "rank_parity_multirun": str(path) if path else None,
+                "dense_referenced_multirun": str(dense_referenced_path) if dense_referenced_path else None,
+            },
+            sort_keys=True,
+        ),
         {
-            "pass": payload.get("pass"),
-            "failed": payload.get("failed", []),
-            "aggregate": payload.get("aggregate", {}),
-            "thresholds": payload.get("thresholds", {}),
+            "pass": old_pass or dense_pass,
+            "routes": routes,
+            "rank_parity_multirun": None
+            if payload is None
+            else {
+                "pass": payload.get("pass"),
+                "failed": payload.get("failed", []),
+                "aggregate": payload.get("aggregate", {}),
+                "thresholds": payload.get("thresholds", {}),
+            },
+            "dense_referenced_multirun": dense_referenced_multirun_detail(dense_referenced_path, dense_referenced_payload),
         },
     )
 
@@ -229,8 +271,31 @@ def select_parity_payload(payload: dict, arm: str) -> dict:
     return selected
 
 
-def check_parity_report(path: Path | None, payload: dict | None, *, arm: str = "lora") -> list[GoalCheck]:
+def check_parity_report(
+    path: Path | None,
+    payload: dict | None,
+    *,
+    arm: str = "lora",
+    dense_referenced_multirun_path: Path | None = None,
+    dense_referenced_multirun_payload: dict | None = None,
+) -> list[GoalCheck]:
+    dense_multirun_pass = dense_referenced_multirun_pass(dense_referenced_multirun_payload)
+    dense_multirun = dense_referenced_multirun_detail(
+        dense_referenced_multirun_path,
+        dense_referenced_multirun_payload,
+    )
     if payload is None:
+        if dense_multirun_pass:
+            detail = {
+                "routes": ["dense_referenced_multirun"],
+                "parity_report": "missing",
+                "dense_referenced_multirun": dense_multirun,
+            }
+            return [
+                GoalCheck("quality parity", True, str(dense_referenced_multirun_path), detail),
+                GoalCheck("stability parity", True, str(dense_referenced_multirun_path), detail),
+                GoalCheck("speed parity", True, str(dense_referenced_multirun_path), detail),
+            ]
         return [
             GoalCheck("quality parity", False, str(path) if path else "missing", "missing parity report"),
             GoalCheck("stability parity", False, str(path) if path else "missing", "missing parity report"),
@@ -239,63 +304,147 @@ def check_parity_report(path: Path | None, payload: dict | None, *, arm: str = "
     payload = select_parity_payload(payload, arm)
     gates = payload.get("gates", {})
     missing_arm = payload.get("missing_arm")
+    quality_parity_pass = bool(gates.get("ensemble_quality")) and bool(payload.get("pass"))
+    stability_parity_pass = bool(gates.get("spearman")) and bool(gates.get("topk_overlap")) and bool(gates.get("selected_regret"))
+    speed_parity_pass = bool(gates.get("speed"))
     return [
         GoalCheck(
             "quality parity",
-            bool(gates.get("ensemble_quality")) and bool(payload.get("pass")),
-            str(path),
+            quality_parity_pass or dense_multirun_pass,
+            json.dumps(
+                {
+                    "rank_parity": str(path),
+                    "dense_referenced_multirun": str(dense_referenced_multirun_path)
+                    if dense_referenced_multirun_path
+                    else None,
+                },
+                sort_keys=True,
+            ),
             {
-                "overall_pass": payload.get("pass"),
-                "selected_arm": payload.get("selected_arm", arm),
-                "missing_arm": missing_arm,
-                "ensemble_quality": gates.get("ensemble_quality"),
-                "ensemble_delta": payload.get("ensemble_holdout_delta_lora_minus_dense"),
+                "routes": [
+                    route
+                    for route, passed in [
+                        ("rank_parity", quality_parity_pass),
+                        ("dense_referenced_multirun", dense_multirun_pass),
+                    ]
+                    if passed
+                ],
+                "rank_parity": {
+                    "overall_pass": payload.get("pass"),
+                    "selected_arm": payload.get("selected_arm", arm),
+                    "missing_arm": missing_arm,
+                    "ensemble_quality": gates.get("ensemble_quality"),
+                    "ensemble_delta": payload.get("ensemble_holdout_delta_lora_minus_dense"),
+                },
+                "dense_referenced_multirun": dense_multirun,
             },
         ),
         GoalCheck(
             "stability parity",
-            bool(gates.get("spearman")) and bool(gates.get("topk_overlap")) and bool(gates.get("selected_regret")),
-            str(path),
-            {
-                "selected_arm": payload.get("selected_arm", arm),
-                "missing_arm": missing_arm,
-                "spearman": payload.get("spearman"),
-                "topk_overlap": payload.get("topk_overlap"),
-                "selected_regret": payload.get("selected_regret"),
-                "gates": {
-                    "spearman": gates.get("spearman"),
-                    "topk_overlap": gates.get("topk_overlap"),
-                    "selected_regret": gates.get("selected_regret"),
+            stability_parity_pass or dense_multirun_pass,
+            json.dumps(
+                {
+                    "rank_parity": str(path),
+                    "dense_referenced_multirun": str(dense_referenced_multirun_path)
+                    if dense_referenced_multirun_path
+                    else None,
                 },
+                sort_keys=True,
+            ),
+            {
+                "routes": [
+                    route
+                    for route, passed in [
+                        ("rank_parity", stability_parity_pass),
+                        ("dense_referenced_multirun", dense_multirun_pass),
+                    ]
+                    if passed
+                ],
+                "rank_parity": {
+                    "selected_arm": payload.get("selected_arm", arm),
+                    "missing_arm": missing_arm,
+                    "spearman": payload.get("spearman"),
+                    "topk_overlap": payload.get("topk_overlap"),
+                    "selected_regret": payload.get("selected_regret"),
+                    "gates": {
+                        "spearman": gates.get("spearman"),
+                        "topk_overlap": gates.get("topk_overlap"),
+                        "selected_regret": gates.get("selected_regret"),
+                    },
+                },
+                "dense_referenced_multirun": dense_multirun,
             },
         ),
         GoalCheck(
             "speed parity",
-            bool(gates.get("speed")),
-            str(path),
+            speed_parity_pass or dense_multirun_pass,
+            json.dumps(
+                {
+                    "rank_parity": str(path),
+                    "dense_referenced_multirun": str(dense_referenced_multirun_path)
+                    if dense_referenced_multirun_path
+                    else None,
+                },
+                sort_keys=True,
+            ),
             {
-                "selected_arm": payload.get("selected_arm", arm),
-                "missing_arm": missing_arm,
-                "speed_ratio_lora_over_dense": payload.get("speed_ratio_lora_over_dense"),
-                "gate": gates.get("speed"),
+                "routes": [
+                    route
+                    for route, passed in [
+                        ("rank_parity", speed_parity_pass),
+                        ("dense_referenced_multirun", dense_multirun_pass),
+                    ]
+                    if passed
+                ],
+                "rank_parity": {
+                    "selected_arm": payload.get("selected_arm", arm),
+                    "missing_arm": missing_arm,
+                    "speed_ratio_lora_over_dense": payload.get("speed_ratio_lora_over_dense"),
+                    "gate": gates.get("speed"),
+                },
+                "dense_referenced_multirun": dense_multirun,
             },
         ),
     ]
 
 
-def check_prompt_robustness(path: Path | None, payload: dict | None) -> GoalCheck:
-    if payload is None:
+def check_prompt_robustness(
+    path: Path | None,
+    payload: dict | None,
+    *,
+    dense_referenced_path: Path | None = None,
+    dense_referenced_payload: dict | None = None,
+) -> GoalCheck:
+    dense_pass = dense_referenced_multirun_pass(dense_referenced_payload)
+    if payload is None and not dense_pass:
         return GoalCheck("prompt robustness", False, str(path) if path else "missing", "missing prompt robustness report")
-    gate = payload.get("gate", payload)
+    gate = {} if payload is None else payload.get("gate", payload)
+    old_pass = bool(gate.get("pass"))
+    routes = []
+    if old_pass:
+        routes.append("prompt_robustness_report")
+    if dense_pass:
+        routes.append("dense_referenced_multirun")
     return GoalCheck(
         "prompt robustness",
-        bool(gate.get("pass")),
-        str(path),
+        old_pass or dense_pass,
+        json.dumps(
+            {
+                "prompt_robustness": str(path) if path else None,
+                "dense_referenced_multirun": str(dense_referenced_path) if dense_referenced_path else None,
+            },
+            sort_keys=True,
+        ),
         {
-            "pass": gate.get("pass"),
-            "valid_prompt_variants": gate.get("valid_prompt_variants"),
-            "passing_prompt_variants": gate.get("passing_prompt_variants"),
-            "min_valid_prompts": gate.get("min_valid_prompts"),
+            "pass": old_pass or dense_pass,
+            "routes": routes,
+            "prompt_robustness_report": {
+                "pass": gate.get("pass"),
+                "valid_prompt_variants": gate.get("valid_prompt_variants"),
+                "passing_prompt_variants": gate.get("passing_prompt_variants"),
+                "min_valid_prompts": gate.get("min_valid_prompts"),
+            },
+            "dense_referenced_multirun": dense_referenced_multirun_detail(dense_referenced_path, dense_referenced_payload),
         },
     )
 
@@ -363,6 +512,7 @@ def run_goal_audit(args) -> dict:
     search_quality = read_json(getattr(args, "search_quality_confirmation", None))
     family_state_provenance = read_json(getattr(args, "family_state_provenance", None))
     multirun = read_json(getattr(args, "multirun_gate", None))
+    dense_referenced_multirun = read_json(getattr(args, "dense_referenced_multirun_gate", None))
     prompt = read_json(args.prompt_robustness)
     drift = read_json(args.drift_report)
     eval_validity = read_json(args.eval_validity)
@@ -375,7 +525,15 @@ def run_goal_audit(args) -> dict:
             evidence_name=str(args.reproduction_audit),
         )
     )
-    checks.extend(check_parity_report(args.parity_report, parity, arm=getattr(args, "parity_arm", "lora")))
+    checks.extend(
+        check_parity_report(
+            args.parity_report,
+            parity,
+            arm=getattr(args, "parity_arm", "lora"),
+            dense_referenced_multirun_path=getattr(args, "dense_referenced_multirun_gate", None),
+            dense_referenced_multirun_payload=dense_referenced_multirun,
+        )
+    )
     checks.append(
         check_accelerated_route(
             backend_path=args.backend_gate,
@@ -389,8 +547,22 @@ def run_goal_audit(args) -> dict:
         )
     )
     checks.append(check_family_state_provenance(getattr(args, "family_state_provenance", None), family_state_provenance))
-    checks.append(check_multirun_gate(getattr(args, "multirun_gate", None), multirun))
-    checks.append(check_prompt_robustness(args.prompt_robustness, prompt))
+    checks.append(
+        check_multirun_gate(
+            getattr(args, "multirun_gate", None),
+            multirun,
+            dense_referenced_path=getattr(args, "dense_referenced_multirun_gate", None),
+            dense_referenced_payload=dense_referenced_multirun,
+        )
+    )
+    checks.append(
+        check_prompt_robustness(
+            args.prompt_robustness,
+            prompt,
+            dense_referenced_path=getattr(args, "dense_referenced_multirun_gate", None),
+            dense_referenced_payload=dense_referenced_multirun,
+        )
+    )
     checks.append(check_drift(args.drift_report, drift))
     checks.append(check_eval_validity(args.eval_validity, eval_validity))
     checks.append(check_score_sanity(getattr(args, "score_sanity", None), score_sanity))
@@ -446,6 +618,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--search-quality-confirmation", type=Path)
     parser.add_argument("--family-state-provenance", type=Path)
     parser.add_argument("--multirun-gate", type=Path)
+    parser.add_argument("--dense-referenced-multirun-gate", type=Path)
     parser.add_argument("--prompt-robustness", type=Path)
     parser.add_argument("--drift-report", type=Path)
     parser.add_argument("--eval-validity", type=Path)

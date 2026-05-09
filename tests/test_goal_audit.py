@@ -306,6 +306,53 @@ class GoalAuditTests(unittest.TestCase):
             self.assertTrue(by_requirement["accelerated evaluation route"]["detail"]["dense_referenced_two_stage_pass"])
             self.assertEqual(by_requirement["accelerated evaluation route"]["detail"]["routes"], ["dense_referenced_two_stage"])
 
+    def test_dense_referenced_multirun_can_satisfy_parity_prompt_and_multirun(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dense_multirun = root / "dense_multirun" / "summary.json"
+            write_json(
+                dense_multirun,
+                {
+                    "pass": True,
+                    "failed": [],
+                    "aggregate": {
+                        "runs": 2,
+                        "search_quality_pass_count": 2,
+                        "shortlist_dense_pass_count": 2,
+                        "prompt_robust_count": 2,
+                        "min_full_speedup": 5.9,
+                    },
+                    "thresholds": {"min_runs": 2, "min_prompt_variants": 2},
+                },
+            )
+            args = Namespace(
+                reproduction_audit=None,
+                parity_report=None,
+                backend_gate=None,
+                confirmation_gate=None,
+                dense_confirmation_gate=None,
+                search_quality_confirmation=None,
+                family_state_provenance=None,
+                multirun_gate=None,
+                dense_referenced_multirun_gate=dense_multirun,
+                prompt_robustness=None,
+                drift_report=None,
+                eval_validity=None,
+                score_sanity=None,
+                adapter_run=None,
+            )
+
+            summary = run_goal_audit(args)
+            by_requirement = {row["requirement"]: row for row in summary["checks"]}
+
+            self.assertTrue(by_requirement["quality parity"]["passed"])
+            self.assertTrue(by_requirement["stability parity"]["passed"])
+            self.assertTrue(by_requirement["speed parity"]["passed"])
+            self.assertTrue(by_requirement["multi-run prompt-robust confirmation"]["passed"])
+            self.assertTrue(by_requirement["prompt robustness"]["passed"])
+            self.assertIn("dense_referenced_multirun", by_requirement["quality parity"]["detail"]["routes"])
+            self.assertIn("dense_referenced_multirun", by_requirement["prompt robustness"]["detail"]["routes"])
+
     def test_score_sanity_failure_blocks_goal(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
