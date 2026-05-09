@@ -41,7 +41,13 @@ CONFIRMATION_GATE=${CONFIRMATION_GATE:-results/spectral_vllm_confirmation_rank32
 QPROJ_REPLAY_ROOT=${QPROJ_REPLAY_ROOT:-results/qproj_c2_vllm_shortlist_p64}
 DENSE_CONFIRMATION_GATE=${DENSE_CONFIRMATION_GATE:-$QPROJ_REPLAY_ROOT/shortlist_dense_confirmation/summary.json}
 SEARCH_QUALITY_CONFIRMATION=${SEARCH_QUALITY_CONFIRMATION:-$QPROJ_REPLAY_ROOT/search_quality_confirmation/summary.json}
-FAMILY_STATE_PROVENANCE=${FAMILY_STATE_PROVENANCE:-results/family_state_provenance_audit_current/summary.json}
+if [[ -z "${FAMILY_STATE_PROVENANCE:-}" ]]; then
+  if [[ -f "$QPROJ_REPLAY_ROOT/family_state_provenance_audit/summary.json" ]]; then
+    FAMILY_STATE_PROVENANCE=$QPROJ_REPLAY_ROOT/family_state_provenance_audit/summary.json
+  else
+    FAMILY_STATE_PROVENANCE=results/family_state_provenance_audit_current/summary.json
+  fi
+fi
 MULTIRUN_GATE=${MULTIRUN_GATE:-results/spectral_vllm_multirun_gate_p16_default/summary.json}
 PROMPT_ROBUSTNESS=${PROMPT_ROBUSTNESS:-results/prompt_robustness_rank32_top4/summary.json}
 DRIFT_REPORT=${DRIFT_REPORT:-results/drift_parity_dense_vs_lora_rank8_p32_sigma001/summary.json}

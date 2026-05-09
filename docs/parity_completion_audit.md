@@ -45,6 +45,10 @@ QPROJ_REPLAY_ROOT=results/qproj_c2_vllm_shortlist_p64_default_exact_k4 \
   scripts/run_current_goal_audit.sh
 ```
 
+When `QPROJ_REPLAY_ROOT/family_state_provenance_audit/summary.json` exists,
+the wrapper uses that replay-local provenance audit. Otherwise it falls back to
+the current global provenance audit so stale q-only c2 runs still fail.
+
 The expanded default form is:
 
 ```bash
