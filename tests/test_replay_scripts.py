@@ -65,6 +65,18 @@ def test_existing_replay_keeps_diagnostics_after_gate_failures():
     assert "randopt_lora_lab.search_quality_confirmation" in text
 
 
+def test_vllm_shortlist_confirmation_keeps_diagnostics_after_gate_failures():
+    text = Path("scripts/run_vllm_shortlist_confirmation.sh").read_text()
+
+    assert "dense validity gate failed; continuing to write downstream diagnostics" in text
+    assert "confirmed validity gate failed; continuing to write downstream diagnostics" in text
+    assert "family-state provenance audit failed unexpectedly; continuing to score-sanity diagnostics" in text
+    assert 'if ! "$PYTHON" -m randopt_lora_lab.result_validity' in text
+    assert "--no-fail" in text
+    assert "randopt_lora_lab.search_quality_confirmation" in text
+    assert "randopt_lora_lab.score_sanity_audit" in text
+
+
 def test_vllm_confirmation_wrappers_require_all_prompt_variants_valid_by_default():
     for path in [
         Path("scripts/run_vllm_shortlist_confirmation.sh"),

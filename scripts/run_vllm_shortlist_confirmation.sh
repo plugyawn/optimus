@@ -132,9 +132,11 @@ if [[ "$RUN_DENSE" == "1" ]]; then
     --max-new-tokens "$MAX_NEW_TOKENS" \
     --stop-at-answer \
     "${extra_search_args[@]}"
-  "$PYTHON" -m randopt_lora_lab.result_validity \
+  if ! "$PYTHON" -m randopt_lora_lab.result_validity \
     --run "$OUT_ROOT/dense" \
-    --out "$OUT_ROOT/dense/validity"
+    --out "$OUT_ROOT/dense/validity"; then
+    echo "dense validity gate failed; continuing to write downstream diagnostics" >&2
+  fi
 fi
 
 if [[ "$RUN_VLLM" == "1" ]]; then
@@ -210,9 +212,11 @@ if [[ "$RUN_CONFIRM" == "1" ]]; then
     --max-new-tokens "$MAX_NEW_TOKENS" \
     --stop-at-answer \
     "${extra_confirm_args[@]}"
-  "$PYTHON" -m randopt_lora_lab.result_validity \
+  if ! "$PYTHON" -m randopt_lora_lab.result_validity \
     --run "$OUT_ROOT/confirmed" \
-    --out "$OUT_ROOT/confirmed/validity"
+    --out "$OUT_ROOT/confirmed/validity"; then
+    echo "confirmed validity gate failed; continuing to write downstream diagnostics" >&2
+  fi
 fi
 
 if [[ "$RUN_REPORT" == "1" ]]; then
@@ -239,9 +243,12 @@ if [[ "$RUN_SEARCH_QUALITY" == "1" ]]; then
 fi
 
 if [[ "$RUN_PROVENANCE_AUDIT" == "1" ]]; then
-  "$PYTHON" -m randopt_lora_lab.family_state_provenance_audit \
+  if ! "$PYTHON" -m randopt_lora_lab.family_state_provenance_audit \
     --root "$OUT_ROOT" \
-    --out "$OUT_ROOT/family_state_provenance_audit"
+    --out "$OUT_ROOT/family_state_provenance_audit" \
+    --no-fail; then
+    echo "family-state provenance audit failed unexpectedly; continuing to score-sanity diagnostics" >&2
+  fi
 fi
 
 if [[ "$RUN_SCORE_SANITY" == "1" ]]; then
