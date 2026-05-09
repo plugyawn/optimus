@@ -21,8 +21,8 @@ class GoalCheck:
 NEXT_ACTIONS = {
     "official full-Gaussian baseline validity": {
         "priority": 50,
-        "action": "rerun a dense Gaussian reference with current reproduction metadata before using it as the paper-style baseline",
-        "command": "scripts/run_gaussian_parity_baseline.sh",
+        "action": "produce a paper-scale upstream RandOpt Countdown audit or a local dense Gaussian reproduction audit before using it as the official baseline",
+        "command": "scripts/run_upstream_randopt_countdown.sh",
     },
     "quality parity": {
         "priority": 20,
@@ -99,6 +99,66 @@ def check_present_pass(requirement: str, path: Path | None, payload: dict | None
     if payload is None:
         return GoalCheck(requirement, False, str(path) if path else "missing", "missing evidence")
     return GoalCheck(requirement, bool(payload.get("pass")), evidence_name, payload.get("failed", payload.get("gates", payload)))
+
+
+def check_official_baseline(
+    *,
+    reproduction_path: Path | None,
+    reproduction_payload: dict | None,
+    upstream_path: Path | None,
+    upstream_payload: dict | None,
+) -> GoalCheck:
+    if reproduction_payload is None and upstream_payload is None:
+        return GoalCheck(
+            "official full-Gaussian baseline validity",
+            False,
+            json.dumps(
+                {
+                    "local_reproduction": str(reproduction_path) if reproduction_path else None,
+                    "upstream_countdown": str(upstream_path) if upstream_path else None,
+                },
+                sort_keys=True,
+            ),
+            "missing baseline evidence",
+        )
+    local_pass = bool(reproduction_payload and reproduction_payload.get("pass"))
+    upstream_paper_pass = bool(upstream_payload and upstream_payload.get("paper_scale_pass"))
+    routes = []
+    if local_pass:
+        routes.append("local_reproduction_audit")
+    if upstream_paper_pass:
+        routes.append("upstream_paper_scale")
+    passed = local_pass or upstream_paper_pass
+    return GoalCheck(
+        "official full-Gaussian baseline validity",
+        passed,
+        json.dumps(
+            {
+                "local_reproduction": str(reproduction_path) if reproduction_path else None,
+                "upstream_countdown": str(upstream_path) if upstream_path else None,
+            },
+            sort_keys=True,
+        ),
+        {
+            "pass": passed,
+            "routes": routes,
+            "local_reproduction": None
+            if reproduction_payload is None
+            else {
+                "pass": reproduction_payload.get("pass"),
+                "failed": reproduction_payload.get("failed", []),
+            },
+            "upstream_countdown": None
+            if upstream_payload is None
+            else {
+                "pass": upstream_payload.get("pass"),
+                "smoke_pass": upstream_payload.get("smoke_pass"),
+                "paper_scale_pass": upstream_payload.get("paper_scale_pass"),
+                "failed": upstream_payload.get("failed", []),
+                "summary": upstream_payload.get("summary", {}),
+            },
+        },
+    )
 
 
 def check_confirmation(path: Path | None, payload: dict | None) -> GoalCheck:
@@ -505,6 +565,7 @@ def check_adapter_convenience(path: Path | None) -> GoalCheck:
 def run_goal_audit(args) -> dict:
     checks: list[GoalCheck] = []
     reproduction = read_json(args.reproduction_audit)
+    upstream_baseline = read_json(getattr(args, "upstream_baseline_audit", None))
     parity = read_json(args.parity_report)
     backend = read_json(args.backend_gate)
     confirmation = read_json(args.confirmation_gate)
@@ -518,11 +579,11 @@ def run_goal_audit(args) -> dict:
     eval_validity = read_json(args.eval_validity)
     score_sanity = read_json(getattr(args, "score_sanity", None))
     checks.append(
-        check_present_pass(
-            "official full-Gaussian baseline validity",
-            args.reproduction_audit,
-            reproduction,
-            evidence_name=str(args.reproduction_audit),
+        check_official_baseline(
+            reproduction_path=args.reproduction_audit,
+            reproduction_payload=reproduction,
+            upstream_path=getattr(args, "upstream_baseline_audit", None),
+            upstream_payload=upstream_baseline,
         )
     )
     checks.extend(
@@ -610,6 +671,7 @@ def render_markdown(summary: dict) -> str:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Audit whether the end-to-end LoRA perturbation-search goal is met.")
     parser.add_argument("--reproduction-audit", type=Path)
+    parser.add_argument("--upstream-baseline-audit", type=Path)
     parser.add_argument("--parity-report", type=Path)
     parser.add_argument("--parity-arm", default="lora")
     parser.add_argument("--backend-gate", type=Path)

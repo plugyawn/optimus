@@ -19,3 +19,6 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 include = ["randopt_lora_lab*"]
+
+[tool.pytest.ini_options]
+norecursedirs = ["external", "results", ".git", ".venv"]

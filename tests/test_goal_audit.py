@@ -118,6 +118,85 @@ class GoalAuditTests(unittest.TestCase):
             self.assertEqual(summary["failed"], [])
             self.assertEqual(summary["next_actions"], [])
 
+    def test_upstream_paper_scale_audit_can_satisfy_official_baseline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            upstream = root / "upstream" / "summary.json"
+            write_json(
+                upstream,
+                {
+                    "pass": True,
+                    "smoke_pass": True,
+                    "paper_scale_pass": True,
+                    "failed": [],
+                    "summary": {"population_size": 5000, "train_samples": 200, "max_tokens": 1024},
+                },
+            )
+            args = Namespace(
+                reproduction_audit=None,
+                upstream_baseline_audit=upstream,
+                parity_report=None,
+                backend_gate=None,
+                confirmation_gate=None,
+                dense_confirmation_gate=None,
+                search_quality_confirmation=None,
+                family_state_provenance=None,
+                multirun_gate=None,
+                prompt_robustness=None,
+                drift_report=None,
+                eval_validity=None,
+                score_sanity=None,
+                adapter_run=None,
+            )
+
+            summary = run_goal_audit(args)
+            by_requirement = {row["requirement"]: row for row in summary["checks"]}
+
+            self.assertTrue(by_requirement["official full-Gaussian baseline validity"]["passed"])
+            self.assertEqual(
+                by_requirement["official full-Gaussian baseline validity"]["detail"]["routes"],
+                ["upstream_paper_scale"],
+            )
+
+    def test_upstream_smoke_audit_does_not_satisfy_official_baseline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            upstream = root / "upstream" / "summary.json"
+            write_json(
+                upstream,
+                {
+                    "pass": True,
+                    "smoke_pass": True,
+                    "paper_scale_pass": False,
+                    "failed": [],
+                    "summary": {"population_size": 32, "train_samples": 200, "max_tokens": 1024},
+                },
+            )
+            args = Namespace(
+                reproduction_audit=None,
+                upstream_baseline_audit=upstream,
+                parity_report=None,
+                backend_gate=None,
+                confirmation_gate=None,
+                dense_confirmation_gate=None,
+                search_quality_confirmation=None,
+                family_state_provenance=None,
+                multirun_gate=None,
+                prompt_robustness=None,
+                drift_report=None,
+                eval_validity=None,
+                score_sanity=None,
+                adapter_run=None,
+            )
+
+            summary = run_goal_audit(args)
+            by_requirement = {row["requirement"]: row for row in summary["checks"]}
+            detail = by_requirement["official full-Gaussian baseline validity"]["detail"]
+
+            self.assertFalse(by_requirement["official full-Gaussian baseline validity"]["passed"])
+            self.assertTrue(detail["upstream_countdown"]["smoke_pass"])
+            self.assertFalse(detail["upstream_countdown"]["paper_scale_pass"])
+
     def test_parity_report_must_pass_stability_and_speed_gates(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -8,3 +8,4 @@ wandb/
 *.pt
 *.pth
 hf_cache/
+external/

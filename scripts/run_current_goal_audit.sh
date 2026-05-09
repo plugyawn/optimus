@@ -35,6 +35,7 @@ PYTHON=${PYTHON:-python}
 OUT=${OUT:-results/current_goal_audit_current}
 
 REPRODUCTION_AUDIT=${REPRODUCTION_AUDIT:-results/paper_style_p128_qwen3b/dense/reproduction_audit/summary.json}
+UPSTREAM_BASELINE_AUDIT=${UPSTREAM_BASELINE_AUDIT:-results/upstream_randopt_official_p32/countdown_20260507_135251/upstream_smoke_audit/summary.json}
 PARITY_REPORT=${PARITY_REPORT:-results/spectral_vllm_confirmation_rank32_c1p5_p16_default/parity/summary.json}
 BACKEND_GATE=${BACKEND_GATE:-results/backend_parity_gate_p64_tokenized_vllm/gate/summary.json}
 CONFIRMATION_GATE=${CONFIRMATION_GATE:-results/spectral_vllm_confirmation_rank32_c1p5_p16_default/confirmation/summary.json}
@@ -60,6 +61,7 @@ ADAPTER_RUN=${ADAPTER_RUN:-$QPROJ_REPLAY_ROOT/vllm}
 
 "$PYTHON" -m randopt_lora_lab.goal_audit \
   --reproduction-audit "$REPRODUCTION_AUDIT" \
+  --upstream-baseline-audit "$UPSTREAM_BASELINE_AUDIT" \
   --parity-report "$PARITY_REPORT" \
   --parity-arm lora \
   --backend-gate "$BACKEND_GATE" \
