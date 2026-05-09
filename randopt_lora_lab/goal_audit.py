@@ -47,6 +47,21 @@ def check_confirmation(path: Path | None, payload: dict | None) -> GoalCheck:
     )
 
 
+def check_family_state_provenance(path: Path | None, payload: dict | None) -> GoalCheck:
+    if payload is None:
+        return GoalCheck("adapter identity provenance", False, str(path) if path else "missing", "missing family-state provenance audit")
+    return GoalCheck(
+        "adapter identity provenance",
+        bool(payload.get("pass")),
+        str(path),
+        {
+            "pass": payload.get("pass"),
+            "failed": payload.get("failed", []),
+            "runs": len(payload.get("runs", [])),
+        },
+    )
+
+
 def check_multirun_gate(path: Path | None, payload: dict | None) -> GoalCheck:
     if payload is None:
         return GoalCheck("multi-run prompt-robust confirmation", False, str(path) if path else "missing", "missing multi-run gate")
@@ -189,6 +204,7 @@ def run_goal_audit(args) -> dict:
     parity = read_json(args.parity_report)
     backend = read_json(args.backend_gate)
     confirmation = read_json(args.confirmation_gate)
+    family_state_provenance = read_json(getattr(args, "family_state_provenance", None))
     multirun = read_json(getattr(args, "multirun_gate", None))
     prompt = read_json(args.prompt_robustness)
     drift = read_json(args.drift_report)
@@ -211,6 +227,7 @@ def run_goal_audit(args) -> dict:
         )
     )
     checks.append(check_confirmation(args.confirmation_gate, confirmation))
+    checks.append(check_family_state_provenance(getattr(args, "family_state_provenance", None), family_state_provenance))
     checks.append(check_multirun_gate(getattr(args, "multirun_gate", None), multirun))
     checks.append(check_prompt_robustness(args.prompt_robustness, prompt))
     checks.append(check_drift(args.drift_report, drift))
@@ -249,6 +266,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--parity-arm", default="lora")
     parser.add_argument("--backend-gate", type=Path)
     parser.add_argument("--confirmation-gate", type=Path)
+    parser.add_argument("--family-state-provenance", type=Path)
     parser.add_argument("--multirun-gate", type=Path)
     parser.add_argument("--prompt-robustness", type=Path)
     parser.add_argument("--drift-report", type=Path)

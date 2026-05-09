@@ -19,6 +19,7 @@ class GoalAuditTests(unittest.TestCase):
             parity_report=None,
             backend_gate=None,
             confirmation_gate=None,
+            family_state_provenance=None,
             multirun_gate=None,
             prompt_robustness=None,
             drift_report=None,
@@ -32,6 +33,7 @@ class GoalAuditTests(unittest.TestCase):
         self.assertIn("official full-Gaussian baseline validity", summary["failed"])
         self.assertIn("quality parity", summary["failed"])
         self.assertIn("two-stage accelerated confirmation", summary["failed"])
+        self.assertIn("adapter identity provenance", summary["failed"])
         self.assertIn("multi-run prompt-robust confirmation", summary["failed"])
         self.assertIn("drift parity", summary["failed"])
         self.assertIn("eval validity", summary["failed"])
@@ -43,6 +45,7 @@ class GoalAuditTests(unittest.TestCase):
             parity = root / "parity" / "summary.json"
             backend = root / "backend" / "summary.json"
             confirmation = root / "confirmation" / "summary.json"
+            provenance = root / "provenance" / "summary.json"
             multirun = root / "multirun" / "summary.json"
             prompt = root / "prompt" / "summary.json"
             drift = root / "drift" / "summary.json"
@@ -66,6 +69,7 @@ class GoalAuditTests(unittest.TestCase):
             )
             write_json(backend, {"pass": True})
             write_json(confirmation, {"gate": {"pass": True}, "best_recovered_k": 1, "zero_regret_k": 1})
+            write_json(provenance, {"pass": True, "failed": [], "runs": [{"root": "run", "pass": True}]})
             write_json(multirun, {"pass": True, "failed": [], "aggregate": {"runs": 2}})
             write_json(prompt, {"gate": {"pass": True, "valid_prompt_variants": 2, "passing_prompt_variants": 2, "min_valid_prompts": 2}})
             write_json(drift, {"pass": True})
@@ -76,6 +80,7 @@ class GoalAuditTests(unittest.TestCase):
                 parity_report=parity,
                 backend_gate=backend,
                 confirmation_gate=confirmation,
+                family_state_provenance=provenance,
                 multirun_gate=multirun,
                 prompt_robustness=prompt,
                 drift_report=drift,
@@ -114,6 +119,7 @@ class GoalAuditTests(unittest.TestCase):
                 parity_report=parity,
                 backend_gate=None,
                 confirmation_gate=None,
+                family_state_provenance=None,
                 multirun_gate=None,
                 prompt_robustness=None,
                 drift_report=None,
@@ -164,6 +170,7 @@ class GoalAuditTests(unittest.TestCase):
                 parity_arm="lora",
                 backend_gate=None,
                 confirmation_gate=None,
+                family_state_provenance=None,
                 multirun_gate=None,
                 prompt_robustness=None,
                 drift_report=None,
@@ -183,6 +190,7 @@ class GoalAuditTests(unittest.TestCase):
             root = Path(tmp)
             backend = root / "backend" / "summary.json"
             confirmation = root / "confirmation" / "summary.json"
+            provenance = root / "provenance" / "summary.json"
             multirun = root / "multirun" / "summary.json"
             write_json(backend, {"pass": False, "failed": ["ranking"]})
             write_json(
@@ -194,11 +202,13 @@ class GoalAuditTests(unittest.TestCase):
                 },
             )
             write_json(multirun, {"pass": False, "failed": ["all_quality_parity_pass"]})
+            write_json(provenance, {"pass": False, "failed": ["results/stale_run"]})
             args = Namespace(
                 reproduction_audit=None,
                 parity_report=None,
                 backend_gate=backend,
                 confirmation_gate=confirmation,
+                family_state_provenance=provenance,
                 multirun_gate=multirun,
                 prompt_robustness=None,
                 drift_report=None,
@@ -211,9 +221,11 @@ class GoalAuditTests(unittest.TestCase):
 
             self.assertFalse(by_requirement["trusted accelerated backend selector"]["passed"])
             self.assertTrue(by_requirement["two-stage accelerated confirmation"]["passed"])
+            self.assertFalse(by_requirement["adapter identity provenance"]["passed"])
             self.assertFalse(by_requirement["multi-run prompt-robust confirmation"]["passed"])
             self.assertIn("trusted accelerated backend selector", summary["failed"])
             self.assertNotIn("two-stage accelerated confirmation", summary["failed"])
+            self.assertIn("adapter identity provenance", summary["failed"])
 
 
 if __name__ == "__main__":

@@ -23,6 +23,13 @@ LoRA-family search, vLLM LoRA serving probes, geometry audits, and parity
 reports. It does not yet show a LoRA-style family with full dense-Gaussian
 search-utility parity.
 
+The latest blocker is adapter identity provenance for activation-spectral
+families. Current q-only c2 P64 vLLM proposal runs saved
+`vllm/family_state.pt`, but their PEFT confirmations did not copy or record that
+state. Since `activation_spectral_lora*` candidates are defined by both the
+candidate key and the activation basis, those confirmations cannot be used as
+strict vLLM-to-PEFT selector parity or dense-regret evidence until rerun.
+
 Use the machine-readable goal audit to prevent partial evidence from being
 treated as completion:
 
@@ -33,6 +40,7 @@ python -m randopt_lora_lab.goal_audit \
   --parity-arm lora \
   --backend-gate results/BACKEND_GATE/summary.json \
   --multirun-gate results/spectral_vllm_multirun_gate/summary.json \
+  --family-state-provenance results/FAMILY_STATE_PROVENANCE/summary.json \
   --prompt-robustness results/PROMPT_ROBUSTNESS/summary.json \
   --drift-report results/DRIFT_AUDIT/summary.json \
   --eval-validity results/SEARCH_RUN/validity/summary.json \
@@ -148,6 +156,7 @@ stability gates are still red.
 | Convenience | LoRA adapters are materialized as portable safetensors | partial |
 | Robustness | generated non-overlap data, cap-hit/malformed logging, paired holdout rows | partial |
 | Eval validity | strict parser rescoring, semantic split audit, base row checks, cap/malformed thresholds | implemented, must pass per claim |
+| Adapter identity provenance | `results/family_state_provenance_audit_current` fails both q-only c2 P64 runs because PEFT confirmation did not reuse/copy `vllm/family_state.pt` | missing for activation-spectral claims |
 | Paper-aligned geometry | sparse SGD RLVR note added after arXiv 2602.07729 | hypothesis only |
 | Sample-size aggregation | rank-32 top-4 score-weighted aggregate improved holdout, but with high cap-hit | promising, invalid until cap audit |
 | Sparse-low-rank family | `sparse_low_rank_lora` implemented with density variants and variance matching | implemented, not run |
@@ -244,6 +253,37 @@ vLLM-only selector parity: strict, currently failing.
 vLLM proposal + PEFT confirmation: same-family recall/speed gate, currently passed on one P64 panel.
 dense-referenced confirmation: required before treating the accelerated path as dense RandOpt quality evidence.
 ```
+
+For activation-spectral families, add a third required gate before interpreting
+any two-stage confirmation:
+
+```bash
+python -m randopt_lora_lab.family_state_provenance_audit \
+  --root results/RUN_ROOT \
+  --out results/RUN_ROOT/family_state_provenance_audit
+```
+
+Pass criteria:
+
+```text
+1. `vllm/family_state.pt` exists for activation-spectral proposal runs.
+2. `confirmed/summary.json` records `family_state_file`.
+3. `confirmed/family_state.pt` exists.
+4. `confirmed/family_state.pt` hash matches `vllm/family_state.pt`.
+5. `confirmed/family_state_summary.json` has `kind=loaded_family_state`.
+```
+
+The current audit:
+
+```text
+results/family_state_provenance_audit_current: FAIL
+failed:
+  results/qproj_c2_vllm_shortlist_p64
+  results/qproj_c2_vllm_shortlist_p64_seed20260508
+```
+
+Therefore q-only c2 remains a promising family-level lead, but its saved
+confirmation artifacts are not current-valid adapter-identity evidence.
 
 For sparse-low-rank follow-up, avoid full PEFT all-arm sweeps. Use vLLM to
 screen the sparse family, write a top-K shortlist, PEFT-confirm only that
