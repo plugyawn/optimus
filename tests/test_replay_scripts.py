@@ -24,7 +24,10 @@ def test_current_goal_audit_script_is_non_gpu_and_dense_referenced():
 
     assert "randopt_lora_lab.goal_audit" in text
     assert "results/current_goal_audit_current" in text
-    assert "--dense-confirmation-gate results/qproj_c2_vllm_shortlist_p64/shortlist_dense_confirmation/summary.json" in text
-    assert "--search-quality-confirmation results/qproj_c2_vllm_shortlist_p64/search_quality_confirmation/summary.json" in text
+    assert "QPROJ_REPLAY_ROOT=${QPROJ_REPLAY_ROOT:-results/qproj_c2_vllm_shortlist_p64}" in text
+    assert "DENSE_CONFIRMATION_GATE=${DENSE_CONFIRMATION_GATE:-$QPROJ_REPLAY_ROOT/shortlist_dense_confirmation/summary.json}" in text
+    assert "SEARCH_QUALITY_CONFIRMATION=${SEARCH_QUALITY_CONFIRMATION:-$QPROJ_REPLAY_ROOT/search_quality_confirmation/summary.json}" in text
+    assert "--dense-confirmation-gate \"$DENSE_CONFIRMATION_GATE\"" in text
+    assert "--search-quality-confirmation \"$SEARCH_QUALITY_CONFIRMATION\"" in text
     assert "MODE=confirm" not in text
     assert "experiments search" not in text

@@ -38,7 +38,14 @@ scripts/run_current_goal_audit.sh
 ```
 
 That wrapper is non-GPU and reads the current strongest artifacts. The explicit
-form is:
+post-replay form is:
+
+```bash
+QPROJ_REPLAY_ROOT=results/qproj_c2_vllm_shortlist_p64_default_exact_k4 \
+  scripts/run_current_goal_audit.sh
+```
+
+The expanded default form is:
 
 ```bash
 python -m randopt_lora_lab.goal_audit \
