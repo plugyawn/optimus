@@ -48,16 +48,16 @@ MODE=confirm scripts/run_qproj_c2_corrected_confirmation.sh
 The old exact-replay form remains useful for provenance forensics on the stale
 source panel, but it should not be treated as the primary prompt-agnostic
 quality claim if its vLLM summary still contains base-invalid XML stress
-prompts. The explicit post-replay audit form is:
+prompts. The corrected audit default points at:
 
 ```bash
-QPROJ_REPLAY_ROOT=results/qproj_c2_vllm_shortlist_p64_default_exact_k4 \
+QPROJ_REPLAY_ROOT=results/qproj_c2_vllm_shortlist_p64_default_reordered \
   scripts/run_current_goal_audit.sh
 ```
 
-When `QPROJ_REPLAY_ROOT/family_state_provenance_audit/summary.json` exists,
-the wrapper uses that replay-local provenance audit. Otherwise it falls back to
-the current global provenance audit so stale q-only c2 runs still fail.
+The wrapper requires replay-local provenance at
+`QPROJ_REPLAY_ROOT/family_state_provenance_audit/summary.json`; it no longer
+falls back to stale global provenance for the corrected claim.
 
 The expanded default form is:
 
@@ -68,14 +68,15 @@ python -m randopt_lora_lab.goal_audit \
   --parity-arm lora \
   --backend-gate results/backend_parity_gate_p64_tokenized_vllm/gate/summary.json \
   --confirmation-gate results/spectral_vllm_confirmation_rank32_c1p5_p16_default/confirmation/summary.json \
-  --dense-confirmation-gate results/qproj_c2_vllm_shortlist_p64/shortlist_dense_confirmation/summary.json \
-  --search-quality-confirmation results/qproj_c2_vllm_shortlist_p64/search_quality_confirmation/summary.json \
+  --dense-confirmation-gate results/qproj_c2_vllm_shortlist_p64_default_reordered/shortlist_dense_confirmation/summary.json \
+  --search-quality-confirmation results/qproj_c2_vllm_shortlist_p64_default_reordered/search_quality_confirmation/summary.json \
   --multirun-gate results/spectral_vllm_multirun_gate_p16_default/summary.json \
-  --family-state-provenance results/family_state_provenance_audit_current/summary.json \
+  --family-state-provenance results/qproj_c2_vllm_shortlist_p64_default_reordered/family_state_provenance_audit/summary.json \
   --prompt-robustness results/prompt_robustness_rank32_top4/summary.json \
   --drift-report results/drift_parity_dense_vs_lora_rank8_p32_sigma001/summary.json \
-  --eval-validity results/qproj_c2_vllm_shortlist_p64/confirmed/validity/summary.json \
-  --adapter-run results/qproj_c2_vllm_shortlist_p64/vllm \
+  --eval-validity results/qproj_c2_vllm_shortlist_p64_default_reordered/confirmed/validity/summary.json \
+  --score-sanity results/qproj_c2_vllm_shortlist_p64_default_reordered/score_sanity/summary.json \
+  --adapter-run results/qproj_c2_vllm_shortlist_p64_default_reordered/vllm \
   --out results/current_goal_audit_current
 ```
 
