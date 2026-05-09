@@ -122,8 +122,10 @@ results/qproj_c2_vllm_shortlist_p64_default_exact_k4/replay_manifest
 ```
 
 The manifest is diagnostic, not a substitute for the completion audit. It records
-which dense/vLLM/shortlist/confirmation/provenance/audit artifacts are present,
-which gates failed, and whether the chained goal audit passed.
+which dense/vLLM/shortlist/score-sanity/confirmation/provenance/audit artifacts
+are present, which gates failed, and whether the chained goal audit passed. The
+score-sanity audit checks top-candidate cap hits, malformed rates, answer closure,
+screen sample size, and whether the top candidate clears the base screen score.
 
 That wrapper copies `SOURCE_ROOT/dense` and `SOURCE_ROOT/vllm` into `OUT_ROOT`,
 writes a selector-union shortlist, then runs PEFT confirmation with:

@@ -10,6 +10,7 @@ def test_qproj_c2_replay_defaults_to_preflight_mode():
     assert "scripts/run_existing_vllm_shortlist_confirmation.sh" in text
     assert 'if [[ "$MODE" == "confirm" && "$RUN_GOAL_AUDIT" == "1" ]]' in text
     assert 'QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh' in text
+    assert "randopt_lora_lab.score_sanity_audit" in text
     assert "randopt_lora_lab.replay_manifest" in text
     assert '--mode "$MODE"' in text
 

@@ -66,6 +66,11 @@ NEXT_ACTIONS = {
         "action": "run strict parser, semantic split, cap-hit, malformed, and ensemble-row validity on the claim artifact",
         "command": "python -m randopt_lora_lab.result_validity --run RUN --out RUN/validity",
     },
+    "score sanity": {
+        "priority": 12,
+        "action": "audit top-candidate cap hits, malformed rates, answer closure, base prompt health, and base-score lift",
+        "command": "python -m randopt_lora_lab.score_sanity_audit --root RUN --out RUN/score_sanity",
+    },
     "adapter convenience": {
         "priority": 13,
         "action": "materialize and keep portable LoRA adapters plus replay metadata for the selected family",
@@ -310,6 +315,21 @@ def check_eval_validity(path: Path | None, payload: dict | None) -> GoalCheck:
     )
 
 
+def check_score_sanity(path: Path | None, payload: dict | None) -> GoalCheck:
+    if payload is None:
+        return GoalCheck("score sanity", False, str(path) if path else "missing", "missing score sanity audit")
+    return GoalCheck(
+        "score sanity",
+        bool(payload.get("pass")),
+        str(path),
+        {
+            "pass": payload.get("pass"),
+            "failed": payload.get("failed", []),
+            "thresholds": payload.get("thresholds", {}),
+        },
+    )
+
+
 def check_adapter_convenience(path: Path | None) -> GoalCheck:
     if path is None:
         return GoalCheck("adapter convenience", False, "missing", "missing adapter run directory")
@@ -343,6 +363,7 @@ def run_goal_audit(args) -> dict:
     prompt = read_json(args.prompt_robustness)
     drift = read_json(args.drift_report)
     eval_validity = read_json(args.eval_validity)
+    score_sanity = read_json(getattr(args, "score_sanity", None))
     checks.append(
         check_present_pass(
             "official full-Gaussian baseline validity",
@@ -369,6 +390,7 @@ def run_goal_audit(args) -> dict:
     checks.append(check_prompt_robustness(args.prompt_robustness, prompt))
     checks.append(check_drift(args.drift_report, drift))
     checks.append(check_eval_validity(args.eval_validity, eval_validity))
+    checks.append(check_score_sanity(getattr(args, "score_sanity", None), score_sanity))
     checks.append(check_adapter_convenience(args.adapter_run))
     rows = [asdict(check) for check in checks]
     failed = [row["requirement"] for row in rows if not row["passed"]]
@@ -424,6 +446,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--prompt-robustness", type=Path)
     parser.add_argument("--drift-report", type=Path)
     parser.add_argument("--eval-validity", type=Path)
+    parser.add_argument("--score-sanity", type=Path)
     parser.add_argument("--adapter-run", type=Path)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)

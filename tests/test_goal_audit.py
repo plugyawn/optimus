@@ -26,6 +26,7 @@ class GoalAuditTests(unittest.TestCase):
             prompt_robustness=None,
             drift_report=None,
             eval_validity=None,
+            score_sanity=None,
             adapter_run=None,
         )
 
@@ -39,6 +40,7 @@ class GoalAuditTests(unittest.TestCase):
         self.assertIn("multi-run prompt-robust confirmation", summary["failed"])
         self.assertIn("drift parity", summary["failed"])
         self.assertIn("eval validity", summary["failed"])
+        self.assertIn("score sanity", summary["failed"])
         action_by_requirement = {row["requirement"]: row for row in summary["next_actions"]}
         self.assertEqual(summary["next_actions"][0]["requirement"], "accelerated evaluation route")
         self.assertEqual(summary["next_actions"][1]["requirement"], "adapter identity provenance")
@@ -67,6 +69,7 @@ class GoalAuditTests(unittest.TestCase):
             prompt = root / "prompt" / "summary.json"
             drift = root / "drift" / "summary.json"
             eval_validity = root / "eval_validity" / "summary.json"
+            score_sanity = root / "score_sanity" / "summary.json"
             adapter = root / "adapter"
             write_json(reproduction, {"pass": True})
             write_json(
@@ -91,6 +94,7 @@ class GoalAuditTests(unittest.TestCase):
             write_json(prompt, {"gate": {"pass": True, "valid_prompt_variants": 2, "passing_prompt_variants": 2, "min_valid_prompts": 2}})
             write_json(drift, {"pass": True})
             write_json(eval_validity, {"pass": True})
+            write_json(score_sanity, {"pass": True})
             write_json(adapter / "summary.json", {"adapters_kept": True})
             args = Namespace(
                 reproduction_audit=reproduction,
@@ -104,6 +108,7 @@ class GoalAuditTests(unittest.TestCase):
                 prompt_robustness=prompt,
                 drift_report=drift,
                 eval_validity=eval_validity,
+                score_sanity=score_sanity,
                 adapter_run=adapter,
             )
 
@@ -146,6 +151,7 @@ class GoalAuditTests(unittest.TestCase):
                 prompt_robustness=None,
                 drift_report=None,
                 eval_validity=None,
+                score_sanity=None,
                 adapter_run=None,
             )
 
@@ -199,6 +205,7 @@ class GoalAuditTests(unittest.TestCase):
                 prompt_robustness=None,
                 drift_report=None,
                 eval_validity=None,
+                score_sanity=None,
                 adapter_run=None,
             )
 
@@ -239,6 +246,7 @@ class GoalAuditTests(unittest.TestCase):
                 prompt_robustness=None,
                 drift_report=None,
                 eval_validity=None,
+                score_sanity=None,
                 adapter_run=None,
             )
 
@@ -287,6 +295,7 @@ class GoalAuditTests(unittest.TestCase):
                 prompt_robustness=None,
                 drift_report=None,
                 eval_validity=None,
+                score_sanity=None,
                 adapter_run=None,
             )
 
@@ -296,6 +305,34 @@ class GoalAuditTests(unittest.TestCase):
             self.assertTrue(by_requirement["accelerated evaluation route"]["passed"])
             self.assertTrue(by_requirement["accelerated evaluation route"]["detail"]["dense_referenced_two_stage_pass"])
             self.assertEqual(by_requirement["accelerated evaluation route"]["detail"]["routes"], ["dense_referenced_two_stage"])
+
+    def test_score_sanity_failure_blocks_goal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            score_sanity = root / "score_sanity" / "summary.json"
+            write_json(score_sanity, {"pass": False, "failed": ["vllm:base_screen_prompt_health"]})
+            args = Namespace(
+                reproduction_audit=None,
+                parity_report=None,
+                backend_gate=None,
+                confirmation_gate=None,
+                dense_confirmation_gate=None,
+                search_quality_confirmation=None,
+                family_state_provenance=None,
+                multirun_gate=None,
+                prompt_robustness=None,
+                drift_report=None,
+                eval_validity=None,
+                score_sanity=score_sanity,
+                adapter_run=None,
+            )
+
+            summary = run_goal_audit(args)
+            by_requirement = {row["requirement"]: row for row in summary["checks"]}
+
+            self.assertFalse(by_requirement["score sanity"]["passed"])
+            self.assertIn("score sanity", summary["failed"])
+            self.assertEqual(by_requirement["score sanity"]["detail"]["failed"], ["vllm:base_screen_prompt_health"])
 
 
 if __name__ == "__main__":

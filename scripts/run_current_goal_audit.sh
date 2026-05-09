@@ -52,6 +52,15 @@ MULTIRUN_GATE=${MULTIRUN_GATE:-results/spectral_vllm_multirun_gate_p16_default/s
 PROMPT_ROBUSTNESS=${PROMPT_ROBUSTNESS:-results/prompt_robustness_rank32_top4/summary.json}
 DRIFT_REPORT=${DRIFT_REPORT:-results/drift_parity_dense_vs_lora_rank8_p32_sigma001/summary.json}
 EVAL_VALIDITY=${EVAL_VALIDITY:-$QPROJ_REPLAY_ROOT/confirmed/validity/summary.json}
+if [[ -z "${SCORE_SANITY:-}" ]]; then
+  if [[ -f "$QPROJ_REPLAY_ROOT/score_sanity/summary.json" ]]; then
+    SCORE_SANITY=$QPROJ_REPLAY_ROOT/score_sanity/summary.json
+  elif [[ -f "$QPROJ_REPLAY_ROOT/score_sanity_current/summary.json" ]]; then
+    SCORE_SANITY=$QPROJ_REPLAY_ROOT/score_sanity_current/summary.json
+  else
+    SCORE_SANITY=$QPROJ_REPLAY_ROOT/score_sanity/summary.json
+  fi
+fi
 ADAPTER_RUN=${ADAPTER_RUN:-$QPROJ_REPLAY_ROOT/vllm}
 
 "$PYTHON" -m randopt_lora_lab.goal_audit \
@@ -67,6 +76,7 @@ ADAPTER_RUN=${ADAPTER_RUN:-$QPROJ_REPLAY_ROOT/vllm}
   --prompt-robustness "$PROMPT_ROBUSTNESS" \
   --drift-report "$DRIFT_REPORT" \
   --eval-validity "$EVAL_VALIDITY" \
+  --score-sanity "$SCORE_SANITY" \
   --adapter-run "$ADAPTER_RUN" \
   --out "$OUT"
 

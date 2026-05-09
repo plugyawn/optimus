@@ -19,6 +19,7 @@ def test_preflight_manifest_requires_source_panel_shortlist_and_preflight(tmp_pa
     write_json(tmp_path / "vllm" / "summary.json", {"kind": "vllm_search"})
     write_jsonl(tmp_path / "shortlist_top4.jsonl", [{"candidate": "activation_spectral_lora_c2:seed0"}])
     write_json(tmp_path / "preflight_summary.json", {"kind": "existing_vllm_shortlist_confirmation_preflight", "pass": True})
+    write_json(tmp_path / "score_sanity" / "summary.json", {"kind": "score_sanity_audit", "pass": True})
 
     summary = build_manifest(tmp_path, mode="preflight")
 
@@ -38,6 +39,7 @@ def test_confirm_manifest_separates_missing_artifacts_from_failed_gates(tmp_path
     write_json(tmp_path / "vllm" / "summary.json", {"kind": "vllm_search"})
     write_jsonl(tmp_path / "shortlist_top4.jsonl", [{"candidate": "activation_spectral_lora_c2:seed0"}])
     write_json(tmp_path / "preflight_summary.json", {"pass": True})
+    write_json(tmp_path / "score_sanity" / "summary.json", {"kind": "score_sanity_audit", "pass": True})
     write_json(tmp_path / "confirmed" / "summary.json", {"kind": "search"})
     write_json(tmp_path / "confirmed" / "validity" / "summary.json", {"pass": True})
     write_json(tmp_path / "shortlist_dense_confirmation" / "summary.json", {"gate": {"pass": False, "failed": ["dense_best_recovered"]}})
@@ -59,6 +61,7 @@ def test_manifest_marks_corrupt_required_json_unreadable(tmp_path: Path):
     write_json(tmp_path / "vllm" / "summary.json", {"kind": "vllm_search"})
     write_jsonl(tmp_path / "shortlist_top4.jsonl", [{"candidate": "activation_spectral_lora_c2:seed0"}])
     write_json(tmp_path / "preflight_summary.json", {"pass": True})
+    write_json(tmp_path / "score_sanity" / "summary.json", {"kind": "score_sanity_audit", "pass": True})
 
     summary = build_manifest(tmp_path, mode="preflight")
 
@@ -76,6 +79,7 @@ def test_confirm_manifest_method_pass_requires_current_goal_audit_pass(tmp_path:
     write_json(tmp_path / "vllm" / "summary.json", {"kind": "vllm_search"})
     write_jsonl(tmp_path / "shortlist_top4.jsonl", [{"candidate": "activation_spectral_lora_c2:seed0"}])
     write_json(tmp_path / "preflight_summary.json", {"pass": True})
+    write_json(tmp_path / "score_sanity" / "summary.json", {"kind": "score_sanity_audit", "pass": True})
     write_json(tmp_path / "confirmed" / "summary.json", {"kind": "search"})
     write_json(tmp_path / "confirmed" / "validity" / "summary.json", {"pass": True})
     write_json(tmp_path / "shortlist_dense_confirmation" / "summary.json", {"gate": {"pass": True}})

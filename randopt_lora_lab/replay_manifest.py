@@ -11,6 +11,7 @@ ARTIFACTS = [
     ("vllm_summary", "vllm/summary.json", ("preflight", "confirm"), "summary"),
     ("shortlist", "shortlist_top*.jsonl", ("preflight", "confirm"), "jsonl"),
     ("preflight", "preflight_summary.json", ("preflight", "confirm"), "pass"),
+    ("score_sanity", "score_sanity/summary.json", ("preflight", "confirm"), "pass"),
     ("confirmed_summary", "confirmed/summary.json", ("confirm",), "summary"),
     ("confirmed_validity", "confirmed/validity/summary.json", ("confirm",), "pass"),
     ("shortlist_dense_confirmation", "shortlist_dense_confirmation/summary.json", ("confirm",), "gate"),
