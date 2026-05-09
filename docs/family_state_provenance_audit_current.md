@@ -78,3 +78,27 @@ search_quality_confirmation/summary.json
 ```
 
 Only after that passes should the old q-only c2 speed/quality claims be considered live again.
+
+Use the existing-panel replay wrapper so the source run is not mutated:
+
+```bash
+SOURCE_ROOT=results/qproj_c2_vllm_shortlist_p64 \
+OUT_ROOT=results/qproj_c2_vllm_shortlist_p64_default_exact_k4 \
+FAMILY=activation_spectral_lora_c2 \
+TARGETS=q_proj \
+SEED=20260507 \
+DATA=data/countdown_generated_1200_seed20260507.json \
+SHORTLIST_POLICY=default_exact \
+SHORTLIST_K=4 \
+CONFIRM_KS=1,2,4 \
+CONFIRM_MAX_K=4 \
+CONFIRM_MAX_DENSE_REGRET=0.015625 \
+scripts/run_existing_vllm_shortlist_confirmation.sh
+```
+
+That wrapper copies `SOURCE_ROOT/dense` and `SOURCE_ROOT/vllm` into `OUT_ROOT`,
+writes a selector-union shortlist, then runs PEFT confirmation with:
+
+```text
+--family-state-file "$OUT_ROOT/vllm/family_state.pt"
+```

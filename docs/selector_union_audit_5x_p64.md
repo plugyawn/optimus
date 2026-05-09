@@ -107,10 +107,12 @@ one screen example while preserving end-to-end speed.
 ## Next GPU Test
 
 Use q-only c2 because it has the strongest existing operational evidence, and
-rerun only the proposal/confirmation path with alternate shortlist policies
-against the existing dense baseline:
+rerun only the confirmation path with alternate shortlist policies against the
+existing dense and vLLM baseline. Use the existing-panel replay wrapper because
+it preserves the saved activation basis from `vllm/family_state.pt`:
 
 ```bash
+SOURCE_ROOT=results/qproj_c2_vllm_shortlist_p64 \
 OUT_ROOT=results/qproj_c2_vllm_shortlist_p64_default_exact_k4 \
 FAMILY=activation_spectral_lora_c2 \
 TARGETS=q_proj \
@@ -123,8 +125,7 @@ VLLM_PROMPT_INPUT=token_ids \
 VLLM_PROMPT_VARIANTS=default,reordered,xml \
 VLLM_SCORE_MODE=robust_mean \
 SHORTLIST_POLICY=default_exact \
-RUN_DENSE=0 RUN_VLLM=1 RUN_CONFIRM=1 RUN_REPORT=1 \
-scripts/run_vllm_shortlist_confirmation.sh
+scripts/run_existing_vllm_shortlist_confirmation.sh
 ```
 
 For a higher-recall but more expensive test:
