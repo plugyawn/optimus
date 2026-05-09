@@ -106,10 +106,18 @@ one screen example while preserving end-to-end speed.
 
 ## Next GPU Test
 
-Use q-only c2 because it has the strongest existing operational evidence, and
-rerun only the confirmation path with alternate shortlist policies against the
-existing dense and vLLM baseline. Use the existing-panel replay wrapper because
-it preserves the saved activation basis from `vllm/family_state.pt`:
+Use q-only c2 because it has the strongest existing operational evidence, but
+the next primary GPU test should create a fresh corrected vLLM screen with
+base-healthy prompt variants:
+
+```bash
+MODE=confirm scripts/run_qproj_c2_corrected_confirmation.sh
+```
+
+The older existing-panel replay remains useful for provenance forensics because
+it preserves the saved activation basis from `vllm/family_state.pt`, but it
+inherits the old `default,reordered,xml` source summary and should not be used
+as the primary prompt-agnostic quality claim:
 
 ```bash
 SOURCE_ROOT=results/qproj_c2_vllm_shortlist_p64 \
@@ -122,7 +130,7 @@ POPULATION=64 PROMPTS=64 HOLDOUT_PROMPTS=128 VLLM_HOLDOUT_PROMPTS=8 \
 SHORTLIST_K=4 RANK=32 SIGMA_VALUES=0.0005,0.001,0.002 \
 ENSEMBLE_KS=1,4 MAX_NEW_TOKENS=128 HF_BATCH_SIZE=16 \
 VLLM_PROMPT_INPUT=token_ids \
-VLLM_PROMPT_VARIANTS=default,reordered,xml \
+VLLM_PROMPT_VARIANTS=default,reordered \
 VLLM_SCORE_MODE=robust_mean \
 SHORTLIST_POLICY=default_exact \
 scripts/run_existing_vllm_shortlist_confirmation.sh

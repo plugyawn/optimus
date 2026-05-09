@@ -24,6 +24,21 @@ def test_qproj_c2_replay_targets_saved_basis_shortlist():
     assert "CONFIRM_MAX_DENSE_REGRET=${CONFIRM_MAX_DENSE_REGRET:-0.015625}" in text
 
 
+def test_qproj_c2_corrected_confirmation_is_guarded_and_uses_healthy_prompts():
+    text = Path("scripts/run_qproj_c2_corrected_confirmation.sh").read_text()
+
+    assert "MODE=${MODE:-preflight}" in text
+    assert "MODE=confirm" in text
+    assert "scripts/run_vllm_shortlist_confirmation.sh" in text
+    assert "OUT_ROOT=${OUT_ROOT:-results/qproj_c2_vllm_shortlist_p64_default_reordered}" in text
+    assert "FAMILY=${FAMILY:-activation_spectral_lora_c2}" in text
+    assert "TARGETS=${TARGETS:-q_proj}" in text
+    assert "SHORTLIST_POLICY=${SHORTLIST_POLICY:-default_exact}" in text
+    assert "VLLM_PROMPT_VARIANTS=${VLLM_PROMPT_VARIANTS:-default,reordered}" in text
+    assert "VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID=${VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID:-1}" in text
+    assert 'QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh' in text
+
+
 def test_current_goal_audit_script_is_non_gpu_and_dense_referenced():
     text = Path("scripts/run_current_goal_audit.sh").read_text()
 
@@ -61,3 +76,12 @@ def test_vllm_confirmation_wrappers_require_all_prompt_variants_valid_by_default
         assert "default,reordered" in text
         assert "VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID=${VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID:-1}" in text
         assert "--require-all-prompt-variants-valid" in text
+
+
+def test_vllm_shortlist_confirmation_writes_quality_and_score_sanity_gates():
+    text = Path("scripts/run_vllm_shortlist_confirmation.sh").read_text()
+
+    assert "RUN_SEARCH_QUALITY=${RUN_SEARCH_QUALITY:-1}" in text
+    assert "RUN_SCORE_SANITY=${RUN_SCORE_SANITY:-1}" in text
+    assert "randopt_lora_lab.search_quality_confirmation" in text
+    assert "randopt_lora_lab.score_sanity_audit" in text

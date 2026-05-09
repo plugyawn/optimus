@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Any
 
 
+QPROJ_CORRECTED_CONFIRM_COMMAND = "MODE=confirm scripts/run_qproj_c2_corrected_confirmation.sh"
+
+
 @dataclass
 class GoalCheck:
     requirement: str
@@ -24,27 +27,27 @@ NEXT_ACTIONS = {
     "quality parity": {
         "priority": 20,
         "action": "produce a current-valid LoRA-family parity report whose holdout quality matches or beats dense Gaussian",
-        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+        "command": QPROJ_CORRECTED_CONFIRM_COMMAND,
     },
     "stability parity": {
         "priority": 21,
         "action": "rerun parity on a shared candidate panel until Spearman, top-k overlap, and selected-regret gates pass across seeds",
-        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+        "command": QPROJ_CORRECTED_CONFIRM_COMMAND,
     },
     "speed parity": {
         "priority": 22,
         "action": "measure quality-coupled accelerated search speed against the dense full-screen reference, not same-family speed alone",
-        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+        "command": QPROJ_CORRECTED_CONFIRM_COMMAND,
     },
     "accelerated evaluation route": {
         "priority": 10,
         "action": "run the dense-referenced shortlist confirmation path or fix direct accelerated-backend selector parity",
-        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+        "command": QPROJ_CORRECTED_CONFIRM_COMMAND,
     },
     "adapter identity provenance": {
         "priority": 11,
         "action": "rerun activation-spectral PEFT confirmation with the saved vLLM family_state.pt copied and audited",
-        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+        "command": QPROJ_CORRECTED_CONFIRM_COMMAND,
     },
     "multi-run prompt-robust confirmation": {
         "priority": 40,
@@ -69,12 +72,12 @@ NEXT_ACTIONS = {
     "score sanity": {
         "priority": 12,
         "action": "audit top-candidate cap hits, malformed rates, answer closure, base prompt health, and base-score lift",
-        "command": "python -m randopt_lora_lab.score_sanity_audit --root RUN --out RUN/score_sanity",
+        "command": QPROJ_CORRECTED_CONFIRM_COMMAND,
     },
     "adapter convenience": {
         "priority": 13,
         "action": "materialize and keep portable LoRA adapters plus replay metadata for the selected family",
-        "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+        "command": QPROJ_CORRECTED_CONFIRM_COMMAND,
     },
 }
 

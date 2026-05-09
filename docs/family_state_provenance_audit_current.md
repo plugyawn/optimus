@@ -77,7 +77,28 @@ shortlist_dense_confirmation/summary.json
 search_quality_confirmation/summary.json
 ```
 
-Only after that passes should the old q-only c2 speed/quality claims be considered live again.
+Only after that passes should q-only c2 speed/quality claims be considered live
+again. The preferred path is now a fresh corrected confirmation, not replaying
+the old `default,reordered,xml` source panel:
+
+```bash
+scripts/run_qproj_c2_corrected_confirmation.sh
+```
+
+When a GPU is intentionally available:
+
+```bash
+MODE=confirm scripts/run_qproj_c2_corrected_confirmation.sh
+```
+
+This creates a fresh vLLM screen with `default,reordered`, requires all requested
+prompt variants to be base-valid, writes dense-referenced confirmation,
+search-quality, score-sanity, provenance, and current goal-audit artifacts.
+
+The exact replay wrapper below is now primarily forensic: it verifies whether an
+old source panel was confirmed with the same saved vLLM family state. It should
+not be used as the primary prompt-agnostic quality claim if the source vLLM
+summary still contains base-invalid XML stress prompts.
 
 Use the existing-panel replay wrapper so the source run is not mutated:
 
@@ -96,14 +117,14 @@ CONFIRM_MAX_DENSE_REGRET=0.015625 \
 scripts/run_existing_vllm_shortlist_confirmation.sh
 ```
 
-The guarded one-command form defaults to preflight-only and should be used
+The guarded exact-replay form defaults to preflight-only and should be used
 before attaching a GPU:
 
 ```bash
 scripts/run_qproj_c2_exact_replay.sh
 ```
 
-When a GPU is intentionally available:
+When a GPU is intentionally available for forensic replay:
 
 ```bash
 MODE=confirm scripts/run_qproj_c2_exact_replay.sh

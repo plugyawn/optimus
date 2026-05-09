@@ -15,8 +15,8 @@ Default:
 Useful override:
   OUT=/tmp/randopt_current_goal_audit scripts/run_current_goal_audit.sh
 
-After exact q-proj c2 replay:
-  QPROJ_REPLAY_ROOT=results/qproj_c2_vllm_shortlist_p64_default_exact_k4 \
+After corrected q-proj c2 confirmation:
+  QPROJ_REPLAY_ROOT=results/qproj_c2_vllm_shortlist_p64_default_reordered \
     scripts/run_current_goal_audit.sh
 EOF
 }

@@ -52,6 +52,8 @@ RUN_VLLM=${RUN_VLLM:-1}
 RUN_CONFIRM=${RUN_CONFIRM:-1}
 RUN_REPORT=${RUN_REPORT:-1}
 RUN_PROVENANCE_AUDIT=${RUN_PROVENANCE_AUDIT:-1}
+RUN_SEARCH_QUALITY=${RUN_SEARCH_QUALITY:-1}
+RUN_SCORE_SANITY=${RUN_SCORE_SANITY:-1}
 
 VLLM_PROMPT_INPUT=${VLLM_PROMPT_INPUT:-token_ids}
 VLLM_PROMPT_VARIANTS=${VLLM_PROMPT_VARIANTS:-${PROMPT_VARIANTS:-default,reordered}}
@@ -227,8 +229,23 @@ if [[ "$RUN_REPORT" == "1" ]]; then
     --min-full-without-dense-load-speedup "$CONFIRM_MIN_FULL_SPEEDUP"
 fi
 
+if [[ "$RUN_SEARCH_QUALITY" == "1" ]]; then
+  "$PYTHON" -m randopt_lora_lab.search_quality_confirmation \
+    --root "$OUT_ROOT" \
+    --out "$OUT_ROOT/search_quality_confirmation" \
+    --max-confirm-k "$CONFIRM_MAX_K" \
+    --min-full-speedup "$CONFIRM_MIN_FULL_SPEEDUP" \
+    --min-holdout-delta 0.0
+fi
+
 if [[ "$RUN_PROVENANCE_AUDIT" == "1" ]]; then
   "$PYTHON" -m randopt_lora_lab.family_state_provenance_audit \
     --root "$OUT_ROOT" \
     --out "$OUT_ROOT/family_state_provenance_audit"
+fi
+
+if [[ "$RUN_SCORE_SANITY" == "1" ]]; then
+  "$PYTHON" -m randopt_lora_lab.score_sanity_audit \
+    --root "$OUT_ROOT" \
+    --out "$OUT_ROOT/score_sanity"
 fi

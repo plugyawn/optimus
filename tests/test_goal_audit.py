@@ -46,7 +46,7 @@ class GoalAuditTests(unittest.TestCase):
         self.assertEqual(summary["next_actions"][1]["requirement"], "adapter identity provenance")
         self.assertEqual(
             action_by_requirement["accelerated evaluation route"]["command"],
-            "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+            "MODE=confirm scripts/run_qproj_c2_corrected_confirmation.sh",
         )
         self.assertLess(
             action_by_requirement["accelerated evaluation route"]["priority"],
@@ -54,7 +54,7 @@ class GoalAuditTests(unittest.TestCase):
         )
         self.assertEqual(
             action_by_requirement["adapter identity provenance"]["command"],
-            "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+            "MODE=confirm scripts/run_qproj_c2_corrected_confirmation.sh",
         )
 
     def test_full_evidence_passes(self):

@@ -37,8 +37,18 @@ treated as completion:
 scripts/run_current_goal_audit.sh
 ```
 
-That wrapper is non-GPU and reads the current strongest artifacts. The explicit
-post-replay form is:
+That wrapper is non-GPU and reads the current strongest artifacts. After the
+prompt-health correction, the next GPU path should be the fresh corrected
+confirmation:
+
+```bash
+MODE=confirm scripts/run_qproj_c2_corrected_confirmation.sh
+```
+
+The old exact-replay form remains useful for provenance forensics on the stale
+source panel, but it should not be treated as the primary prompt-agnostic
+quality claim if its vLLM summary still contains base-invalid XML stress
+prompts. The explicit post-replay audit form is:
 
 ```bash
 QPROJ_REPLAY_ROOT=results/qproj_c2_vllm_shortlist_p64_default_exact_k4 \
