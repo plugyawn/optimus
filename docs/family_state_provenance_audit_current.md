@@ -96,6 +96,19 @@ CONFIRM_MAX_DENSE_REGRET=0.015625 \
 scripts/run_existing_vllm_shortlist_confirmation.sh
 ```
 
+The guarded one-command form defaults to preflight-only and should be used
+before attaching a GPU:
+
+```bash
+scripts/run_qproj_c2_exact_replay.sh
+```
+
+When a GPU is intentionally available:
+
+```bash
+MODE=confirm scripts/run_qproj_c2_exact_replay.sh
+```
+
 That wrapper copies `SOURCE_ROOT/dense` and `SOURCE_ROOT/vllm` into `OUT_ROOT`,
 writes a selector-union shortlist, then runs PEFT confirmation with:
 
