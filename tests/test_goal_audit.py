@@ -19,6 +19,8 @@ class GoalAuditTests(unittest.TestCase):
             parity_report=None,
             backend_gate=None,
             confirmation_gate=None,
+            dense_confirmation_gate=None,
+            search_quality_confirmation=None,
             family_state_provenance=None,
             multirun_gate=None,
             prompt_robustness=None,
@@ -32,7 +34,7 @@ class GoalAuditTests(unittest.TestCase):
         self.assertFalse(summary["pass"])
         self.assertIn("official full-Gaussian baseline validity", summary["failed"])
         self.assertIn("quality parity", summary["failed"])
-        self.assertIn("two-stage accelerated confirmation", summary["failed"])
+        self.assertIn("accelerated evaluation route", summary["failed"])
         self.assertIn("adapter identity provenance", summary["failed"])
         self.assertIn("multi-run prompt-robust confirmation", summary["failed"])
         self.assertIn("drift parity", summary["failed"])
@@ -80,6 +82,8 @@ class GoalAuditTests(unittest.TestCase):
                 parity_report=parity,
                 backend_gate=backend,
                 confirmation_gate=confirmation,
+                dense_confirmation_gate=None,
+                search_quality_confirmation=None,
                 family_state_provenance=provenance,
                 multirun_gate=multirun,
                 prompt_robustness=prompt,
@@ -119,6 +123,8 @@ class GoalAuditTests(unittest.TestCase):
                 parity_report=parity,
                 backend_gate=None,
                 confirmation_gate=None,
+                dense_confirmation_gate=None,
+                search_quality_confirmation=None,
                 family_state_provenance=None,
                 multirun_gate=None,
                 prompt_robustness=None,
@@ -170,6 +176,8 @@ class GoalAuditTests(unittest.TestCase):
                 parity_arm="lora",
                 backend_gate=None,
                 confirmation_gate=None,
+                dense_confirmation_gate=None,
+                search_quality_confirmation=None,
                 family_state_provenance=None,
                 multirun_gate=None,
                 prompt_robustness=None,
@@ -185,7 +193,7 @@ class GoalAuditTests(unittest.TestCase):
             self.assertTrue(by_requirement["stability parity"]["passed"])
             self.assertTrue(by_requirement["speed parity"]["passed"])
 
-    def test_confirmation_gate_is_separate_from_backend_selector(self):
+    def test_same_family_confirmation_does_not_satisfy_accelerated_route(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             backend = root / "backend" / "summary.json"
@@ -208,6 +216,8 @@ class GoalAuditTests(unittest.TestCase):
                 parity_report=None,
                 backend_gate=backend,
                 confirmation_gate=confirmation,
+                dense_confirmation_gate=None,
+                search_quality_confirmation=None,
                 family_state_provenance=provenance,
                 multirun_gate=multirun,
                 prompt_robustness=None,
@@ -219,13 +229,57 @@ class GoalAuditTests(unittest.TestCase):
             summary = run_goal_audit(args)
             by_requirement = {row["requirement"]: row for row in summary["checks"]}
 
-            self.assertFalse(by_requirement["trusted accelerated backend selector"]["passed"])
-            self.assertTrue(by_requirement["two-stage accelerated confirmation"]["passed"])
+            self.assertFalse(by_requirement["accelerated evaluation route"]["passed"])
+            self.assertTrue(by_requirement["accelerated evaluation route"]["detail"]["same_family_confirmation_pass"])
             self.assertFalse(by_requirement["adapter identity provenance"]["passed"])
             self.assertFalse(by_requirement["multi-run prompt-robust confirmation"]["passed"])
-            self.assertIn("trusted accelerated backend selector", summary["failed"])
-            self.assertNotIn("two-stage accelerated confirmation", summary["failed"])
+            self.assertIn("accelerated evaluation route", summary["failed"])
             self.assertIn("adapter identity provenance", summary["failed"])
+
+    def test_dense_referenced_two_stage_route_can_satisfy_acceleration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            backend = root / "backend" / "summary.json"
+            dense_confirmation = root / "dense_confirmation" / "summary.json"
+            search_quality = root / "search_quality" / "summary.json"
+            write_json(backend, {"pass": False, "failed": ["ranking"]})
+            write_json(
+                dense_confirmation,
+                {
+                    "kind": "shortlist_dense_confirmation",
+                    "zero_dense_regret_k": 4,
+                    "dense_best_recovered_k": 4,
+                    "gate": {"pass": True, "failed": [], "thresholds": {"max_confirm_k": 8}},
+                },
+            )
+            write_json(
+                search_quality,
+                {
+                    "kind": "search_quality_confirmation",
+                    "gate": {"pass": True, "failed": [], "thresholds": {"min_full_speedup": 1.0}},
+                },
+            )
+            args = Namespace(
+                reproduction_audit=None,
+                parity_report=None,
+                backend_gate=backend,
+                confirmation_gate=None,
+                dense_confirmation_gate=dense_confirmation,
+                search_quality_confirmation=search_quality,
+                family_state_provenance=None,
+                multirun_gate=None,
+                prompt_robustness=None,
+                drift_report=None,
+                eval_validity=None,
+                adapter_run=None,
+            )
+
+            summary = run_goal_audit(args)
+            by_requirement = {row["requirement"]: row for row in summary["checks"]}
+
+            self.assertTrue(by_requirement["accelerated evaluation route"]["passed"])
+            self.assertTrue(by_requirement["accelerated evaluation route"]["detail"]["dense_referenced_two_stage_pass"])
+            self.assertEqual(by_requirement["accelerated evaluation route"]["detail"]["routes"], ["dense_referenced_two_stage"])
 
 
 if __name__ == "__main__":

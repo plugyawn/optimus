@@ -47,6 +47,74 @@ def check_confirmation(path: Path | None, payload: dict | None) -> GoalCheck:
     )
 
 
+def gate_pass(payload: dict | None) -> bool:
+    if payload is None:
+        return False
+    gate = payload.get("gate", payload)
+    return bool(gate.get("pass"))
+
+
+def gate_failed(payload: dict | None) -> Any:
+    if payload is None:
+        return "missing"
+    gate = payload.get("gate", payload)
+    return gate.get("failed", payload.get("failed", []))
+
+
+def check_accelerated_route(
+    *,
+    backend_path: Path | None,
+    backend_payload: dict | None,
+    same_family_confirmation_path: Path | None,
+    same_family_confirmation_payload: dict | None,
+    dense_confirmation_path: Path | None,
+    dense_confirmation_payload: dict | None,
+    search_quality_path: Path | None,
+    search_quality_payload: dict | None,
+) -> GoalCheck:
+    backend_selector_pass = bool(backend_payload and backend_payload.get("pass"))
+    dense_confirmation_pass = gate_pass(dense_confirmation_payload)
+    search_quality_pass = gate_pass(search_quality_payload)
+    dense_referenced_two_stage_pass = dense_confirmation_pass and search_quality_pass
+    same_family_confirmation_pass = gate_pass(same_family_confirmation_payload)
+    passed = backend_selector_pass or dense_referenced_two_stage_pass
+    routes = []
+    if backend_selector_pass:
+        routes.append("backend_selector")
+    if dense_referenced_two_stage_pass:
+        routes.append("dense_referenced_two_stage")
+    evidence = {
+        "backend_gate": None if backend_path is None else str(backend_path),
+        "same_family_confirmation_gate": None
+        if same_family_confirmation_path is None
+        else str(same_family_confirmation_path),
+        "dense_confirmation_gate": None if dense_confirmation_path is None else str(dense_confirmation_path),
+        "search_quality_confirmation": None if search_quality_path is None else str(search_quality_path),
+    }
+    return GoalCheck(
+        "accelerated evaluation route",
+        passed,
+        json.dumps(evidence, sort_keys=True),
+        {
+            "pass": passed,
+            "routes": routes,
+            "backend_selector_pass": backend_selector_pass,
+            "backend_failed": gate_failed(backend_payload),
+            "same_family_confirmation_pass": same_family_confirmation_pass,
+            "same_family_confirmation_failed": gate_failed(same_family_confirmation_payload),
+            "dense_referenced_two_stage_pass": dense_referenced_two_stage_pass,
+            "dense_confirmation_pass": dense_confirmation_pass,
+            "dense_confirmation_failed": gate_failed(dense_confirmation_payload),
+            "search_quality_pass": search_quality_pass,
+            "search_quality_failed": gate_failed(search_quality_payload),
+            "dense_zero_regret_k": None if dense_confirmation_payload is None else dense_confirmation_payload.get("zero_dense_regret_k"),
+            "dense_best_recovered_k": None
+            if dense_confirmation_payload is None
+            else dense_confirmation_payload.get("dense_best_recovered_k"),
+        },
+    )
+
+
 def check_family_state_provenance(path: Path | None, payload: dict | None) -> GoalCheck:
     if payload is None:
         return GoalCheck("adapter identity provenance", False, str(path) if path else "missing", "missing family-state provenance audit")
@@ -204,6 +272,8 @@ def run_goal_audit(args) -> dict:
     parity = read_json(args.parity_report)
     backend = read_json(args.backend_gate)
     confirmation = read_json(args.confirmation_gate)
+    dense_confirmation = read_json(getattr(args, "dense_confirmation_gate", None))
+    search_quality = read_json(getattr(args, "search_quality_confirmation", None))
     family_state_provenance = read_json(getattr(args, "family_state_provenance", None))
     multirun = read_json(getattr(args, "multirun_gate", None))
     prompt = read_json(args.prompt_robustness)
@@ -219,14 +289,17 @@ def run_goal_audit(args) -> dict:
     )
     checks.extend(check_parity_report(args.parity_report, parity, arm=getattr(args, "parity_arm", "lora")))
     checks.append(
-        check_present_pass(
-            "trusted accelerated backend selector",
-            args.backend_gate,
-            backend,
-            evidence_name=str(args.backend_gate),
+        check_accelerated_route(
+            backend_path=args.backend_gate,
+            backend_payload=backend,
+            same_family_confirmation_path=args.confirmation_gate,
+            same_family_confirmation_payload=confirmation,
+            dense_confirmation_path=getattr(args, "dense_confirmation_gate", None),
+            dense_confirmation_payload=dense_confirmation,
+            search_quality_path=getattr(args, "search_quality_confirmation", None),
+            search_quality_payload=search_quality,
         )
     )
-    checks.append(check_confirmation(args.confirmation_gate, confirmation))
     checks.append(check_family_state_provenance(getattr(args, "family_state_provenance", None), family_state_provenance))
     checks.append(check_multirun_gate(getattr(args, "multirun_gate", None), multirun))
     checks.append(check_prompt_robustness(args.prompt_robustness, prompt))
@@ -266,6 +339,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--parity-arm", default="lora")
     parser.add_argument("--backend-gate", type=Path)
     parser.add_argument("--confirmation-gate", type=Path)
+    parser.add_argument("--dense-confirmation-gate", type=Path)
+    parser.add_argument("--search-quality-confirmation", type=Path)
     parser.add_argument("--family-state-provenance", type=Path)
     parser.add_argument("--multirun-gate", type=Path)
     parser.add_argument("--prompt-robustness", type=Path)

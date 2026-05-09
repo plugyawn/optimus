@@ -39,6 +39,9 @@ python -m randopt_lora_lab.goal_audit \
   --parity-report results/PARITY/report/summary.json \
   --parity-arm lora \
   --backend-gate results/BACKEND_GATE/summary.json \
+  --confirmation-gate results/SAME_FAMILY_CONFIRMATION/summary.json \
+  --dense-confirmation-gate results/DENSE_REFERENCED_CONFIRMATION/summary.json \
+  --search-quality-confirmation results/SEARCH_QUALITY_CONFIRMATION/summary.json \
   --multirun-gate results/spectral_vllm_multirun_gate/summary.json \
   --family-state-provenance results/FAMILY_STATE_PROVENANCE/summary.json \
   --prompt-robustness results/PROMPT_ROBUSTNESS/summary.json \
@@ -49,7 +52,19 @@ python -m randopt_lora_lab.goal_audit \
 ```
 
 Missing evidence is a failure. The audit only passes when every objective axis
-has a concrete artifact.
+has a concrete artifact. The accelerated route can pass in either of two ways:
+
+```text
+1. vLLM/SGLang selector parity passes directly against the trusted PEFT/HF
+   backend; or
+2. vLLM/SGLang proposes a shortlist, PEFT/HF confirms it, dense-referenced
+   confirmation proves the shortlist reaches dense RandOpt quality, and strict
+   holdout quality-at-speed passes.
+```
+
+Same-family confirmation economics alone is not enough. Recovering the best
+LoRA candidate under PEFT proves a systems shortlist can be useful for that
+family, but it does not prove parity with full dense Gaussian RandOpt.
 
 For spectral vLLM confirmation, aggregate across runs before making any project
 claim:
@@ -163,6 +178,7 @@ stability gates are still red.
 | Sparse d0p125 quality lead | P16 default-prompt panel improved best ensemble holdout by 2/128 over factor LoRA, but failed dense ranking/regret and prompt-robust replication | weak lead, not parity |
 | Prompt robustness | prompt-relative report gate added; method claims require multiple valid prompt templates | implemented, not passed |
 | vLLM backend parity | P=16 gate passed protocol/base/tensor checks but failed ranking with Spearman -0.181 | missing |
+| Accelerated evaluation route | direct backend selector parity or dense-referenced shortlist confirmation plus strict holdout quality-at-speed | missing; same-family confirmation alone is insufficient |
 | Two-stage acceleration | tokenized vLLM proposal + PEFT confirmation recovered PEFT best at k=1 with 10.55x eval-only speedup and 1.93x speedup including vLLM load/build | same-family systems path passed on one P64 panel; dense-referenced confirmation now required |
 
 ## Next Gate
