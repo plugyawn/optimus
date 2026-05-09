@@ -17,46 +17,57 @@ class GoalCheck:
 
 NEXT_ACTIONS = {
     "official full-Gaussian baseline validity": {
+        "priority": 50,
         "action": "rerun a dense Gaussian reference with current reproduction metadata before using it as the paper-style baseline",
         "command": "scripts/run_gaussian_parity_baseline.sh",
     },
     "quality parity": {
+        "priority": 20,
         "action": "produce a current-valid LoRA-family parity report whose holdout quality matches or beats dense Gaussian",
         "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
     },
     "stability parity": {
+        "priority": 21,
         "action": "rerun parity on a shared candidate panel until Spearman, top-k overlap, and selected-regret gates pass across seeds",
         "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
     },
     "speed parity": {
+        "priority": 22,
         "action": "measure quality-coupled accelerated search speed against the dense full-screen reference, not same-family speed alone",
         "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
     },
     "accelerated evaluation route": {
+        "priority": 10,
         "action": "run the dense-referenced shortlist confirmation path or fix direct accelerated-backend selector parity",
         "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
     },
     "adapter identity provenance": {
+        "priority": 11,
         "action": "rerun activation-spectral PEFT confirmation with the saved vLLM family_state.pt copied and audited",
         "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
     },
     "multi-run prompt-robust confirmation": {
+        "priority": 40,
         "action": "aggregate at least two prompt-valid runs after the dense-referenced confirmation path passes",
         "command": "python -m randopt_lora_lab.multirun_gate --run RUN1 --run RUN2 --parity-arm lora --out results/spectral_vllm_multirun_gate",
     },
     "prompt robustness": {
+        "priority": 30,
         "action": "prove nonnegative lift and no cap/malformed regression on multiple base-valid prompt variants",
         "command": "python -m randopt_lora_lab.prompt_robustness --help",
     },
     "drift parity": {
+        "priority": 60,
         "action": "run true nonnegative full-vocab next-token KL drift parity against dense Gaussian",
         "command": "python -m randopt_lora_lab.drift_parity --help",
     },
     "eval validity": {
+        "priority": 12,
         "action": "run strict parser, semantic split, cap-hit, malformed, and ensemble-row validity on the claim artifact",
         "command": "python -m randopt_lora_lab.result_validity --run RUN --out RUN/validity",
     },
     "adapter convenience": {
+        "priority": 13,
         "action": "materialize and keep portable LoRA adapters plus replay metadata for the selected family",
         "command": "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
     },
@@ -69,6 +80,11 @@ def read_json(path: Path | None) -> dict | None:
     if not path.exists():
         return None
     return json.loads(path.read_text())
+
+
+def next_action(requirement: str) -> dict:
+    payload = NEXT_ACTIONS.get(requirement, {"priority": 999, "action": "inspect failed gate detail", "command": ""})
+    return {"requirement": requirement, **payload}
 
 
 def check_present_pass(requirement: str, path: Path | None, payload: dict | None, *, evidence_name: str) -> GoalCheck:
@@ -360,10 +376,7 @@ def run_goal_audit(args) -> dict:
         "pass": all(row["passed"] for row in rows),
         "failed": failed,
         "checks": rows,
-        "next_actions": [
-            {"requirement": requirement, **NEXT_ACTIONS.get(requirement, {"action": "inspect failed gate detail", "command": ""})}
-            for requirement in failed
-        ],
+        "next_actions": sorted((next_action(requirement) for requirement in failed), key=lambda row: (row["priority"], row["requirement"])),
     }
 
 

@@ -40,9 +40,15 @@ class GoalAuditTests(unittest.TestCase):
         self.assertIn("drift parity", summary["failed"])
         self.assertIn("eval validity", summary["failed"])
         action_by_requirement = {row["requirement"]: row for row in summary["next_actions"]}
+        self.assertEqual(summary["next_actions"][0]["requirement"], "accelerated evaluation route")
+        self.assertEqual(summary["next_actions"][1]["requirement"], "adapter identity provenance")
         self.assertEqual(
             action_by_requirement["accelerated evaluation route"]["command"],
             "MODE=confirm scripts/run_qproj_c2_exact_replay.sh",
+        )
+        self.assertLess(
+            action_by_requirement["accelerated evaluation route"]["priority"],
+            action_by_requirement["official full-Gaussian baseline validity"]["priority"],
         )
         self.assertEqual(
             action_by_requirement["adapter identity provenance"]["command"],
