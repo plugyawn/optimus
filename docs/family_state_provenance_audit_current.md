@@ -127,6 +127,12 @@ are present, which gates failed, and whether the chained goal audit passed. The
 score-sanity audit checks top-candidate cap hits, malformed rates, answer closure,
 screen sample size, and whether the top candidate clears the base screen score.
 
+Do not use `xml` as a default vLLM screening prompt variant. Existing artifacts
+show `default` and `reordered` are base-healthy, while `xml` is consistently
+malformed enough to fail the score-sanity gate. XML can still be used as an
+explicit stress prompt, but prompt-agnostic quality claims should start from
+`default,reordered` and require all requested variants to be base-valid.
+
 That wrapper copies `SOURCE_ROOT/dense` and `SOURCE_ROOT/vllm` into `OUT_ROOT`,
 writes a selector-union shortlist, then runs PEFT confirmation with:
 

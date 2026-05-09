@@ -57,5 +57,7 @@ def test_vllm_confirmation_wrappers_require_all_prompt_variants_valid_by_default
         Path("scripts/run_spectral_vllm_confirmation.sh"),
     ]:
         text = path.read_text()
+        assert "default,reordered,xml" not in text
+        assert "default,reordered" in text
         assert "VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID=${VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID:-1}" in text
         assert "--require-all-prompt-variants-valid" in text
