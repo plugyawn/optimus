@@ -102,3 +102,29 @@ writes a selector-union shortlist, then runs PEFT confirmation with:
 ```text
 --family-state-file "$OUT_ROOT/vllm/family_state.pt"
 ```
+
+The wrapper also supports a local preflight that does not load the model:
+
+```bash
+PREFLIGHT_ONLY=1 \
+SOURCE_ROOT=results/qproj_c2_vllm_shortlist_p64 \
+OUT_ROOT=/tmp/qproj_c2_default_exact_k4_preflight \
+FAMILY=activation_spectral_lora_c2 \
+TARGETS=q_proj \
+SHORTLIST_POLICY=default_exact \
+SHORTLIST_K=4 \
+scripts/run_existing_vllm_shortlist_confirmation.sh
+```
+
+Current preflight result:
+
+```text
+pass: true
+shortlist_rows: 4
+shortlist_policy: default_exact
+vllm_candidates: 64
+source_family_state_sha256:
+  cdf619d779c3d092a4520a78ba28353471809641a64e0ef3e4d0215361e532f1
+vllm_family_state_sha256:
+  cdf619d779c3d092a4520a78ba28353471809641a64e0ef3e4d0215361e532f1
+```
