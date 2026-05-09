@@ -115,6 +115,16 @@ Confirmation mode also writes a current completion audit to:
 results/qproj_c2_vllm_shortlist_p64_default_exact_k4/current_goal_audit
 ```
 
+Every guarded replay also writes a forensic manifest to:
+
+```text
+results/qproj_c2_vllm_shortlist_p64_default_exact_k4/replay_manifest
+```
+
+The manifest is diagnostic, not a substitute for the completion audit. It records
+which dense/vLLM/shortlist/confirmation/provenance/audit artifacts are present,
+which gates failed, and whether the chained goal audit passed.
+
 That wrapper copies `SOURCE_ROOT/dense` and `SOURCE_ROOT/vllm` into `OUT_ROOT`,
 writes a selector-union shortlist, then runs PEFT confirmation with:
 

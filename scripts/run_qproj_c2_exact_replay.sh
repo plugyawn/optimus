@@ -63,11 +63,18 @@ export CONFIRM_KS=${CONFIRM_KS:-1,2,4}
 export CONFIRM_MAX_K=${CONFIRM_MAX_K:-$SHORTLIST_K}
 export CONFIRM_MAX_DENSE_REGRET=${CONFIRM_MAX_DENSE_REGRET:-0.015625}
 export CONFIRM_MIN_FULL_SPEEDUP=${CONFIRM_MIN_FULL_SPEEDUP:-1.0}
+PYTHON=${PYTHON:-python}
 RUN_GOAL_AUDIT=${RUN_GOAL_AUDIT:-1}
 GOAL_AUDIT_OUT=${GOAL_AUDIT_OUT:-$OUT_ROOT/current_goal_audit}
+REPLAY_MANIFEST_OUT=${REPLAY_MANIFEST_OUT:-$OUT_ROOT/replay_manifest}
 
 scripts/run_existing_vllm_shortlist_confirmation.sh
 
 if [[ "$MODE" == "confirm" && "$RUN_GOAL_AUDIT" == "1" ]]; then
   QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh
 fi
+
+"$PYTHON" -m randopt_lora_lab.replay_manifest \
+  --root "$OUT_ROOT" \
+  --out "$REPLAY_MANIFEST_OUT" \
+  --mode "$MODE"
