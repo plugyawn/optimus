@@ -45,6 +45,66 @@ confirmation:
 MODE=confirm scripts/run_qproj_c2_corrected_confirmation.sh
 ```
 
+As of 2026-05-09, that wrapper has an explicit non-GPU preflight mode:
+
+```bash
+scripts/run_qproj_c2_corrected_confirmation.sh
+```
+
+Preflight writes:
+
+```text
+results/qproj_c2_vllm_shortlist_p64_default_reordered/preflight_summary.json
+```
+
+The default corrected run configuration is:
+
+```text
+OUT_ROOT=results/qproj_c2_vllm_shortlist_p64_default_reordered
+FAMILY=activation_spectral_lora_c2
+TARGETS=q_proj
+POPULATION=64
+PROMPTS=64
+HOLDOUT_PROMPTS=128
+VLLM_HOLDOUT_PROMPTS=8
+SHORTLIST_K=4
+SHORTLIST_POLICY=default_exact
+VLLM_PROMPT_VARIANTS=default,reordered
+VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID=1
+RUN_SEARCH_QUALITY=1
+RUN_SCORE_SANITY=1
+```
+
+Confirmation mode is allowed to fail the final goal audit while still writing
+downstream diagnostic artifacts. That is intentional: a negative paid run
+should leave enough evidence to distinguish quality failure, prompt-health
+failure, backend-ranking failure, provenance failure, and parser/cap failure.
+The wrapper therefore writes a replay manifest after the run:
+
+```text
+results/qproj_c2_vllm_shortlist_p64_default_reordered/replay_manifest/summary.json
+```
+
+The corrected run is not claim-valid unless all of these artifacts exist and
+the relevant gates pass:
+
+```text
+dense/summary.json
+dense/validity/summary.json
+vllm/summary.json
+vllm/adapters.jsonl
+vllm/family_state.pt
+shortlist_top4.jsonl
+confirmed/summary.json
+confirmed/validity/summary.json
+shortlist_dense_confirmation/summary.json
+search_quality_confirmation/summary.json
+family_state_provenance_audit/summary.json
+score_sanity/summary.json
+current_goal_audit/summary.json
+replay_manifest/summary.json
+```
+
 The old exact-replay form remains useful for provenance forensics on the stale
 source panel, but it should not be treated as the primary prompt-agnostic
 quality claim if its vLLM summary still contains base-invalid XML stress
