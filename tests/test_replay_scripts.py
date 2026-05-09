@@ -49,3 +49,13 @@ def test_existing_replay_keeps_diagnostics_after_gate_failures():
     assert "--no-fail" in text
     assert "randopt_lora_lab.shortlist_dense_confirmation" in text
     assert "randopt_lora_lab.search_quality_confirmation" in text
+
+
+def test_vllm_confirmation_wrappers_require_all_prompt_variants_valid_by_default():
+    for path in [
+        Path("scripts/run_vllm_shortlist_confirmation.sh"),
+        Path("scripts/run_spectral_vllm_confirmation.sh"),
+    ]:
+        text = path.read_text()
+        assert "VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID=${VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID:-1}" in text
+        assert "--require-all-prompt-variants-valid" in text

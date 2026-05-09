@@ -252,6 +252,48 @@ def selection_variants_or_raise(base_by_variant: dict[str, dict], args, *, split
     return valid
 
 
+def require_all_prompt_variants_valid_or_raise(
+    base_screen_by_variant: dict[str, dict],
+    base_holdout_by_variant: dict[str, dict],
+    screen_selection_variants: list[str],
+    holdout_selection_variants: list[str],
+    args,
+) -> None:
+    invalid = {
+        "screen": sorted(set(base_screen_by_variant) - set(screen_selection_variants)),
+        "holdout": sorted(set(base_holdout_by_variant) - set(holdout_selection_variants)),
+    }
+    failed = {split: variants for split, variants in invalid.items() if variants}
+    if not failed:
+        return
+    detail = {
+        "failed": failed,
+        "thresholds": {
+            "max_base_malformed_for_selection": args.max_base_malformed_for_selection,
+            "max_base_cap_hit_for_selection": args.max_base_cap_hit_for_selection,
+        },
+        "base_screen_by_prompt": {
+            variant: {
+                "exact_mean": metrics.get("exact_mean"),
+                "malformed_mean": metrics.get("malformed_mean"),
+                "cap_hit_mean": metrics.get("cap_hit_mean"),
+                "answer_closed_mean": metrics.get("answer_closed_mean"),
+            }
+            for variant, metrics in sorted(base_screen_by_variant.items())
+        },
+        "base_holdout_by_prompt": {
+            variant: {
+                "exact_mean": metrics.get("exact_mean"),
+                "malformed_mean": metrics.get("malformed_mean"),
+                "cap_hit_mean": metrics.get("cap_hit_mean"),
+                "answer_closed_mean": metrics.get("answer_closed_mean"),
+            }
+            for variant, metrics in sorted(base_holdout_by_variant.items())
+        },
+    }
+    raise RuntimeError("requested prompt variants are not all base-valid: " + json.dumps(detail, sort_keys=True))
+
+
 def mixed_eval(
     llm,
     LoRARequest,
@@ -437,6 +479,14 @@ def run_search(args) -> dict:
         base_holdout_by_variant[variant] = metrics
     screen_selection_variants = selection_variants_or_raise(base_screen_by_variant, args, split="screen")
     holdout_selection_variants = selection_variants_or_raise(base_holdout_by_variant, args, split="holdout")
+    if args.require_all_prompt_variants_valid:
+        require_all_prompt_variants_valid_or_raise(
+            base_screen_by_variant,
+            base_holdout_by_variant,
+            screen_selection_variants,
+            holdout_selection_variants,
+            args,
+        )
     screen_stress_variants = sorted(set(prompt_variants) - set(screen_selection_variants))
     holdout_stress_variants = sorted(set(prompt_variants) - set(holdout_selection_variants))
     write_jsonl(out / "per_prompt.jsonl", base_screen_rows)
@@ -629,6 +679,7 @@ def run_search(args) -> dict:
         "max_base_malformed_for_selection": args.max_base_malformed_for_selection,
         "max_base_cap_hit_for_selection": args.max_base_cap_hit_for_selection,
         "min_selection_prompt_variants": args.min_selection_prompt_variants,
+        "require_all_prompt_variants_valid": args.require_all_prompt_variants_valid,
         "screen_prompts": len(screen),
         "holdout_prompts": len(holdout),
         "screen_unique_prompts": unique_example_count(screen),
@@ -727,6 +778,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-base-malformed-for-selection", type=float, default=0.05)
     p.add_argument("--max-base-cap-hit-for-selection", type=float, default=0.05)
     p.add_argument("--min-selection-prompt-variants", type=int, default=1)
+    p.add_argument(
+        "--require-all-prompt-variants-valid",
+        action="store_true",
+        help="Fail the run if any requested prompt variant is base-invalid on screen or holdout.",
+    )
     p.add_argument(
         "--family",
         default="isotropic",
