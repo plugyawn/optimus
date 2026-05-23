@@ -45,6 +45,18 @@ POPULATIONS="1024 4096" \
 scripts/prime_sync_and_run.sh
 ```
 
+If 8xA100 provisioning is stale or cannot reach SSH, a 4x fallback can still
+run the P1024/P4096 suite with tensor parallel size 4:
+
+```bash
+MODE=gpu-suite \
+SSH_TARGET=root@POD_HOST \
+REMOTE_ROOT=optimus \
+TENSOR_PARALLEL_SIZE=4 \
+POPULATIONS="1024 4096" \
+scripts/prime_sync_and_run.sh
+```
+
 ## Expected Outputs
 
 After the full run, copy back:
@@ -55,7 +67,8 @@ results/report/optimus_systems/
 ```
 
 The sync helper fetches remote results into `results/prime_runs/results/` by
-default. Then run locally:
+default. For named runs, keep the fetched directory under a timestamped
+`results/prime_runs/<name>/results/` path. Then run locally:
 
 ```bash
 optimus validate-run \

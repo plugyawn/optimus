@@ -74,20 +74,20 @@ The generated evidence is not enough by itself. A final claim requires:
 ## Current Validation State
 
 The software path has passed local validation, a remote L40S bootstrap smoke,
-and a completed Prime 2x L40S P1024/P4096 run.
+and a completed Prime 4x L40S P1024/P4096 run.
 
 Latest completed run:
 
 ```text
-results/prime_runs/l40sx2_20260523_2134/results
+results/prime_runs/l40sx4_20260523_2237/results
 ```
 
 Run shape:
 
-- hardware: Prime Crusoe 2x L40S 48GB;
+- hardware: Prime Crusoe 4x L40S 48GB;
 - model: `Qwen/Qwen2.5-3B-Instruct`;
 - runtime: vLLM 0.9.2, Torch 2.7.0 CUDA 12.6, Transformers 4.51.3;
-- tensor parallelism: `TENSOR_PARALLEL_SIZE=2`;
+- tensor parallelism: `TENSOR_PARALLEL_SIZE=4`;
 - populations: `1024 4096`;
 - screen prompts: `64`;
 - holdout prompts: `256`;
@@ -99,8 +99,8 @@ Validation command:
 
 ```bash
 python -m optimus.cli validate-run \
-  --root results/prime_runs/l40sx2_20260523_2134/results/optimus_gpu_suite_v092_noflash \
-  --systems-out results/prime_runs/l40sx2_20260523_2134/results/report/optimus_systems_v092_noflash \
+  --root results/prime_runs/l40sx4_20260523_2237/results/optimus_gpu_suite_v092_noflash_tp4 \
+  --systems-out results/prime_runs/l40sx4_20260523_2237/results/report/optimus_systems_v092_noflash_tp4 \
   --populations 1024,4096 \
   --bench-adapters 8 \
   --skip-halving \
@@ -108,25 +108,27 @@ python -m optimus.cli validate-run \
 ```
 
 This passed, and the report PNGs passed `file` checks as valid PNG images.
+The committed public report bundle is `docs/reports/l40sx4_20260523_2237/`.
 
 Quality summary:
 
 | run | base holdout | screen-selected holdout | screen-selected delta | promoted holdout oracle | oracle delta |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| P1024 | `19/256` | `37/256` | `+18/256` | `39/256` | `+20/256` |
-| P4096 | `20/256` | `18/256` | `-2/256` | `39/256` | `+19/256` |
+| P1024 | `18/256` | `26/256` | `+8/256` | `38/256` | `+20/256` |
+| P4096 | `18/256` | `28/256` | `+10/256` | `38/256` | `+20/256` |
 
-The P4096 screen winner failed to transfer, while another promoted P4096
-candidate transferred. Treat this as candidate-generation evidence plus a
-selector-regret diagnosis, not as a solved large-population selector claim.
+Both full-search screen winners transferred positively on the 4x run. Treat the
+screen-selected column as the selector evidence and the promoted holdout-oracle
+column as candidate-generation evidence; the oracle column is not a selector
+claim.
 
 Remaining publication-grade gaps:
 
-- rerun on the intended 8xA100-class target when provider inventory is usable;
+- rerun on the intended 8xA100-class target when provider inventory is usable,
+  if larger systems evidence is needed beyond the accepted 4x fallback;
 - run staged P1024 search for prompt-eval savings and selected-regret plots;
 - add trusted HF/PEFT or dense-reference confirmation for promoted candidates;
-- improve the selector so P4096 screen-selected heldout transfer does not rely
-  on a post-hoc holdout oracle.
+- broaden selector confirmation beyond this single 4x panel.
 
 The authoritative pod ledger is `.opencode/prime-gpu-ledger.md`.
 

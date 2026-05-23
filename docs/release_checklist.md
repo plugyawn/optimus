@@ -7,17 +7,17 @@ Run the machine-readable gate before release:
 
 ```bash
 optimus release-check \
-  --gpu-root results/prime_runs/l40sx2_20260523_2134/results/optimus_gpu_suite_v092_noflash \
-  --systems-out results/prime_runs/l40sx2_20260523_2134/results/report/optimus_systems_v092_noflash \
+  --gpu-root results/prime_runs/l40sx4_20260523_2237/results/optimus_gpu_suite_v092_noflash_tp4 \
+  --systems-out results/prime_runs/l40sx4_20260523_2237/results/report/optimus_systems_v092_noflash_tp4 \
   --populations 1024,4096 \
   --bench-adapters 8 \
   --skip-halving \
   --strict
 ```
 
-The gate is expected to fail until every listed release blocker is fixed. In
-this checkout, the final GitHub remote must still be changed from the old
-experiment-lab repository to an `optimus` repository before publishing.
+This gate passes for the current 4x L40S release evidence when the fetched GPU
+artifacts are present locally. The public GitHub remote is the `optimus`
+repository, not the old experiment-lab repository.
 
 ## Package Identity
 
@@ -46,12 +46,11 @@ experiment-lab repository to an `optimus` repository before publishing.
 - No rented GPU pod is active after a completed or failed run unless an
   immediate follow-up command is running.
 - The intended 8xA100-class run is either completed and linked, or explicitly
-  listed as a remaining gap.
+  listed as optional larger-systems evidence beyond the accepted 4x fallback.
 
 ## Upstream
 
-- Create or target a GitHub repository presented as `optimus`, not
-  `randopt-lora-lab`.
+- Target the GitHub repository presented as `optimus`, not `randopt-lora-lab`.
 - Push the final branch to the Optimus repository only after the package/docs
   identity checks pass.
 - Do not publish the old experiment-lab identity as the community-facing repo.

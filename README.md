@@ -12,9 +12,9 @@ The supported public interface is the `optimus` package and CLI.
 - High-throughput LoRA candidate screening with vLLM.
 - Dense-reference and HF/PEFT confirmation of candidate quality.
 - Population scaling studies for P1024/P4096 zeroth-order search.
-- Systems plots: candidate/sec, prompts/sec, token throughput, staged-search
-  savings, adapter throughput, best-of-N scaling, and MFU-style utilization
-  summaries.
+- Systems plots: candidate/sec, prompts/sec, token throughput, adapter
+  throughput, best-of-N scaling, quality scaling, and staged-search savings
+  when a staged run is present.
 - Auditable run outputs: candidate manifests, per-prompt rows, validation
   reports, parity gates, and plot inputs.
 
@@ -137,8 +137,8 @@ Check release readiness:
 
 ```bash
 optimus release-check \
-  --gpu-root results/prime_runs/l40sx2_20260523_2134/results/optimus_gpu_suite_v092_noflash \
-  --systems-out results/prime_runs/l40sx2_20260523_2134/results/report/optimus_systems_v092_noflash \
+  --gpu-root results/prime_runs/l40sx4_20260523_2237/results/optimus_gpu_suite_v092_noflash_tp4 \
+  --systems-out results/prime_runs/l40sx4_20260523_2237/results/report/optimus_systems_v092_noflash_tp4 \
   --populations 1024,4096 \
   --bench-adapters 8 \
   --skip-halving \
@@ -163,31 +163,38 @@ run actually uses the dense reference family and passes the parity gate.
 
 ## Current Evidence Snapshot
 
-The largest completed population-scale run is the Prime 2x L40S P1024/P4096
+The largest completed population-scale run is the Prime 4x L40S P1024/P4096
 suite under:
 
 ```text
-results/prime_runs/l40sx2_20260523_2134/results
+results/prime_runs/l40sx4_20260523_2237/results
 ```
 
 The validated report is:
 
 ```text
-results/prime_runs/l40sx2_20260523_2134/results/report/optimus_systems_v092_noflash/report.md
+results/prime_runs/l40sx4_20260523_2237/results/report/optimus_systems_v092_noflash_tp4/report.md
+```
+
+The same report artifacts are committed for public inspection under:
+
+```text
+docs/reports/l40sx4_20260523_2237/
 ```
 
 The key quality result is deliberately reported in two columns:
 
-- P1024 screen-selected heldout transfer: base `19/256`, selected `37/256`,
-  lift `+18/256`.
-- P4096 screen-selected heldout transfer: base `20/256`, selected `18/256`,
-  lift `-2/256`.
-- P4096 promoted holdout-oracle candidate: `39/256`, lift `+19/256`.
+- P1024 screen-selected heldout transfer: base `18/256`, selected `26/256`,
+  lift `+8/256`.
+- P4096 screen-selected heldout transfer: base `18/256`, selected `28/256`,
+  lift `+10/256`.
+- P1024 and P4096 promoted holdout-oracle candidates: `38/256`, lift
+  `+20/256`.
 
-That means the current P4096 evidence shows candidate-generation capacity, not a
-finished selector. Optimus reports screen-selected heldout quality separately
-from promoted holdout-oracle quality so selection failures cannot be hidden by a
-post-hoc best-of-promoted number.
+That means the current run shows positive heldout transfer for the vLLM
+screen-selected candidates and stronger candidate-generation capacity under the
+post-hoc promoted holdout oracle. Optimus reports those separately so a
+screen-selector claim cannot be hidden by a best-of-promoted number.
 
 ## GPU Suite Run Plan
 
@@ -204,7 +211,9 @@ The reference GPU workload is encoded in `scripts/run_optimus_gpu_suite.sh`:
 Prime GPU use must be logged in the project ledger before launch, and active
 pods must be shut down or explicitly reported at the end of the run.
 
-The 2x L40S run completed items 1, 2, 5, and the core report plots with
-`BENCH_ADAPTERS=8` and `RUN_HALVING=0`. Remaining publication-grade work is the
-8xA100-scale rerun, staged-search evidence, and trusted-backend confirmation for
-the promoted candidates.
+The 4x L40S run completed items 1, 2, 5, the adapter-throughput bench, and the
+core report plots with `BENCH_ADAPTERS=8` and `RUN_HALVING=0`. The intended
+8xA100 run was attempted, but provider provisioning never reached SSH; the 4x
+fallback was used instead. Remaining publication-grade extensions are
+staged-search evidence and trusted-backend confirmation for the promoted
+candidates.

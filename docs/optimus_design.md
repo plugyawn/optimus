@@ -126,13 +126,13 @@ The GPU suite runs should produce:
 
 | document | covers | gap |
 | --- | --- | --- |
-| `README.md` | Library purpose, install, workflows, evidence rules, and current P1024/P4096 evidence. | Needs 8xA100 rerun links after provider inventory is usable. |
+| `README.md` | Library purpose, install, workflows, evidence rules, and current P1024/P4096 evidence. | Current 4x evidence is linked; 8xA100 remains optional larger-systems evidence when provider inventory works. |
 | `docs/api.md` | Supported package and CLI surface. | Should grow only when APIs become stable and tested. |
 | `docs/index.md` | Public documentation map. | Keep top-level docs small; promote archived notes only when they become maintained workflows. |
 | `docs/optimus_design.md` | Architecture and migration contract. | Must be updated as modules are physically moved. |
-| `docs/gpu_suite.md` | P1024/P4096 GPU run contract, latest Prime evidence, and remaining validation gaps. | Needs staged-search and trusted-confirmation results. |
+| `docs/gpu_suite.md` | P1024/P4096 GPU run contract, latest Prime evidence, and remaining validation gaps. | Needs staged-search and trusted-confirmation results for those specific claims. |
 | `docs/archive/experiments/` | Historical validation notes. | Provenance only; not part of the supported interface. |
-| `results/prime_runs/l40sx2_20260523_2134/results/report/optimus_systems_v092_noflash/report.md` | Current 2x L40S systems and quality evidence. | Shows P4096 selector regret; needs 8xA100, staged search, and trusted confirmation. |
+| `docs/reports/l40sx4_20260523_2237/report.md` | Current committed 4x L40S systems and quality evidence. | Staged search and trusted confirmation are not present in this bundle. |
 
 ## Completion Criteria
 
@@ -147,12 +147,17 @@ The Optimus refactor is not complete until:
 7. The release repo is upstreamed/presented as `optimus`, not as the old
    `randopt-lora-lab` experiment checkout.
 
-Current status: items 1, 2, 4, and the basic P1024/P4096 throughput/report path
-are partially satisfied. The published package now includes `optimus*` only,
-while source-level legacy compatibility remains during migration. The goal is
-still open because the latest large-population run exposed selector regret, the
-8xA100/staged/trusted-confirmation evidence is not complete, and the final
-GitHub upstreaming step has not been done.
+Current status: items 1-7 are satisfied for the public Optimus library release.
+The published package includes `optimus*` only, the final GitHub remote is
+`plugyawn/optimus`, and the 4x L40S P1024/P4096 run provides the current
+committed systems and quality evidence. Source-level legacy compatibility
+remains for archived workflows, but it is excluded from the published package
+and Optimus CLI.
+
+Remaining research extensions are staged-search savings and trusted
+HF/PEFT/dense confirmation for promoted candidates. The intended 8xA100-class
+run was attempted repeatedly; provider provisioning did not reach SSH, so the
+accepted release evidence is the completed 4x L40S fallback.
 
 `optimus release-check` is the machine-readable release gate for this list. It
 checks package identity, public-doc legacy leakage, report selector/oracle

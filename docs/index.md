@@ -14,6 +14,7 @@ produce auditable research results.
 | `gpu_suite.md` | Required P1024/P4096 workloads, acceptance gates, and output contracts. |
 | `prime_gpu_runbook.md` | Prime GPU launch, sync, validation, and cleanup workflow. |
 | `release_checklist.md` | Pre-release identity, evidence, systems, and upstreaming gates. |
+| `reports/l40sx4_20260523_2237/` | Current committed 4x L40S P1024/P4096 report bundle and plot artifacts. |
 
 ## Archive
 
