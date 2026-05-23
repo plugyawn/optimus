@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from randopt_lora_lab.backend_parity_gate import main, resolve_adapter_model_path
+from optimus.evaluation.backend_parity import main, resolve_adapter_model_path
 
 
 SUMMARY = {

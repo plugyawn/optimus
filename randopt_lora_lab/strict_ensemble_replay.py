@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .countdown import CountdownExample
+from optimus.tasks.countdown import CountdownExample
 from .experiments import majority_vote_evaluation, write_jsonl
 
 

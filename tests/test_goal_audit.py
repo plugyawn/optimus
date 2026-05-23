@@ -15,7 +15,7 @@ def write_json(path: Path, payload: dict):
 class GoalAuditTests(unittest.TestCase):
     def test_missing_evidence_fails_every_goal_dimension(self):
         args = Namespace(
-            reproduction_audit=None,
+            local_baseline_audit=None,
             parity_report=None,
             backend_gate=None,
             confirmation_gate=None,
@@ -33,7 +33,7 @@ class GoalAuditTests(unittest.TestCase):
         summary = run_goal_audit(args)
 
         self.assertFalse(summary["pass"])
-        self.assertIn("official full-Gaussian baseline validity", summary["failed"])
+        self.assertIn("upstream dense baseline validity", summary["failed"])
         self.assertIn("quality parity", summary["failed"])
         self.assertIn("accelerated evaluation route", summary["failed"])
         self.assertIn("adapter identity provenance", summary["failed"])
@@ -50,7 +50,7 @@ class GoalAuditTests(unittest.TestCase):
         )
         self.assertLess(
             action_by_requirement["accelerated evaluation route"]["priority"],
-            action_by_requirement["official full-Gaussian baseline validity"]["priority"],
+            action_by_requirement["upstream dense baseline validity"]["priority"],
         )
         self.assertEqual(
             action_by_requirement["adapter identity provenance"]["command"],
@@ -60,7 +60,7 @@ class GoalAuditTests(unittest.TestCase):
     def test_full_evidence_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            reproduction = root / "repro" / "summary.json"
+            local_baseline = root / "local_baseline" / "summary.json"
             parity = root / "parity" / "summary.json"
             backend = root / "backend" / "summary.json"
             confirmation = root / "confirmation" / "summary.json"
@@ -71,7 +71,7 @@ class GoalAuditTests(unittest.TestCase):
             eval_validity = root / "eval_validity" / "summary.json"
             score_sanity = root / "score_sanity" / "summary.json"
             adapter = root / "adapter"
-            write_json(reproduction, {"pass": True})
+            write_json(local_baseline, {"pass": True})
             write_json(
                 parity,
                 {
@@ -97,7 +97,7 @@ class GoalAuditTests(unittest.TestCase):
             write_json(score_sanity, {"pass": True})
             write_json(adapter / "summary.json", {"adapters_kept": True})
             args = Namespace(
-                reproduction_audit=reproduction,
+                local_baseline_audit=local_baseline,
                 parity_report=parity,
                 backend_gate=backend,
                 confirmation_gate=confirmation,
@@ -118,7 +118,7 @@ class GoalAuditTests(unittest.TestCase):
             self.assertEqual(summary["failed"], [])
             self.assertEqual(summary["next_actions"], [])
 
-    def test_upstream_paper_scale_audit_can_satisfy_official_baseline(self):
+    def test_upstream_full_scale_audit_can_satisfy_official_baseline(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             upstream = root / "upstream" / "summary.json"
@@ -127,13 +127,13 @@ class GoalAuditTests(unittest.TestCase):
                 {
                     "pass": True,
                     "smoke_pass": True,
-                    "paper_scale_pass": True,
+                    "upstream_scale_pass": True,
                     "failed": [],
                     "summary": {"population_size": 5000, "train_samples": 200, "max_tokens": 1024},
                 },
             )
             args = Namespace(
-                reproduction_audit=None,
+                local_baseline_audit=None,
                 upstream_baseline_audit=upstream,
                 parity_report=None,
                 backend_gate=None,
@@ -152,10 +152,10 @@ class GoalAuditTests(unittest.TestCase):
             summary = run_goal_audit(args)
             by_requirement = {row["requirement"]: row for row in summary["checks"]}
 
-            self.assertTrue(by_requirement["official full-Gaussian baseline validity"]["passed"])
+            self.assertTrue(by_requirement["upstream dense baseline validity"]["passed"])
             self.assertEqual(
-                by_requirement["official full-Gaussian baseline validity"]["detail"]["routes"],
-                ["upstream_paper_scale"],
+                by_requirement["upstream dense baseline validity"]["detail"]["routes"],
+                ["upstream_full_scale"],
             )
 
     def test_upstream_smoke_audit_does_not_satisfy_official_baseline(self):
@@ -167,13 +167,13 @@ class GoalAuditTests(unittest.TestCase):
                 {
                     "pass": True,
                     "smoke_pass": True,
-                    "paper_scale_pass": False,
+                    "upstream_scale_pass": False,
                     "failed": [],
                     "summary": {"population_size": 32, "train_samples": 200, "max_tokens": 1024},
                 },
             )
             args = Namespace(
-                reproduction_audit=None,
+                local_baseline_audit=None,
                 upstream_baseline_audit=upstream,
                 parity_report=None,
                 backend_gate=None,
@@ -191,11 +191,11 @@ class GoalAuditTests(unittest.TestCase):
 
             summary = run_goal_audit(args)
             by_requirement = {row["requirement"]: row for row in summary["checks"]}
-            detail = by_requirement["official full-Gaussian baseline validity"]["detail"]
+            detail = by_requirement["upstream dense baseline validity"]["detail"]
 
-            self.assertFalse(by_requirement["official full-Gaussian baseline validity"]["passed"])
+            self.assertFalse(by_requirement["upstream dense baseline validity"]["passed"])
             self.assertTrue(detail["upstream_countdown"]["smoke_pass"])
-            self.assertFalse(detail["upstream_countdown"]["paper_scale_pass"])
+            self.assertFalse(detail["upstream_countdown"]["upstream_scale_pass"])
 
     def test_parity_report_must_pass_stability_and_speed_gates(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -219,7 +219,7 @@ class GoalAuditTests(unittest.TestCase):
                 },
             )
             args = Namespace(
-                reproduction_audit=None,
+                local_baseline_audit=None,
                 parity_report=parity,
                 backend_gate=None,
                 confirmation_gate=None,
@@ -272,7 +272,7 @@ class GoalAuditTests(unittest.TestCase):
                 },
             )
             args = Namespace(
-                reproduction_audit=None,
+                local_baseline_audit=None,
                 parity_report=parity,
                 parity_arm="lora",
                 backend_gate=None,
@@ -314,7 +314,7 @@ class GoalAuditTests(unittest.TestCase):
             write_json(multirun, {"pass": False, "failed": ["all_quality_parity_pass"]})
             write_json(provenance, {"pass": False, "failed": ["results/stale_run"]})
             args = Namespace(
-                reproduction_audit=None,
+                local_baseline_audit=None,
                 parity_report=None,
                 backend_gate=backend,
                 confirmation_gate=confirmation,
@@ -363,7 +363,7 @@ class GoalAuditTests(unittest.TestCase):
                 },
             )
             args = Namespace(
-                reproduction_audit=None,
+                local_baseline_audit=None,
                 parity_report=None,
                 backend_gate=backend,
                 confirmation_gate=None,
@@ -405,7 +405,7 @@ class GoalAuditTests(unittest.TestCase):
                 },
             )
             args = Namespace(
-                reproduction_audit=None,
+                local_baseline_audit=None,
                 parity_report=None,
                 backend_gate=None,
                 confirmation_gate=None,
@@ -438,7 +438,7 @@ class GoalAuditTests(unittest.TestCase):
             score_sanity = root / "score_sanity" / "summary.json"
             write_json(score_sanity, {"pass": False, "failed": ["vllm:base_screen_prompt_health"]})
             args = Namespace(
-                reproduction_audit=None,
+                local_baseline_audit=None,
                 parity_report=None,
                 backend_gate=None,
                 confirmation_gate=None,

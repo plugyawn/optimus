@@ -1,6 +1,6 @@
 import unittest
 
-from randopt_lora_lab.backends import visible_token_count
+from optimus.serving.transformers import visible_token_count
 from randopt_lora_lab.cap_stability import metric_row
 
 

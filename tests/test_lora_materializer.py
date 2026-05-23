@@ -7,8 +7,9 @@ import math
 import torch
 from safetensors.torch import load_file
 
-from randopt_lora_lab.dense_space import dense_noise_tensor
-from randopt_lora_lab.gaussian_parity import best_rank_projection, lora_update
+from optimus.modeling import qwen_lora_shapes, save_seed_adapter
+from optimus.modeling.dense import dense_noise_tensor
+from optimus.modeling.geometry import best_rank_projection, lora_update
 from randopt_lora_lab.lora_space import (
     Candidate,
     activation_basis_spectral_scale,
@@ -23,7 +24,6 @@ from randopt_lora_lab.lora_space import (
     sparse_lora_density,
     spectral_projected_scale,
 )
-from randopt_lora_lab.vllm_lora_bench import save_seed_adapter
 
 
 class LoraMaterializerTests(unittest.TestCase):
@@ -31,6 +31,10 @@ class LoraMaterializerTests(unittest.TestCase):
         peft_name = "base_model.model.model.layers.0.self_attn.q_proj"
         self.assertEqual(canonical_module_name(peft_name), "model.layers.0.self_attn.q_proj")
         self.assertEqual(canonical_module_name("model.layers.1.self_attn.v_proj"), "model.layers.1.self_attn.v_proj")
+
+    def test_canonical_module_name_strips_qwen3_vl_peft_prefix(self):
+        peft_name = "base_model.model.model.language_model.layers.0.self_attn.q_proj"
+        self.assertEqual(canonical_module_name(peft_name), "model.language_model.layers.0.self_attn.q_proj")
 
     def test_peft_and_vllm_materialization_share_tensors(self):
         candidate = Candidate("isotropic", seed=123, sigma=0.0075, sign=-1)
@@ -52,6 +56,37 @@ class LoraMaterializerTests(unittest.TestCase):
                 candidate=candidate,
                 rank=rank,
                 targets=["q_proj"],
+                config=config,
+                tensor_dtype="float32",
+            )
+            tensors = load_file(str(Path(tmp) / "adapter_model.safetensors"))
+        prefix = f"base_model.model.{module}"
+        self.assertTrue(torch.equal(tensors[f"{prefix}.lora_A.weight"], expected_a))
+        self.assertTrue(torch.equal(tensors[f"{prefix}.lora_B.weight"], expected_b))
+
+    def test_qwen3_vl_materialization_uses_language_model_prefix(self):
+        candidate = Candidate("isotropic", seed=123, sigma=0.0075, sign=-1)
+        rank = 4
+        hidden = 16
+        config = types.SimpleNamespace(
+            model_type="qwen3_vl_text",
+            hidden_size=hidden,
+            intermediate_size=32,
+            num_hidden_layers=1,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=4,
+        )
+        module = "model.language_model.layers.0.self_attn.k_proj"
+        self.assertIn((module, hidden, 8), qwen_lora_shapes(config, ["k_proj"]))
+        expected_a, expected_b = lora_noise_tensors(module, (rank, hidden), (8, rank), candidate, rank)
+        with tempfile.TemporaryDirectory() as tmp:
+            save_seed_adapter(
+                Path(tmp),
+                model="Qwen/Qwen3-VL-8B-Instruct",
+                candidate=candidate,
+                rank=rank,
+                targets=["k_proj"],
                 config=config,
                 tensor_dtype="float32",
             )

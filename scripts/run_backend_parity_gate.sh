@@ -22,14 +22,14 @@ ADAPTER_SAMPLE=${ADAPTER_SAMPLE:-16}
 
 export PYTHONUNBUFFERED=1
 export VLLM_USAGE_STATS_ENABLED=${VLLM_USAGE_STATS_ENABLED:-0}
-export XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp/randopt-xdg-config}
+export XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp/optimus-xdg-config}
 mkdir -p "$OUT_ROOT" "$XDG_CONFIG_HOME"
 
 if [[ ! -f "$DATA" ]]; then
-  python -m randopt_lora_lab.make_countdown_data --out "$DATA" --count 1200 --seed 20260507
+  optimus make-countdown-data --out "$DATA" --count 1200 --seed 20260507
 fi
 
-python -m randopt_lora_lab.experiments search \
+optimus peft-search \
   --out "$OUT_ROOT/peft" \
   --model "$MODEL" \
   --data "$DATA" \
@@ -47,7 +47,7 @@ python -m randopt_lora_lab.experiments search \
   --stop-at-answer \
   --antithetic
 
-python -m randopt_lora_lab.vllm_lora_search \
+optimus vllm-search \
   --out "$OUT_ROOT/vllm" \
   --model "$MODEL" \
   --data "$DATA" \
@@ -69,14 +69,14 @@ python -m randopt_lora_lab.vllm_lora_search \
   --antithetic \
   --keep-adapters
 
-python -m randopt_lora_lab.backend_output_diff \
+optimus backend-output-diff \
   --trusted "$OUT_ROOT/peft" \
   --candidate "$OUT_ROOT/vllm" \
   --trusted-name peft \
   --candidate-name vllm \
   --out "$OUT_ROOT/output_diff"
 
-python -m randopt_lora_lab.backend_parity_gate \
+optimus backend-parity-gate \
   --trusted "$OUT_ROOT/peft" \
   --candidate "$OUT_ROOT/vllm" \
   --trusted-name peft \

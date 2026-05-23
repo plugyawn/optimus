@@ -23,18 +23,18 @@ def test_preflight_manifest_requires_source_panel_shortlist_and_preflight(tmp_pa
 
     summary = build_manifest(tmp_path, mode="preflight")
 
-    assert summary["artifact_complete"] is True
+    assert summary["outputs_complete"] is True
     assert summary["method_pass"] is False
     assert summary["missing_required"] == []
     assert summary["unreadable_required"] == []
     assert summary["failed_gates"] == []
-    shortlist = next(row for row in summary["artifacts"] if row["name"] == "shortlist")
+    shortlist = next(row for row in summary["outputs"] if row["name"] == "shortlist")
     assert shortlist["present"] is True
     assert shortlist["rows"] == 1
     assert shortlist["relpath"] == "shortlist_top4.jsonl"
 
 
-def test_confirm_manifest_separates_missing_artifacts_from_failed_gates(tmp_path: Path):
+def test_confirm_manifest_separates_missing_outputs_from_failed_gates(tmp_path: Path):
     write_json(tmp_path / "dense" / "summary.json", {"kind": "dense_search"})
     write_json(tmp_path / "vllm" / "summary.json", {"kind": "vllm_search"})
     write_jsonl(tmp_path / "shortlist_top4.jsonl", [{"candidate": "activation_spectral_lora_c2:seed0"}])
@@ -48,7 +48,7 @@ def test_confirm_manifest_separates_missing_artifacts_from_failed_gates(tmp_path
 
     summary = build_manifest(tmp_path, mode="confirm")
 
-    assert summary["artifact_complete"] is False
+    assert summary["outputs_complete"] is False
     assert summary["missing_required"] == ["current_goal_audit"]
     assert summary["unreadable_required"] == []
     assert summary["failed_gates"] == ["shortlist_dense_confirmation"]
@@ -65,10 +65,10 @@ def test_manifest_marks_corrupt_required_json_unreadable(tmp_path: Path):
 
     summary = build_manifest(tmp_path, mode="preflight")
 
-    assert summary["artifact_complete"] is False
+    assert summary["outputs_complete"] is False
     assert summary["missing_required"] == []
     assert summary["unreadable_required"] == ["dense_summary"]
-    dense = next(row for row in summary["artifacts"] if row["name"] == "dense_summary")
+    dense = next(row for row in summary["outputs"] if row["name"] == "dense_summary")
     assert dense["present"] is True
     assert dense["readable"] is False
     assert "JSONDecodeError" in dense["error"]
@@ -89,7 +89,7 @@ def test_confirm_manifest_method_pass_requires_current_goal_audit_pass(tmp_path:
 
     summary = build_manifest(tmp_path, mode="confirm")
 
-    assert summary["artifact_complete"] is True
+    assert summary["outputs_complete"] is True
     assert summary["unreadable_required"] == []
     assert summary["failed_gates"] == []
     assert summary["method_pass"] is True

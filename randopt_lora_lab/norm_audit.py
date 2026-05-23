@@ -7,7 +7,7 @@ from pathlib import Path
 
 import torch
 
-from .countdown import load_examples
+from optimus.tasks.countdown import load_examples
 from .experiments import candidate_panel, make_backend, maybe_build_family_state, write_jsonl
 from .lora_space import Candidate, lora_noise_tensors
 

@@ -2,8 +2,8 @@ import unittest
 
 import torch
 
-from randopt_lora_lab.aggregate_lora import aggregate_lora_tensors, normalized_weights
-from randopt_lora_lab.gaussian_parity import lora_update
+from optimus.search.aggregation import aggregate_lora_tensors, normalized_weights
+from optimus.modeling.geometry import lora_update
 from randopt_lora_lab.lora_space import Candidate, lora_noise_tensors
 
 
@@ -36,4 +36,3 @@ class AggregateLoraTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

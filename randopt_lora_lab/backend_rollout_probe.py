@@ -8,12 +8,13 @@ from dataclasses import asdict
 from pathlib import Path
 from statistics import mean
 
-from .backend_contract import backend_contract, vllm_tokenizer_contract
+from optimus.modeling import AdapterSpec, parse_targets
+from optimus.serving.contracts import backend_contract, vllm_tokenizer_contract
+from optimus.serving.runtime import import_vllm_lora_request, make_sampling_params, write_json, write_jsonl
 from .backend_next_token_probe import make_adapter_specs, parse_candidate_key
 from .backends import TransformersLoraBackend
-from .countdown import load_examples, prompts as make_prompts, score_completion
+from optimus.tasks.countdown import load_examples, prompts as make_prompts, score_completion
 from .lora_space import Candidate
-from .vllm_lora_bench import AdapterSpec, import_vllm_lora_request, make_sampling_params, parse_targets, write_json, write_jsonl
 
 
 def vllm_generate(llm, SamplingParams, LoRARequest, prompts: list[str], args, spec: AdapterSpec | None):

@@ -1,15 +1,15 @@
 import unittest
 
-from randopt_lora_lab.cap_stability import (
+from optimus.tasks.prompt_variants import (
     compact_tagged_prompt,
     direct_tagged_prompt,
-    metric_row,
     prompt_fn,
     reordered_tagged_prompt,
     tight_tagged_prompt,
     xml_tagged_prompt,
 )
-from randopt_lora_lab.countdown import CountdownExample
+from optimus.tasks.countdown import CountdownExample
+from randopt_lora_lab.cap_stability import metric_row
 
 
 class CapStabilityTests(unittest.TestCase):

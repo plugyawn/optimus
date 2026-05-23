@@ -2,7 +2,7 @@ import unittest
 
 import torch
 
-from randopt_lora_lab.gaussian_parity import (
+from optimus.modeling.geometry import (
     best_rank_projection,
     dense_gaussian_matrix,
     expected_update_stats,

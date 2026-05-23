@@ -142,7 +142,10 @@ def load_run(
         "score_sanity_failed": [] if score_sanity is None else score_sanity.get("failed", []),
         "family_state_provenance_pass": bool(provenance and provenance.get("pass")),
         "family_state_provenance_failed": [] if provenance is None else provenance.get("failed", []),
-        "artifact_complete": bool(replay and replay.get("artifact_complete")),
+        "outputs_complete": bool(
+            replay
+            and replay.get("outputs_complete", replay.get("artifact_complete"))
+        ),
         "missing_required": [] if replay is None else replay.get("missing_required", []),
         "prompt_variants": variants,
         "prompt_variant_count": len(variants),
@@ -235,9 +238,9 @@ def aggregate(
             {row["run_dir"]: row["family_state_provenance_failed"] for row in runs},
         ),
         GateCheck(
-            "all_artifacts_complete",
-            all(row["artifact_complete"] and not row["missing_required"] for row in runs),
-            {row["run_dir"]: {"artifact_complete": row["artifact_complete"], "missing_required": row["missing_required"]} for row in runs},
+            "all_outputs_complete",
+            all(row["outputs_complete"] and not row["missing_required"] for row in runs),
+            {row["run_dir"]: {"outputs_complete": row["outputs_complete"], "missing_required": row["missing_required"]} for row in runs},
         ),
         GateCheck(
             "prompt_robust_selection",
@@ -283,7 +286,7 @@ def aggregate(
             ),
             "score_sanity_pass_count": sum(1 for row in runs if row["score_sanity_pass"]),
             "family_state_provenance_pass_count": sum(1 for row in runs if row["family_state_provenance_pass"]),
-            "artifact_complete_count": sum(1 for row in runs if row["artifact_complete"] and not row["missing_required"]),
+            "outputs_complete_count": sum(1 for row in runs if row["outputs_complete"] and not row["missing_required"]),
             "prompt_robust_count": sum(
                 1
                 for row in runs

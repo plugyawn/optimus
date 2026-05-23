@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from randopt_lora_lab.compare_halving import compare_halving
-from randopt_lora_lab.vllm_lora_halving import build_parser
+from optimus.serving.halving import build_parser
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:

@@ -8,11 +8,12 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 
-from .backend_contract import backend_contract, vllm_tokenizer_contract
+from optimus.modeling import AdapterSpec, parse_targets, save_seed_adapter
+from optimus.serving.contracts import backend_contract, vllm_tokenizer_contract
+from optimus.serving.runtime import import_vllm_lora_request, write_json, write_jsonl
 from .backends import TransformersLoraBackend
-from .countdown import load_examples, prompts as make_prompts
+from optimus.tasks.countdown import load_examples, prompts as make_prompts
 from .lora_space import Candidate
-from .vllm_lora_bench import AdapterSpec, import_vllm_lora_request, parse_targets, save_seed_adapter, write_json, write_jsonl
 
 
 def parse_candidate_key(key: str) -> Candidate:

@@ -8,7 +8,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
-from .countdown import CountdownExample, score_completion, semantic_example_key
+from optimus.tasks.countdown import CountdownExample, score_completion, semantic_example_key
 
 
 @dataclass

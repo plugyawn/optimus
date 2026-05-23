@@ -5,7 +5,7 @@ import json
 import time
 from pathlib import Path
 
-from .countdown import load_examples, prompts as make_prompts, score_completion
+from optimus.tasks.countdown import load_examples, prompts as make_prompts, score_completion
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:

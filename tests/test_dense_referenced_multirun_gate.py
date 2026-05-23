@@ -52,7 +52,7 @@ def write_run(
     )
     write_json(root / "score_sanity" / "summary.json", {"pass": True, "failed": []})
     write_json(root / "family_state_provenance_audit" / "summary.json", {"pass": True, "failed": []})
-    write_json(root / "replay_manifest" / "summary.json", {"artifact_complete": True, "missing_required": []})
+    write_json(root / "replay_manifest" / "summary.json", {"outputs_complete": True, "missing_required": []})
     write_json(
         root / "vllm" / "summary.json",
         {

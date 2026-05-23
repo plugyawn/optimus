@@ -2,18 +2,16 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from randopt_lora_lab.countdown import CountdownExample
-from randopt_lora_lab.experiments import (
+from optimus.tasks.countdown import CountdownExample
+from optimus.search.ensemble import ensemble_ks_from_values, majority_vote_evaluation, parse_k_list
+from optimus.search.peft import (
     candidate_panel,
-    ensemble_ks_from_values,
-    majority_vote_evaluation,
     maybe_build_family_state,
-    parse_k_list,
     read_candidate_file as read_peft_candidate_file,
     record_loaded_family_state,
 )
 from randopt_lora_lab.strict_ensemble_replay import replay
-from randopt_lora_lab.vllm_lora_search import candidate_panel as vllm_candidate_panel, read_candidate_file
+from optimus.core.candidates import candidate_panel as vllm_candidate_panel, read_candidate_file
 
 
 class ExperimentEnsembleTests(unittest.TestCase):

@@ -2,7 +2,7 @@ import unittest
 
 import torch
 
-from randopt_lora_lab.dense_space import DenseGaussianPatcher, dense_noise_tensor
+from optimus.modeling.dense import DenseGaussianPatcher, dense_noise_tensor
 from randopt_lora_lab.lora_space import Candidate
 
 
@@ -90,14 +90,16 @@ class DenseSpaceTests(unittest.TestCase):
         for name, param in model.named_parameters():
             self.assertFalse(torch.equal(param, original[name]))
 
-    def test_paper_noise_mode_uses_same_seed_stream_per_parameter(self):
+    def test_upstream_noise_mode_uses_same_seed_stream_per_parameter(self):
         candidate = Candidate("dense_gaussian", seed=123, sigma=0.01)
 
-        first = dense_noise_tensor("a", (2, 2), candidate, noise_mode="paper")
-        second = dense_noise_tensor("b", (2, 2), candidate, noise_mode="paper")
+        first = dense_noise_tensor("a", (2, 2), candidate, noise_mode="upstream")
+        second = dense_noise_tensor("b", (2, 2), candidate, noise_mode="upstream")
+        upstream = dense_noise_tensor("b", (2, 2), candidate, noise_mode="upstream")
         canonical = dense_noise_tensor("b", (2, 2), candidate, noise_mode="canonical")
 
         self.assertTrue(torch.equal(first, second))
+        self.assertTrue(torch.equal(first, upstream))
         self.assertFalse(torch.equal(first, canonical))
 
 

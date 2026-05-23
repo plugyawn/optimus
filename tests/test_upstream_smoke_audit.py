@@ -34,25 +34,25 @@ def upstream_payload(population: int = 32):
 
 
 class UpstreamSmokeAuditTests(unittest.TestCase):
-    def test_reduced_population_official_semantics_passes_smoke_not_paper_scale(self):
+    def test_reduced_population_upstream_semantics_passes_smoke_not_full_scale(self):
         summary = audit_upstream_countdown_smoke(upstream_payload(), min_population=32, min_test_samples=128)
 
         self.assertTrue(summary["smoke_pass"])
-        self.assertFalse(summary["paper_scale_pass"])
+        self.assertFalse(summary["upstream_scale_pass"])
         self.assertTrue(summary["pass"])
         self.assertEqual(summary["failed"], [])
 
-    def test_require_paper_scale_fails_for_p32(self):
+    def test_require_upstream_scale_fails_for_p32(self):
         summary = audit_upstream_countdown_smoke(
             upstream_payload(),
-            require_paper_scale=True,
+            require_upstream_scale=True,
             min_population=32,
             min_test_samples=128,
         )
 
         self.assertFalse(summary["pass"])
         self.assertTrue(summary["smoke_pass"])
-        self.assertIn("paper_scale_population", summary["failed"])
+        self.assertIn("upstream_scale_population", summary["failed"])
 
     def test_local_like_payload_fails_official_semantics(self):
         payload = upstream_payload()

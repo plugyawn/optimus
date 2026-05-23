@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from randopt_lora_lab.countdown import (
+from optimus.tasks.countdown import (
     CountdownExample,
     extract_numeric_vote,
     load_examples,
@@ -11,10 +11,14 @@ from randopt_lora_lab.countdown import (
     unique_semantic_example_count,
     voted_answer_exact,
 )
-from randopt_lora_lab.backends import TransformersLoraBackend
+from randopt_lora_lab.countdown import CountdownExample as LegacyCountdownExample
+from optimus.serving.transformers import TransformersLoraBackend
 
 
 class CountdownDataTests(unittest.TestCase):
+    def test_legacy_namespace_reexports_public_countdown_type(self):
+        self.assertIs(LegacyCountdownExample, CountdownExample)
+
     def test_load_examples_refuses_silent_repetition(self):
         with self.assertRaisesRegex(ValueError, "only 32 unique examples"):
             load_examples(None, 33, seed=1)

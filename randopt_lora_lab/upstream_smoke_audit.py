@@ -6,12 +6,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from .reproduction_audit import (
-    OFFICIAL_COUNTDOWN_DATA_SOURCE,
-    OFFICIAL_COUNTDOWN_MODEL,
-    OFFICIAL_COUNTDOWN_SIGMAS,
-    OFFICIAL_COUNTDOWN_TOP_K_RATIOS,
-    official_countdown_ensemble_ks,
+from .upstream_baseline_audit import (
+    UPSTREAM_COUNTDOWN_DATA_SOURCE,
+    UPSTREAM_COUNTDOWN_MODEL,
+    UPSTREAM_COUNTDOWN_SIGMAS,
+    UPSTREAM_COUNTDOWN_TOP_K_RATIOS,
+    upstream_countdown_ensemble_ks,
 )
 
 
@@ -55,7 +55,7 @@ def _norm_ratio_text(values: Any) -> str:
 def _is_official_data(path: Any) -> bool:
     text = str(path or "")
     return (
-        text == OFFICIAL_COUNTDOWN_DATA_SOURCE
+        text == UPSTREAM_COUNTDOWN_DATA_SOURCE
         or "VsonicV/es-fine-tuning-paper" in text
         or "countdown_official.json" in text
         or text.endswith("es-fine-tuning-paper/countdown/data/countdown.json")
@@ -73,7 +73,7 @@ def load_upstream_payload(run_dir: Path) -> dict[str, Any]:
 def audit_upstream_countdown_smoke(
     payload: dict[str, Any],
     *,
-    require_paper_scale: bool = False,
+    require_upstream_scale: bool = False,
     min_population: int = 1,
     min_test_samples: int = 1,
 ) -> dict[str, Any]:
@@ -83,22 +83,22 @@ def audit_upstream_countdown_smoke(
     population = int(args.get("population_size") or 0)
     test_samples = int(args.get("test_samples") or results.get("test_samples") or 0)
     train_samples = int(args.get("train_samples") or results.get("train_samples") or 0)
-    expected_top_k = official_countdown_ensemble_ks(population) if population else []
+    expected_top_k = upstream_countdown_ensemble_ks(population) if population else []
     actual_top_k = sorted(int(value) for value in (args.get("top_k_list") or []))
     checks = [
         _check("dataset", args.get("dataset"), "countdown"),
-        _check("model", args.get("model_name"), OFFICIAL_COUNTDOWN_MODEL),
+        _check("model", args.get("model_name"), UPSTREAM_COUNTDOWN_MODEL),
         _check_bool(
             "official_train_data",
             _is_official_data(args.get("train_data_path")),
             args.get("train_data_path"),
-            OFFICIAL_COUNTDOWN_DATA_SOURCE,
+            UPSTREAM_COUNTDOWN_DATA_SOURCE,
         ),
         _check_bool(
             "official_test_data",
             _is_official_data(args.get("test_data_path")),
             args.get("test_data_path"),
-            OFFICIAL_COUNTDOWN_DATA_SOURCE,
+            UPSTREAM_COUNTDOWN_DATA_SOURCE,
         ),
         _check("train_samples", train_samples, 200),
         _check_bool("population_minimum", population >= min_population, population, f">={min_population}"),
@@ -106,12 +106,12 @@ def audit_upstream_countdown_smoke(
         _check(
             "sigma_values",
             sorted(_norm_float_list(args.get("sigma_list", args.get("sigma_values")))),
-            sorted(OFFICIAL_COUNTDOWN_SIGMAS),
+            sorted(UPSTREAM_COUNTDOWN_SIGMAS),
         ),
         _check(
             "top_k_ratios",
             _norm_ratio_text(args.get("top_k_ratios")),
-            _norm_ratio_text(OFFICIAL_COUNTDOWN_TOP_K_RATIOS),
+            _norm_ratio_text(UPSTREAM_COUNTDOWN_TOP_K_RATIOS),
         ),
         _check("top_k_list", actual_top_k, expected_top_k),
         _check("max_tokens", int(args.get("max_tokens") or 0), 1024),
@@ -136,20 +136,20 @@ def audit_upstream_countdown_smoke(
             ">0",
         ),
         _check_bool(
-            "paper_scale_population",
-            (not require_paper_scale) or population == 5000,
+            "upstream_scale_population",
+            (not require_upstream_scale) or population == 5000,
             population,
             5000,
-            note="set --require-paper-scale for a true paper-scale reproduction gate",
+            note="set --require-upstream-scale for an upstream-equivalence gate",
         ),
     ]
     failed = [check.name for check in checks if not check.passed]
-    smoke_pass = not [check for check in checks if not check.passed and check.name != "paper_scale_population"]
+    smoke_pass = not [check for check in checks if not check.passed and check.name != "upstream_scale_population"]
     return {
         "kind": "upstream_countdown_smoke_audit",
         "pass": not failed,
         "smoke_pass": smoke_pass,
-        "paper_scale_pass": smoke_pass and population == 5000,
+        "upstream_scale_pass": smoke_pass and population == 5000,
         "failed": failed,
         "checks": [asdict(check) for check in checks],
         "summary": {
@@ -171,7 +171,7 @@ def render_markdown(summary: dict[str, Any]) -> str:
         "",
         f"Pass: `{str(summary['pass']).lower()}`",
         f"Smoke pass: `{str(summary['smoke_pass']).lower()}`",
-        f"Paper-scale pass: `{str(summary['paper_scale_pass']).lower()}`",
+        f"Upstream-scale pass: `{str(summary['upstream_scale_pass']).lower()}`",
         "",
         "## Summary",
         "",
@@ -192,17 +192,17 @@ def render_markdown(summary: dict[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Audit upstream RandOpt Countdown args/results artifacts.")
+    parser = argparse.ArgumentParser(description="Audit upstream Countdown args/results outputs.")
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--require-paper-scale", action="store_true")
+    parser.add_argument("--require-upstream-scale", action="store_true")
     parser.add_argument("--min-population", type=int, default=1)
     parser.add_argument("--min-test-samples", type=int, default=1)
     args = parser.parse_args(argv)
 
     summary = audit_upstream_countdown_smoke(
         load_upstream_payload(args.run),
-        require_paper_scale=args.require_paper_scale,
+        require_upstream_scale=args.require_upstream_scale,
         min_population=args.min_population,
         min_test_samples=args.min_test_samples,
     )

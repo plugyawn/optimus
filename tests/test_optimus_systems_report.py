@@ -1,0 +1,185 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from optimus.evaluation.systems import (
+    best_of_n_rows,
+    full_search_rows,
+    main as systems_report_main,
+    quality_rows,
+    systems_summaries,
+)
+
+
+def test_systems_report_discovers_optimus_p4096_runs(tmp_path: Path):
+    run = tmp_path / "optimus_gpu_suite" / "search_p4096_chunk8"
+    run.mkdir(parents=True)
+    (run / "summary.json").write_text(
+        json.dumps(
+            {
+                "kind": "vllm_lora_search",
+                "population": 4096,
+                "screen_prompts": 64,
+                "holdout_prompts": 128,
+                "chunk_adapters": 8,
+                "max_loras": 8,
+                "max_new_tokens": 32,
+                "tensor_parallel_size": 8,
+                "base_screen_exact": 0.10,
+                "base_holdout_exact": 0.09,
+                "top_screen": [{"candidate": "c2", "exact_mean": 0.20}],
+                "top_holdout": [{"candidate": "c2", "exact_mean": 0.16}],
+                "best_ensemble_holdout_exact": 0.18,
+                "best_strict_ensemble_holdout_exact": 0.17,
+                "candidate_sec": 3.25,
+                "screen_prompts_per_sec": 208.0,
+                "screen_tokens_per_sec": 4096.0,
+                "holdout_tokens_per_sec": 3500.0,
+                "best_tokens_per_sec": 4300.0,
+                "eval_elapsed_s": 1260.0,
+                "load_s": 80.0,
+            }
+        )
+        + "\n"
+    )
+    (run / "candidate_summary.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"adapter_index": 0, "candidate": "c0", "exact_mean": 0.08}),
+                json.dumps({"adapter_index": 1, "candidate": "c1", "exact_mean": 0.12}),
+                json.dumps({"adapter_index": 2, "candidate": "c2", "exact_mean": 0.20}),
+            ]
+        )
+        + "\n"
+    )
+
+    rows = systems_summaries(tmp_path)
+    full = full_search_rows(rows)
+    best = best_of_n_rows(full)
+
+    assert len(rows) == 1
+    assert full[0]["suite"] == "optimus_gpu_suite"
+    assert full[0]["run"] == "search_p4096_chunk8"
+    assert full[0]["population"] == 4096
+    assert full[0]["tensor_parallel_size"] == 8
+    assert full[0]["screen_tokens_per_sec"] == 4096.0
+    assert [row["best_screen_exact"] for row in best] == [0.08, 0.12, 0.20]
+
+
+def test_systems_report_writes_best_of_n_and_scaling_outputs(tmp_path: Path):
+    search = tmp_path / "optimus_gpu_suite" / "search_p1024_chunk8"
+    search.mkdir(parents=True)
+    (search / "summary.json").write_text(
+        json.dumps(
+            {
+                "kind": "vllm_lora_search",
+                "population": 1024,
+                "screen_prompts": 64,
+                "holdout_prompts": 128,
+                "chunk_adapters": 8,
+                "max_loras": 8,
+                "max_new_tokens": 32,
+                "tensor_parallel_size": 8,
+                "base_screen_exact": 0.10,
+                "base_holdout_exact": 0.09,
+                "top_screen": [{"candidate": "c1", "exact_mean": 0.15}],
+                "top_holdout": [{"candidate": "c1", "exact_mean": 0.14}],
+                "best_ensemble_holdout_exact": 0.16,
+                "best_strict_ensemble_holdout_exact": 0.15,
+                "candidate_sec": 2.5,
+                "screen_prompts_per_sec": 160.0,
+                "screen_tokens_per_sec": 3000.0,
+                "holdout_tokens_per_sec": 2900.0,
+                "best_tokens_per_sec": 3000.0,
+                "eval_elapsed_s": 1000.0,
+                "load_s": 50.0,
+            }
+        )
+        + "\n"
+    )
+    (search / "candidate_summary.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"adapter_index": 0, "candidate": "c0", "exact_mean": 0.11}),
+                json.dumps({"adapter_index": 1, "candidate": "c1", "exact_mean": 0.15}),
+            ]
+        )
+        + "\n"
+    )
+    bench = tmp_path / "optimus_gpu_suite" / "bench_a8_p64"
+    bench.mkdir(parents=True)
+    (bench / "summary.json").write_text(
+        json.dumps(
+            {
+                "kind": "vllm_lora_bench",
+                "adapters": 8,
+                "prompts": 64,
+                "tensor_parallel_size": 8,
+                "max_new_tokens": 32,
+                "lora_tokens_per_sec": 2500.0,
+                "mixed_tokens_per_sec": 3200.0,
+                "lora_prompts_per_sec": 140.0,
+                "mixed_prompts_per_sec": 180.0,
+                "load_s": 42.0,
+            }
+        )
+        + "\n"
+    )
+
+    out = tmp_path / "report"
+    assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 0
+
+    for name in [
+        "bench.csv",
+        "adapter_throughput.png",
+        "best_of_n.csv",
+        "best_of_n.png",
+        "quality_scaling.csv",
+        "quality_scaling.png",
+        "token_throughput.png",
+    ]:
+        path = out / name
+        assert path.exists(), name
+        assert path.stat().st_size > 0, name
+    report = (out / "report.md").read_text()
+    assert "parity_gates.png" not in report
+    assert "screen_selected_holdout_exact" in report
+
+
+def test_quality_rows_separate_selected_transfer_from_holdout_oracle(tmp_path: Path):
+    run = tmp_path / "optimus_gpu_suite" / "search_p4096_chunk8"
+    run.mkdir(parents=True)
+    (run / "summary.json").write_text(
+        json.dumps(
+            {
+                "kind": "vllm_lora_search",
+                "population": 4096,
+                "screen_prompts": 64,
+                "holdout_prompts": 256,
+                "base_screen_exact": 0.10,
+                "base_holdout_exact": 0.08,
+                "top_screen": [
+                    {"candidate": "screen-winner", "exact_mean": 0.21},
+                    {"candidate": "holdout-winner", "exact_mean": 0.17},
+                ],
+                "top_holdout": [
+                    {"candidate": "holdout-winner", "exact_mean": 0.16},
+                    {"candidate": "screen-winner", "exact_mean": 0.07},
+                ],
+            }
+        )
+        + "\n"
+    )
+
+    quality = quality_rows(systems_summaries(tmp_path))
+
+    assert len(quality) == 1
+    row = quality[0]
+    assert row["screen_selected_candidate"] == "screen-winner"
+    assert row["screen_selected_exact"] == 0.21
+    assert row["screen_selected_holdout_exact"] == 0.07
+    assert row["screen_selected_holdout_delta_vs_base"] < 0
+    assert row["promoted_holdout_oracle_candidate"] == "holdout-winner"
+    assert row["promoted_holdout_oracle_exact"] == 0.16
+    assert row["promoted_holdout_oracle_delta_vs_base"] == 0.08

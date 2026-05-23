@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from randopt_lora_lab.compare_backends import average_ranks, compare, parse_ks, pearson, spearman
+from optimus.evaluation.compare import average_ranks, compare, parse_ks, pearson, spearman
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:

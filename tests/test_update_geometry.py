@@ -2,9 +2,9 @@ import unittest
 
 import torch
 
-from randopt_lora_lab.gaussian_parity import MatrixSpec
+from optimus.modeling.geometry import MatrixSpec
 from randopt_lora_lab.lora_space import Candidate
-from randopt_lora_lab.update_geometry import effective_rank, family_geometry, matrix_update_for_family
+from optimus.modeling.update_geometry import effective_rank, family_geometry, matrix_update_for_family
 
 
 class UpdateGeometryTests(unittest.TestCase):

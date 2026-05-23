@@ -1,7 +1,7 @@
 import unittest
 
-from randopt_lora_lab.countdown import safe_eval_expr
-from randopt_lora_lab.make_countdown_data import generate_examples
+from optimus.tasks.countdown import safe_eval_expr
+from optimus.tasks.generation import generate_examples
 
 
 class MakeCountdownDataTests(unittest.TestCase):

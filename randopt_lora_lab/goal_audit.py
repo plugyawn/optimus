@@ -19,10 +19,10 @@ class GoalCheck:
 
 
 NEXT_ACTIONS = {
-    "official full-Gaussian baseline validity": {
+    "upstream dense baseline validity": {
         "priority": 50,
-        "action": "produce a paper-scale upstream RandOpt Countdown audit or a local dense Gaussian reproduction audit before using it as the official baseline",
-        "command": "scripts/run_upstream_randopt_countdown.sh",
+        "action": "produce a full-scale upstream Countdown audit or a local dense Gaussian baseline audit before using it as the reference baseline",
+        "command": "optimus upstream-baseline-audit --run RUN --out results/upstream_baseline_audit",
     },
     "quality parity": {
         "priority": 20,
@@ -52,22 +52,22 @@ NEXT_ACTIONS = {
     "multi-run prompt-robust confirmation": {
         "priority": 40,
         "action": "aggregate at least two prompt-valid runs after the dense-referenced confirmation path passes",
-        "command": "python -m randopt_lora_lab.multirun_gate --run RUN1 --run RUN2 --parity-arm lora --out results/spectral_vllm_multirun_gate",
+        "command": "optimus multirun-gate --run RUN1 --run RUN2 --parity-arm lora --out results/multirun_gate",
     },
     "prompt robustness": {
         "priority": 30,
         "action": "prove nonnegative lift and no cap/malformed regression on multiple base-valid prompt variants",
-        "command": "python -m randopt_lora_lab.prompt_robustness --help",
+        "command": "optimus prompt-robustness --help",
     },
     "drift parity": {
         "priority": 60,
         "action": "run true nonnegative full-vocab next-token KL drift parity against dense Gaussian",
-        "command": "python -m randopt_lora_lab.drift_parity --help",
+        "command": "optimus drift-parity --help",
     },
     "eval validity": {
         "priority": 12,
         "action": "run strict parser, semantic split, cap-hit, malformed, and ensemble-row validity on the claim artifact",
-        "command": "python -m randopt_lora_lab.result_validity --run RUN --out RUN/validity",
+        "command": "optimus result-validity --run RUN --out RUN/validity",
     },
     "score sanity": {
         "priority": 12,
@@ -103,38 +103,41 @@ def check_present_pass(requirement: str, path: Path | None, payload: dict | None
 
 def check_official_baseline(
     *,
-    reproduction_path: Path | None,
-    reproduction_payload: dict | None,
+    local_baseline_path: Path | None,
+    local_baseline_payload: dict | None,
     upstream_path: Path | None,
     upstream_payload: dict | None,
 ) -> GoalCheck:
-    if reproduction_payload is None and upstream_payload is None:
+    if local_baseline_payload is None and upstream_payload is None:
         return GoalCheck(
-            "official full-Gaussian baseline validity",
+            "upstream dense baseline validity",
             False,
             json.dumps(
                 {
-                    "local_reproduction": str(reproduction_path) if reproduction_path else None,
+                    "local_baseline": str(local_baseline_path) if local_baseline_path else None,
                     "upstream_countdown": str(upstream_path) if upstream_path else None,
                 },
                 sort_keys=True,
             ),
             "missing baseline evidence",
         )
-    local_pass = bool(reproduction_payload and reproduction_payload.get("pass"))
-    upstream_paper_pass = bool(upstream_payload and upstream_payload.get("paper_scale_pass"))
+    local_pass = bool(local_baseline_payload and local_baseline_payload.get("pass"))
+    upstream_scale_pass = bool(
+        upstream_payload
+        and upstream_payload.get("upstream_scale_pass", upstream_payload.get("paper_scale_pass"))
+    )
     routes = []
     if local_pass:
-        routes.append("local_reproduction_audit")
-    if upstream_paper_pass:
-        routes.append("upstream_paper_scale")
-    passed = local_pass or upstream_paper_pass
+        routes.append("local_baseline_audit")
+    if upstream_scale_pass:
+        routes.append("upstream_full_scale")
+    passed = local_pass or upstream_scale_pass
     return GoalCheck(
-        "official full-Gaussian baseline validity",
+        "upstream dense baseline validity",
         passed,
         json.dumps(
             {
-                "local_reproduction": str(reproduction_path) if reproduction_path else None,
+                "local_baseline": str(local_baseline_path) if local_baseline_path else None,
                 "upstream_countdown": str(upstream_path) if upstream_path else None,
             },
             sort_keys=True,
@@ -142,18 +145,21 @@ def check_official_baseline(
         {
             "pass": passed,
             "routes": routes,
-            "local_reproduction": None
-            if reproduction_payload is None
+            "local_baseline": None
+            if local_baseline_payload is None
             else {
-                "pass": reproduction_payload.get("pass"),
-                "failed": reproduction_payload.get("failed", []),
+                "pass": local_baseline_payload.get("pass"),
+                "failed": local_baseline_payload.get("failed", []),
             },
             "upstream_countdown": None
             if upstream_payload is None
             else {
                 "pass": upstream_payload.get("pass"),
                 "smoke_pass": upstream_payload.get("smoke_pass"),
-                "paper_scale_pass": upstream_payload.get("paper_scale_pass"),
+                "upstream_scale_pass": upstream_payload.get(
+                    "upstream_scale_pass",
+                    upstream_payload.get("paper_scale_pass"),
+                ),
                 "failed": upstream_payload.get("failed", []),
                 "summary": upstream_payload.get("summary", {}),
             },
@@ -564,7 +570,8 @@ def check_adapter_convenience(path: Path | None) -> GoalCheck:
 
 def run_goal_audit(args) -> dict:
     checks: list[GoalCheck] = []
-    reproduction = read_json(args.reproduction_audit)
+    local_baseline_path = getattr(args, "local_baseline_audit", None)
+    local_baseline = read_json(local_baseline_path)
     upstream_baseline = read_json(getattr(args, "upstream_baseline_audit", None))
     parity = read_json(args.parity_report)
     backend = read_json(args.backend_gate)
@@ -580,8 +587,8 @@ def run_goal_audit(args) -> dict:
     score_sanity = read_json(getattr(args, "score_sanity", None))
     checks.append(
         check_official_baseline(
-            reproduction_path=args.reproduction_audit,
-            reproduction_payload=reproduction,
+            local_baseline_path=local_baseline_path,
+            local_baseline_payload=local_baseline,
             upstream_path=getattr(args, "upstream_baseline_audit", None),
             upstream_payload=upstream_baseline,
         )
@@ -640,7 +647,7 @@ def run_goal_audit(args) -> dict:
 
 def render_markdown(summary: dict) -> str:
     lines = [
-        "# RandOpt LoRA Goal Audit",
+        "# Optimus Goal Audit",
         "",
         f"Pass: `{str(summary['pass']).lower()}`",
         "",
@@ -670,7 +677,7 @@ def render_markdown(summary: dict) -> str:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Audit whether the end-to-end LoRA perturbation-search goal is met.")
-    parser.add_argument("--reproduction-audit", type=Path)
+    parser.add_argument("--local-baseline-audit", type=Path)
     parser.add_argument("--upstream-baseline-audit", type=Path)
     parser.add_argument("--parity-report", type=Path)
     parser.add_argument("--parity-arm", default="lora")

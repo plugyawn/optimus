@@ -1,7 +1,14 @@
-import types
 import unittest
+import types
 
-from randopt_lora_lab.backend_contract import backend_contract, contract_max_tokens, sampling_params_contract, tokenizer_contract, vllm_tokenizer_contract
+from optimus.serving.contracts import (
+    backend_contract,
+    contract_max_tokens,
+    sampling_params_contract,
+    tokenizer_contract,
+    vllm_tokenizer_contract,
+)
+from randopt_lora_lab.backend_contract import backend_contract as legacy_backend_contract
 
 
 class FakeTokenizer:
@@ -55,6 +62,9 @@ class NoTokenizerLLM:
 
 
 class BackendContractTests(unittest.TestCase):
+    def test_legacy_namespace_reexports_public_backend_contract(self):
+        self.assertIs(legacy_backend_contract, backend_contract)
+
     def test_tokenizer_contract_records_exact_prompt_ids_and_stop_ids(self):
         contract = tokenizer_contract(FakeTokenizer(), ["ab", "cd"])
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 
-ARTIFACTS = [
+OUTPUTS = [
     ("dense_summary", "dense/summary.json", ("preflight", "confirm"), "summary"),
     ("vllm_summary", "vllm/summary.json", ("preflight", "confirm"), "summary"),
     ("shortlist", "shortlist_top*.jsonl", ("preflight", "confirm"), "jsonl"),
@@ -56,7 +56,7 @@ def resolve_artifact_path(root: Path, relpath: str) -> Path | None:
     return matches[0] if matches else None
 
 
-def artifact_row(root: Path, name: str, relpath: str, required_modes: tuple[str, ...], pass_source: str) -> dict[str, Any]:
+def output_row(root: Path, name: str, relpath: str, required_modes: tuple[str, ...], pass_source: str) -> dict[str, Any]:
     path = resolve_artifact_path(root, relpath)
     row: dict[str, Any] = {
         "name": name,
@@ -102,22 +102,25 @@ def build_manifest(root: Path, *, mode: str = "auto") -> dict[str, Any]:
     resolved_mode = infer_mode(root) if mode == "auto" else mode
     if resolved_mode not in {"preflight", "confirm"}:
         raise ValueError(f"mode must be preflight, confirm, or auto; got {mode!r}")
-    artifacts = [artifact_row(root, *spec) for spec in ARTIFACTS]
-    required = [row for row in artifacts if resolved_mode in row["required_modes"]]
+    outputs = [output_row(root, *spec) for spec in OUTPUTS]
+    required = [row for row in outputs if resolved_mode in row["required_modes"]]
     missing_required = [row["name"] for row in required if not row["present"]]
     unreadable_required = [row["name"] for row in required if row["readable"] is False]
     failed_gates = [row["name"] for row in required if row["pass"] is False]
-    goal = next((row for row in artifacts if row["name"] == "current_goal_audit"), None)
+    goal = next((row for row in outputs if row["name"] == "current_goal_audit"), None)
+    outputs_complete = not missing_required and not unreadable_required
     return {
         "kind": "qproj_replay_manifest",
         "root": str(root),
         "mode": resolved_mode,
-        "artifact_complete": not missing_required and not unreadable_required,
+        "outputs_complete": outputs_complete,
+        "artifact_complete": outputs_complete,
         "method_pass": bool(goal and goal["pass"] is True),
         "missing_required": missing_required,
         "unreadable_required": unreadable_required,
         "failed_gates": failed_gates,
-        "artifacts": artifacts,
+        "outputs": outputs,
+        "artifacts": outputs,
     }
 
 
@@ -127,13 +130,13 @@ def render_markdown(summary: dict[str, Any]) -> str:
         "",
         f"Root: `{summary['root']}`",
         f"Mode: `{summary['mode']}`",
-        f"Artifact complete: `{str(summary['artifact_complete']).lower()}`",
+        f"Outputs complete: `{str(summary.get('outputs_complete', summary.get('artifact_complete'))).lower()}`",
         f"Method pass: `{str(summary['method_pass']).lower()}`",
         "",
-        "| artifact | present | pass | path | failed |",
+        "| output | present | pass | path | failed |",
         "| --- | ---: | ---: | --- | --- |",
     ]
-    for row in summary["artifacts"]:
+    for row in summary.get("outputs", summary.get("artifacts", [])):
         failed = "" if row["failed"] in (None, []) else json.dumps(row["failed"], sort_keys=True)
         lines.append(f"| {row['name']} | {row['present']} | {row['pass']} | `{row['relpath']}` | `{failed}` |")
     if summary["missing_required"]:
@@ -147,7 +150,7 @@ def render_markdown(summary: dict[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Summarize q-proj replay artifacts and gate status.")
+    parser = argparse.ArgumentParser(description="Summarize q-proj replay outputs and gate status.")
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--mode", choices=["auto", "preflight", "confirm"], default="auto")
@@ -163,3 +166,7 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+ARTIFACTS = OUTPUTS
+artifact_row = output_row

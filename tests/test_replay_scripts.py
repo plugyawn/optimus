@@ -5,22 +5,25 @@ import subprocess
 import sys
 
 
+ARCHIVE = Path("scripts/archive/experiments")
+
+
 def test_qproj_c2_replay_defaults_to_preflight_mode():
-    text = Path("scripts/run_qproj_c2_exact_replay.sh").read_text()
+    text = (ARCHIVE / "run_qproj_c2_exact_replay.sh").read_text()
 
     assert "MODE=${MODE:-preflight}" in text
     assert "export PREFLIGHT_ONLY=1" in text
     assert "MODE=confirm" in text
     assert "scripts/run_existing_vllm_shortlist_confirmation.sh" in text
     assert 'if [[ "$MODE" == "confirm" && "$RUN_GOAL_AUDIT" == "1" ]]' in text
-    assert 'QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh' in text
+    assert 'QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/archive/maintenance/run_current_goal_audit.sh' in text
     assert "randopt_lora_lab.score_sanity_audit" in text
     assert "randopt_lora_lab.replay_manifest" in text
     assert '--mode "$MODE"' in text
 
 
 def test_qproj_c2_replay_targets_saved_basis_shortlist():
-    text = Path("scripts/run_qproj_c2_exact_replay.sh").read_text()
+    text = (ARCHIVE / "run_qproj_c2_exact_replay.sh").read_text()
 
     assert "results/qproj_c2_vllm_shortlist_p64" in text
     assert "activation_spectral_lora_c2" in text
@@ -29,7 +32,7 @@ def test_qproj_c2_replay_targets_saved_basis_shortlist():
 
 
 def test_qproj_c2_corrected_confirmation_is_guarded_and_uses_healthy_prompts():
-    text = Path("scripts/run_qproj_c2_corrected_confirmation.sh").read_text()
+    text = (ARCHIVE / "run_qproj_c2_corrected_confirmation.sh").read_text()
 
     assert "MODE=${MODE:-preflight}" in text
     assert "MODE=confirm" in text
@@ -42,7 +45,7 @@ def test_qproj_c2_corrected_confirmation_is_guarded_and_uses_healthy_prompts():
     assert "VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID=${VLLM_REQUIRE_ALL_PROMPT_VARIANTS_VALID:-1}" in text
     assert "qproj_c2_corrected_confirmation_preflight" in text
     assert "preflight_summary.json" in text
-    assert 'QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/run_current_goal_audit.sh' in text
+    assert 'QPROJ_REPLAY_ROOT="$OUT_ROOT" OUT="$GOAL_AUDIT_OUT" scripts/archive/maintenance/run_current_goal_audit.sh' in text
     assert "current goal audit failed; continuing to replay manifest" in text
     assert "randopt_lora_lab.replay_manifest" in text
 
@@ -57,7 +60,7 @@ def test_qproj_c2_corrected_preflight_writes_summary(tmp_path):
     })
 
     result = subprocess.run(
-        ["bash", "scripts/run_qproj_c2_corrected_confirmation.sh"],
+        ["bash", str(ARCHIVE / "run_qproj_c2_corrected_confirmation.sh")],
         check=True,
         env=env,
         capture_output=True,
@@ -75,9 +78,9 @@ def test_qproj_c2_corrected_preflight_writes_summary(tmp_path):
 
 
 def test_current_goal_audit_script_is_non_gpu_and_dense_referenced():
-    text = Path("scripts/run_current_goal_audit.sh").read_text()
+    text = Path("scripts/archive/maintenance/run_current_goal_audit.sh").read_text()
 
-    assert "randopt_lora_lab.goal_audit" in text
+    assert "optimus.cli goal-audit" in text
     assert "results/current_goal_audit_current" in text
     assert "QPROJ_REPLAY_ROOT=${QPROJ_REPLAY_ROOT:-results/qproj_c2_vllm_shortlist_p64_default_reordered}" in text
     assert "DENSE_CONFIRMATION_GATE=${DENSE_CONFIRMATION_GATE:-$QPROJ_REPLAY_ROOT/shortlist_dense_confirmation/summary.json}" in text
@@ -91,7 +94,7 @@ def test_current_goal_audit_script_is_non_gpu_and_dense_referenced():
 
 
 def test_existing_replay_keeps_diagnostics_after_gate_failures():
-    text = Path("scripts/run_existing_vllm_shortlist_confirmation.sh").read_text()
+    text = (ARCHIVE / "run_existing_vllm_shortlist_confirmation.sh").read_text()
 
     assert "confirmed validity gate failed; continuing to write downstream diagnostics" in text
     assert "family-state provenance audit failed unexpectedly; continuing to search-quality diagnostics" in text
@@ -101,7 +104,7 @@ def test_existing_replay_keeps_diagnostics_after_gate_failures():
 
 
 def test_vllm_shortlist_confirmation_keeps_diagnostics_after_gate_failures():
-    text = Path("scripts/run_vllm_shortlist_confirmation.sh").read_text()
+    text = (ARCHIVE / "run_vllm_shortlist_confirmation.sh").read_text()
 
     assert "dense validity gate failed; continuing to write downstream diagnostics" in text
     assert "confirmed validity gate failed; continuing to write downstream diagnostics" in text
@@ -114,8 +117,8 @@ def test_vllm_shortlist_confirmation_keeps_diagnostics_after_gate_failures():
 
 def test_vllm_confirmation_wrappers_require_all_prompt_variants_valid_by_default():
     for path in [
-        Path("scripts/run_vllm_shortlist_confirmation.sh"),
-        Path("scripts/run_spectral_vllm_confirmation.sh"),
+        ARCHIVE / "run_vllm_shortlist_confirmation.sh",
+        ARCHIVE / "run_spectral_vllm_confirmation.sh",
     ]:
         text = path.read_text()
         assert "default,reordered,xml" not in text
@@ -125,7 +128,7 @@ def test_vllm_confirmation_wrappers_require_all_prompt_variants_valid_by_default
 
 
 def test_vllm_shortlist_confirmation_writes_quality_and_score_sanity_gates():
-    text = Path("scripts/run_vllm_shortlist_confirmation.sh").read_text()
+    text = (ARCHIVE / "run_vllm_shortlist_confirmation.sh").read_text()
 
     assert "RUN_SEARCH_QUALITY=${RUN_SEARCH_QUALITY:-1}" in text
     assert "RUN_SCORE_SANITY=${RUN_SCORE_SANITY:-1}" in text

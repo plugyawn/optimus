@@ -8,11 +8,11 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .aggregate_lora import build_aggregate_state, top_candidate_rows
-from .countdown import CountdownExample, load_examples, score_completion
+from optimus.search.aggregation import build_aggregate_state, top_candidate_rows
+from optimus.tasks.countdown import CountdownExample, load_examples, score_completion
 from .experiments import anzo_anchor_prompts, make_backend, parse_candidate_key, reset_outputs, tag_rows, write_jsonl
 from .lora_space import Candidate
-from .prompt_variants import (
+from optimus.tasks.prompt_variants import (
     PromptFn,
     compact_tagged_prompt,
     direct_tagged_prompt,

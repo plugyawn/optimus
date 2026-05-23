@@ -1,7 +1,10 @@
 [project]
-name = "randopt-lora-lab"
+name = "optimus"
 version = "0.1.0"
+description = "Zeroth-order LoRA search infrastructure for large language models."
+readme = "README.md"
 requires-python = ">=3.10"
+keywords = ["llm", "lora", "zeroth-order-optimization", "vllm"]
 dependencies = [
   "torch",
   "transformers>=4.48,<5",
@@ -17,8 +20,29 @@ dependencies = [
   "safetensors",
 ]
 
+[project.optional-dependencies]
+serving = [
+  "vllm",
+]
+dev = [
+  "pytest",
+  "tomli; python_version < '3.11'",
+]
+all = [
+  "vllm",
+  "pytest",
+  "tomli; python_version < '3.11'",
+]
+
+[project.scripts]
+optimus = "optimus.cli:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools.packages.find]
-include = ["randopt_lora_lab*"]
+include = ["optimus*"]
 
 [tool.pytest.ini_options]
 norecursedirs = ["external", "results", ".git", ".venv"]

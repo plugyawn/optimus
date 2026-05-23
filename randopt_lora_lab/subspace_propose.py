@@ -158,7 +158,7 @@ def run(args) -> dict:
         "Use with:",
         "",
         "```bash",
-        f"python -m randopt_lora_lab.vllm_lora_search --candidate-file {summary['candidate_file']} ...",
+        f"optimus vllm-search --candidate-file {summary['candidate_file']} ...",
         "```",
         "",
     ]

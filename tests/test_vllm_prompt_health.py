@@ -2,7 +2,7 @@ import json
 import unittest
 from argparse import Namespace
 
-from randopt_lora_lab.vllm_lora_search import require_all_prompt_variants_valid_or_raise
+from optimus.serving.search import require_all_prompt_variants_valid_or_raise
 
 
 def metrics(exact: float, *, malformed: float = 0.0, cap: float = 0.0) -> dict:

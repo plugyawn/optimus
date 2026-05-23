@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .countdown import CountdownExample, extract_numeric_vote, score_completion, voted_answer_exact
+from optimus.tasks.countdown import CountdownExample, extract_numeric_vote, score_completion, voted_answer_exact
 
 
 def read_jsonl(path: Path) -> list[dict]:

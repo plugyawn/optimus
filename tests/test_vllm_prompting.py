@@ -1,6 +1,7 @@
 import unittest
 
-from randopt_lora_lab.vllm_prompting import make_vllm_prompt_inputs
+from optimus.serving.prompting import make_vllm_prompt_inputs
+from randopt_lora_lab.vllm_prompting import make_vllm_prompt_inputs as legacy_make_vllm_prompt_inputs
 
 
 class FakeTokenizer:
@@ -22,6 +23,9 @@ def prompt_ids(prompt):
 
 
 class VllmPromptingTests(unittest.TestCase):
+    def test_legacy_namespace_reexports_public_prompt_input_builder(self):
+        self.assertIs(legacy_make_vllm_prompt_inputs, make_vllm_prompt_inputs)
+
     def test_text_mode_preserves_prompt_strings(self):
         prompts = ["ab", "cd"]
 

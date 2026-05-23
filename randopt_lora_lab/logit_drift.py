@@ -6,7 +6,8 @@ from pathlib import Path
 
 import torch
 
-from .countdown import load_examples
+from optimus.modeling.dense import normalize_dense_noise_mode
+from optimus.tasks.countdown import load_examples
 from .experiments import candidate_panel, make_backend, make_prompts_for_backend, maybe_build_family_state, parse_float_list, write_jsonl
 
 
@@ -82,7 +83,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
     parser.add_argument("--perturbation-backend", choices=["lora", "dense"], default="lora")
     parser.add_argument("--dense-snapshot-device", choices=["model", "cpu"], default="model")
-    parser.add_argument("--dense-noise-mode", choices=["canonical", "paper"], default="canonical")
+    parser.add_argument(
+        "--dense-noise-mode",
+        type=normalize_dense_noise_mode,
+        metavar="{canonical,upstream}",
+        default="canonical",
+        help="Dense perturbation RNG contract.",
+    )
     parser.add_argument("--stop-at-answer", action="store_true")
     parser.add_argument("--prompt-variant", default="default")
     parser.add_argument("--use-chat-template", action="store_true")
