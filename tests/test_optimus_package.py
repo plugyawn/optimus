@@ -31,6 +31,7 @@ def test_cli_exposes_professional_run_commands():
     assert resolve_command("validate-run") == "optimus.evaluation.validation"
     assert resolve_command("release-check") == "optimus.evaluation.release"
     assert resolve_command("lighteval") == "optimus.commands.lighteval"
+    assert resolve_command("lighteval-report") == "optimus.commands.lighteval_report"
     assert resolve_command("lighteval-sweep") == "optimus.commands.lighteval_sweep"
     assert resolve_command("peft-search") == "optimus.commands.peft_search"
     assert resolve_command("perturbation-panel") == "optimus.commands.perturbation_panel"
@@ -298,6 +299,7 @@ def test_evaluation_namespace_import_is_lightweight():
     )
 
     assert "lighteval_command" in result.stdout
+    assert "lighteval_report_main" in result.stdout
     assert "lighteval_sweep" in result.stdout
     assert "backend_parity_main" in result.stdout
     assert result.stderr == ""

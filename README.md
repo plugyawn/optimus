@@ -213,6 +213,11 @@ optimus lighteval \
 Plan a matched LightEval sweep for materialized population artifacts:
 
 ```bash
+optimus materialize-selected \
+  --root results/optimus_gpu_suite \
+  --out-root results/materialized \
+  --mode merged
+
 optimus lighteval-sweep \
   --backend vllm \
   --tasks ifeval \
@@ -222,6 +227,10 @@ optimus lighteval-sweep \
   --max-model-length 4096 \
   --out-root results/lighteval/population_sweep \
   --plan-out results/lighteval/population_sweep/plan.json
+
+optimus lighteval-report \
+  --root results/lighteval \
+  --out results/lighteval/report
 ```
 
 ## Evidence Rules

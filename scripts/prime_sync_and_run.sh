@@ -21,9 +21,9 @@ SSH_OPTIONS=${SSH_OPTIONS:-"-o StrictHostKeyChecking=accept-new"}
 REMOTE_CLEAN=${REMOTE_CLEAN:-0}
 
 case "$MODE" in
-  smoke|gpu-suite|lighteval-sweep) ;;
+  smoke|gpu-suite|lighteval-sweep|population-lighteval) ;;
   *)
-    echo "MODE must be smoke, gpu-suite, or lighteval-sweep, got $MODE" >&2
+    echo "MODE must be smoke, gpu-suite, lighteval-sweep, or population-lighteval, got $MODE" >&2
     exit 2
     ;;
 esac
@@ -72,8 +72,10 @@ if [[ "$MODE" == "smoke" ]]; then
   ssh $SSH_OPTIONS "$SSH_TARGET" "cd '$REMOTE_ROOT' && TENSOR_PARALLEL_SIZE='$TENSOR_PARALLEL_SIZE' bash scripts/remote/optimus_prime_smoke.sh"
 elif [[ "$MODE" == "gpu-suite" ]]; then
   ssh $SSH_OPTIONS "$SSH_TARGET" "cd '$REMOTE_ROOT' && TENSOR_PARALLEL_SIZE='$TENSOR_PARALLEL_SIZE' POPULATIONS='$POPULATIONS' bash scripts/remote/optimus_prime_gpu_suite.sh"
-else
+elif [[ "$MODE" == "lighteval-sweep" ]]; then
   ssh $SSH_OPTIONS "$SSH_TARGET" "cd '$REMOTE_ROOT' && TENSOR_PARALLEL_SIZE='$TENSOR_PARALLEL_SIZE' DATA_PARALLEL_SIZE='$DATA_PARALLEL_SIZE' POPULATIONS='$POPULATIONS' MODEL='$MODEL' MODEL_TEMPLATE='$MODEL_TEMPLATE' TASKS='$TASKS' bash scripts/remote/optimus_prime_lighteval_sweep.sh"
+else
+  ssh $SSH_OPTIONS "$SSH_TARGET" "cd '$REMOTE_ROOT' && TENSOR_PARALLEL_SIZE='$TENSOR_PARALLEL_SIZE' DATA_PARALLEL_SIZE='$DATA_PARALLEL_SIZE' POPULATIONS='$POPULATIONS' MODEL='$MODEL' TASKS='$TASKS' bash scripts/remote/optimus_prime_population_lighteval.sh"
 fi
 
 if [[ "$FETCH_RESULTS" == "1" ]]; then

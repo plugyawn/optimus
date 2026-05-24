@@ -98,7 +98,7 @@ if [[ "${OPTIMUS_INSTALL_FLASH_ATTN:-0}" == "1" ]]; then
   fi
 fi
 
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,eval]"
 python -m pip install --upgrade "${OPTIMUS_TRANSFORMERS_PACKAGE:-transformers>=4.51,<5}"
 optimus --help >/dev/null
 find optimus -name '._*' -delete

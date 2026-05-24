@@ -7,6 +7,7 @@ __all__ = [
     "check_run",
     "gpu_suite_contracts",
     "lighteval_command",
+    "lighteval_report_main",
     "lighteval_sweep",
     "release_summary",
 ]
@@ -25,6 +26,10 @@ def __getattr__(name: str):
         from .lighteval import build_sweep
 
         return build_sweep
+    if name == "lighteval_report_main":
+        from .lighteval_report import main
+
+        return main
     if name in {"RunCheck", "RunContract", "check_run", "gpu_suite_contracts"}:
         from . import validation
 

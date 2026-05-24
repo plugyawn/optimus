@@ -198,6 +198,20 @@ def test_plan_payload_respects_full_config_surface(tmp_path: Path):
     assert "q_proj,k_proj,v_proj,o_proj" in search["command"]
 
 
+def test_plan_payload_can_keep_search_adapters_for_external_eval(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        populations=(128,),
+        keep_adapters=True,
+        run_halving=False,
+    )
+
+    search = next(run for run in plan_payload(config)["runs"] if run["kind"] == "search")
+
+    assert "--keep-adapters" in search["command"]
+
+
 def test_halving_plan_uses_full_search_reference_for_regret_metrics(tmp_path: Path):
     config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems")
     halving = next(run for run in plan_payload(config)["runs"] if run["kind"] == "halving")

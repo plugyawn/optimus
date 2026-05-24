@@ -9,8 +9,12 @@ SCRIPTS = [
     Path("scripts/remote/optimus_prime_bootstrap.sh"),
     Path("scripts/remote/optimus_prime_smoke.sh"),
     Path("scripts/remote/optimus_prime_gpu_suite.sh"),
+    Path("scripts/remote/optimus_prime_lighteval_sweep.sh"),
+    Path("scripts/remote/optimus_prime_population_lighteval.sh"),
     Path("scripts/run_backend_parity_gate.sh"),
+    Path("scripts/run_lighteval_population_sweep.sh"),
     Path("scripts/run_optimus_gpu_suite.sh"),
+    Path("scripts/run_population_lighteval_pipeline.sh"),
 ]
 
 
@@ -22,7 +26,7 @@ def test_prime_scripts_parse_as_bash():
 def test_prime_bootstrap_installs_declared_dev_extra():
     text = Path("scripts/remote/optimus_prime_bootstrap.sh").read_text()
 
-    assert 'python -m pip install -e ".[dev]"' in text
+    assert 'python -m pip install -e ".[dev,eval]"' in text
     assert "python -m pip install pytest" not in text
 
 
@@ -34,6 +38,17 @@ def test_gpu_suite_launcher_delegates_execution_to_optimus_runner():
     assert "--execution-log \"$OUT_ROOT/execution.json\"" in text
     assert "run_bench()" not in text
     assert "run_search()" not in text
+
+
+def test_population_lighteval_pipeline_closes_eval_loop():
+    text = Path("scripts/run_population_lighteval_pipeline.sh").read_text()
+
+    assert "scripts/run_optimus_gpu_suite.sh" in text
+    assert "optimus materialize-selected" in text
+    assert "optimus lighteval " in text
+    assert "optimus lighteval-sweep" in text
+    assert "optimus lighteval-report" in text
+    assert "KEEP_ADAPTERS=${KEEP_ADAPTERS:-1}" in text
 
 
 def test_backend_parity_launcher_uses_supported_cli_commands():

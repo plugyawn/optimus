@@ -36,6 +36,7 @@ class GpuSuiteConfig:
     enable_chunked_prefill: bool | None = None
     kv_cache_dtype: str = ""
     vllm_kwargs: tuple[str, ...] = ()
+    keep_adapters: bool = False
     bench_adapters: tuple[int, ...] = (8, 16, 32)
     halving_population: int = 1024
     halving_stage_prompts: int = 8
@@ -109,7 +110,7 @@ def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int
         str(config.max_new_tokens),
         "--stop-at-answer",
         "--antithetic",
-    ] + _vllm_runtime_args(config)
+    ] + _vllm_runtime_args(config) + _search_artifact_args(config)
 
 
 def _vllm_runtime_args(config: GpuSuiteConfig) -> list[str]:
@@ -123,6 +124,10 @@ def _vllm_runtime_args(config: GpuSuiteConfig) -> list[str]:
     for item in config.vllm_kwargs:
         args.extend(["--vllm-kwarg", item])
     return args
+
+
+def _search_artifact_args(config: GpuSuiteConfig) -> list[str]:
+    return ["--keep-adapters"] if config.keep_adapters else []
 
 
 def search_identity(config: GpuSuiteConfig, population: int) -> dict[str, Any]:
@@ -479,6 +484,7 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--enable-chunked-prefill", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--kv-cache-dtype", default="")
     parser.add_argument("--vllm-kwarg", action="append", default=[], help="Extra vLLM LLM() kwarg as KEY=VALUE.")
+    parser.add_argument("--keep-adapters", action="store_true")
     parser.add_argument("--bench-adapters", default="8,16,32")
     parser.add_argument("--halving-population", type=int, default=1024)
     parser.add_argument("--halving-stage-prompts", type=int, default=8)
@@ -509,6 +515,7 @@ def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:
         enable_chunked_prefill=args.enable_chunked_prefill,
         kv_cache_dtype=args.kv_cache_dtype,
         vllm_kwargs=tuple(args.vllm_kwarg),
+        keep_adapters=args.keep_adapters,
         bench_adapters=parse_int_tuple(args.bench_adapters),
         halving_population=args.halving_population,
         halving_stage_prompts=args.halving_stage_prompts,

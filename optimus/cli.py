@@ -9,8 +9,10 @@ from collections.abc import Sequence
 SUPPORTED_COMMANDS: dict[str, str] = {
     "backend-parity-gate": "optimus.commands.backend_parity_gate",
     "lighteval": "optimus.commands.lighteval",
+    "lighteval-report": "optimus.commands.lighteval_report",
     "lighteval-sweep": "optimus.commands.lighteval_sweep",
     "make-countdown-data": "optimus.commands.make_countdown_data",
+    "materialize-selected": "optimus.commands.materialize_selected",
     "peft-search": "optimus.commands.peft_search",
     "perturbation-panel": "optimus.commands.perturbation_panel",
     "release-check": "optimus.evaluation.release",

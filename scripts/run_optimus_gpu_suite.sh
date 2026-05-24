@@ -20,6 +20,7 @@ TENSOR_PARALLEL_SIZE=${TENSOR_PARALLEL_SIZE:-1}
 SYSTEMS_OUT=${SYSTEMS_OUT:-results/report/optimus_systems}
 BENCH_ADAPTERS=${BENCH_ADAPTERS:-8,16,32}
 RUN_HALVING=${RUN_HALVING:-1}
+KEEP_ADAPTERS=${KEEP_ADAPTERS:-0}
 
 export PYTHONUNBUFFERED=1
 export VLLM_USAGE_STATS_ENABLED=${VLLM_USAGE_STATS_ENABLED:-0}
@@ -34,6 +35,10 @@ mkdir -p "$OUT_ROOT" "$SYSTEMS_OUT" "$XDG_CONFIG_HOME"
 halving_arg=()
 if [[ "$RUN_HALVING" != "1" ]]; then
   halving_arg=(--skip-halving)
+fi
+artifact_arg=()
+if [[ "$KEEP_ADAPTERS" == "1" ]]; then
+  artifact_arg=(--keep-adapters)
 fi
 
 vllm_runtime_args=()
@@ -72,6 +77,7 @@ optimus run-plan \
   --tensor-parallel-size "$TENSOR_PARALLEL_SIZE" \
   --bench-adapters "$BENCH_ADAPTERS" \
   "${vllm_runtime_args[@]}" \
+  "${artifact_arg[@]}" \
   "${halving_arg[@]}" \
   --out "$OUT_ROOT/plan.json"
 
@@ -95,6 +101,7 @@ optimus run-suite \
   --tensor-parallel-size "$TENSOR_PARALLEL_SIZE" \
   --bench-adapters "$BENCH_ADAPTERS" \
   "${vllm_runtime_args[@]}" \
+  "${artifact_arg[@]}" \
   "${halving_arg[@]}" \
   --execution-log "$OUT_ROOT/execution.json"
 
