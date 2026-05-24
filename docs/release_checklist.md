@@ -23,10 +23,10 @@ repository, not the old experiment-lab repository.
 
 - The installed package name is `optimus`.
 - The public CLI is `optimus`.
-- Public docs and examples do not instruct users to import or run
-  `randopt_lora_lab`.
-- Historical experiment modules, if still present in the source checkout, are
-  excluded from the published package and Optimus CLI.
+- Public docs and examples use the `optimus` package and CLI only.
+- The checkout has no top-level old experiment source namespace.
+- Historical run outputs are not tracked under `results/`; curated report
+  artifacts live under `docs/reports/`.
 
 ## Evidence Gates
 
@@ -50,7 +50,7 @@ repository, not the old experiment-lab repository.
 
 ## Upstream
 
-- Target the GitHub repository presented as `optimus`, not `randopt-lora-lab`.
+- Target the GitHub repository presented as `optimus`.
 - Push the final branch to the Optimus repository only after the package/docs
   identity checks pass.
 - Do not publish the old experiment-lab identity as the community-facing repo.

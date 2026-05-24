@@ -22,7 +22,6 @@ from .selection import (
 
 __all__ = [
     "SearchCandidate",
-    "aggregate_lora_tensors",
     "anzo_anchor_prompts",
     "base_protocol_valid",
     "candidate_panel",
@@ -32,7 +31,6 @@ __all__ = [
     "enrich_condition_rows",
     "filter_condition_rows_by_variants",
     "majority_vote_evaluation",
-    "normalized_weights",
     "parse_float_list",
     "parse_k_list",
     "parse_ratio_list",
@@ -43,7 +41,6 @@ __all__ = [
     "protocol_valid_variants",
     "run_adaptive_search",
     "run_peft_search",
-    "top_candidate_rows",
 ]
 
 
@@ -57,11 +54,3 @@ def run_peft_search(*args, **kwargs):
     from .peft import run_search
 
     return run_search(*args, **kwargs)
-
-
-def __getattr__(name: str):
-    if name in {"aggregate_lora_tensors", "normalized_weights", "top_candidate_rows"}:
-        from . import aggregation
-
-        return getattr(aggregation, name)
-    raise AttributeError(name)

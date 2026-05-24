@@ -56,7 +56,7 @@ class BackendParityGateTests(unittest.TestCase):
 
             resolved = resolve_adapter_model_path(
                 candidate,
-                {"path": "/root/randopt-lora-lab/results/run/vllm/adapters/00000_remote_name"},
+                {"path": "/root/old-project/results/run/vllm/adapters/00000_remote_name"},
             )
 
             self.assertEqual(resolved, adapter / "adapter_model.safetensors")

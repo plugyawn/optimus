@@ -24,12 +24,16 @@ dependencies = [
 serving = [
   "vllm",
 ]
+eval = [
+  "lighteval>=0.13",
+]
 dev = [
   "pytest",
   "tomli; python_version < '3.11'",
 ]
 all = [
   "vllm",
+  "lighteval>=0.13",
   "pytest",
   "tomli; python_version < '3.11'",
 ]

@@ -5,11 +5,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from optimus.evaluation.release import build_release_checks, summary
+from optimus.evaluation.release import FORBIDDEN_PACKAGE, FORBIDDEN_REPO, build_release_checks, summary
 
 
-def write_minimal_release_tree(root: Path, *, include_legacy_package: bool = False) -> tuple[Path, Path]:
-    package_include = '["optimus*", "randopt_lora_lab*"]' if include_legacy_package else '["optimus*"]'
+def write_minimal_release_tree(root: Path, *, include_old_package: bool = False) -> tuple[Path, Path]:
+    package_include = f'["optimus*", "{FORBIDDEN_PACKAGE}*"]' if include_old_package else '["optimus*"]'
     (root / "pyproject.toml").write_text(
         f"""
 [project]
@@ -85,8 +85,8 @@ def test_release_check_passes_clean_optimus_tree(tmp_path: Path):
     assert payload["pass"] is True
 
 
-def test_release_check_flags_legacy_package_and_old_remote(tmp_path: Path):
-    gpu, systems = write_minimal_release_tree(tmp_path, include_legacy_package=True)
+def test_release_check_flags_old_package_and_old_remote(tmp_path: Path):
+    gpu, systems = write_minimal_release_tree(tmp_path, include_old_package=True)
 
     checks = build_release_checks(
         root=tmp_path,
@@ -95,14 +95,39 @@ def test_release_check_flags_legacy_package_and_old_remote(tmp_path: Path):
         populations=(1024, 4096),
         bench_adapters=(8,),
         run_halving=False,
-        remote="https://github.com/plugyawn/randopt-lora-lab.git",
+        remote=f"https://github.com/plugyawn/{FORBIDDEN_REPO}.git",
     )
     payload = summary(checks)
     failed = {check["name"] for check in payload["checks"] if not check["passed"]}
 
     assert payload["pass"] is False
-    assert "published_package_excludes_legacy_namespace" in failed
+    assert "published_package_excludes_old_namespace" in failed
     assert "github_remote_is_optimus" in failed
+
+
+def test_release_check_flags_old_root_shape(tmp_path: Path):
+    gpu, systems = write_minimal_release_tree(tmp_path)
+    old_namespace = tmp_path / FORBIDDEN_PACKAGE
+    old_namespace.mkdir()
+    (old_namespace / "__init__.py").write_text("")
+    archive = tmp_path / "docs" / "archive"
+    archive.mkdir()
+
+    checks = build_release_checks(
+        root=tmp_path,
+        systems_out=systems,
+        gpu_root=gpu,
+        populations=(1024, 4096),
+        bench_adapters=(8,),
+        run_halving=False,
+        remote="https://github.com/plugyawn/optimus.git",
+    )
+    payload = summary(checks)
+    failed = {check["name"] for check in payload["checks"] if not check["passed"]}
+
+    assert payload["pass"] is False
+    assert "repo_has_no_top_level_old_namespace" in failed
+    assert "repo_has_no_archive_experiment_tree" in failed
 
 
 def test_release_check_cli_is_lightweight(tmp_path: Path):

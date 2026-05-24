@@ -26,14 +26,15 @@ trusted confirmation, and run reporting.
 | `optimus vllm-bench` | Measure adapter materialization and adapter-swapping throughput. |
 | `optimus peft-search` | Run trusted HF/PEFT candidate evaluation. |
 | `optimus backend-parity-gate` | Gate vLLM selector trust against trusted outputs. |
+| `optimus lighteval` | Plan or run a LightEval job for standard or custom-task confirmation. |
 | `optimus systems-report` | Build plot inputs and throughput/quality PNGs from result directories. |
 | `optimus run-plan` | Serialize the normalized P1024/P4096 GPU-suite plan. |
 | `optimus run-suite` | Execute the normalized GPU-suite plan and write an execution log. |
 | `optimus validate-run` | Validate that required GPU-suite outputs are present. |
 | `optimus release-check` | Check package identity, public docs, report semantics, GPU artifact completeness, pod-ledger cleanup, and final GitHub remote identity. |
 
-Historical experiment commands remain in the source checkout for migration
-work, but they are not exported by the Optimus CLI or published package.
+Historical experiment commands are not part of the supported source tree,
+Optimus CLI, or published package.
 
 ## Report Semantics
 

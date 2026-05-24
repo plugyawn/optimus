@@ -12,8 +12,8 @@ from optimus.evaluation.validation import check_run, gpu_suite_contracts, summar
 from optimus.runs.gpu_suite import GpuSuiteConfig, parse_int_tuple
 
 
-LEGACY_PACKAGE = "randopt_" + "lora_lab"
-LEGACY_REPO = "randopt-" + "lora-lab"
+FORBIDDEN_PACKAGE = "randopt_" + "lora_lab"
+FORBIDDEN_REPO = "randopt-" + "lora-lab"
 
 
 @dataclass(frozen=True)
@@ -67,8 +67,8 @@ def pyproject_checks(root: Path) -> list[ReleaseCheck]:
             f"include={package_includes!r}",
         ),
         ReleaseCheck(
-            "published_package_excludes_legacy_namespace",
-            f"{LEGACY_PACKAGE}*" not in package_includes,
+            "published_package_excludes_old_namespace",
+            f"{FORBIDDEN_PACKAGE}*" not in package_includes,
             f"include={package_includes!r}",
         ),
     ]
@@ -86,10 +86,10 @@ def public_doc_checks(root: Path) -> list[ReleaseCheck]:
     missing = [str(path.relative_to(root)) for path in docs if not path.exists()]
     leaked: list[str] = []
     bad_patterns = [
-        rf"python\s+-m\s+{LEGACY_PACKAGE}",
-        rf"\bfrom\s+{LEGACY_PACKAGE}\b",
-        rf"\bimport\s+{LEGACY_PACKAGE}\b",
-        rf"github\.com/[^ \n]*/{LEGACY_REPO}",
+        rf"python\s+-m\s+{FORBIDDEN_PACKAGE}",
+        rf"\bfrom\s+{FORBIDDEN_PACKAGE}\b",
+        rf"\bimport\s+{FORBIDDEN_PACKAGE}\b",
+        rf"github\.com/[^ \n]*/{FORBIDDEN_REPO}",
     ]
     for path in docs:
         if not path.exists():
@@ -105,9 +105,9 @@ def public_doc_checks(root: Path) -> list[ReleaseCheck]:
             "all required docs present" if not missing else f"missing={missing!r}",
         ),
         ReleaseCheck(
-            "public_docs_do_not_promote_legacy_namespace",
+            "public_docs_do_not_promote_old_namespace",
             not leaked,
-            "no legacy command/import examples" if not leaked else f"matches={leaked!r}",
+            "no old command/import examples" if not leaked else f"matches={leaked!r}",
         ),
     ]
 
@@ -119,14 +119,48 @@ def package_code_checks(root: Path) -> list[ReleaseCheck]:
     leaked = []
     for path in sorted(package_root.rglob("*.py")):
         text = path.read_text()
-        if LEGACY_PACKAGE in text or LEGACY_REPO in text:
+        if FORBIDDEN_PACKAGE in text or FORBIDDEN_REPO in text:
             leaked.append(str(path.relative_to(root)))
     return [
         ReleaseCheck("optimus_package_source_present", True, str(package_root)),
         ReleaseCheck(
-            "optimus_package_does_not_reference_legacy_namespace",
+            "optimus_package_does_not_reference_old_namespace",
             not leaked,
-            "no legacy namespace references" if not leaked else f"files={leaked!r}",
+            "no old namespace references" if not leaked else f"files={leaked!r}",
+        ),
+    ]
+
+
+def repo_structure_checks(root: Path) -> list[ReleaseCheck]:
+    old_namespace_py = sorted(str(path.relative_to(root)) for path in (root / FORBIDDEN_PACKAGE).glob("*.py"))
+    docs_archive = root / "docs" / "archive"
+    scripts_archive = root / "scripts" / "archive"
+    tracked_results: list[str] = []
+    if (root / ".git").exists():
+        result = subprocess.run(
+            ["git", "ls-files", "results"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            tracked_results = [line for line in result.stdout.splitlines() if line.strip()]
+    return [
+        ReleaseCheck(
+            "repo_has_no_top_level_old_namespace",
+            not old_namespace_py,
+            "no top-level old-namespace Python files" if not old_namespace_py else f"files={old_namespace_py[:8]!r}",
+        ),
+        ReleaseCheck(
+            "repo_has_no_tracked_results",
+            not tracked_results,
+            "no tracked raw result files" if not tracked_results else f"files={tracked_results[:8]!r}",
+        ),
+        ReleaseCheck(
+            "repo_has_no_archive_experiment_tree",
+            not docs_archive.exists() and not scripts_archive.exists(),
+            "no public archive experiment tree" if not docs_archive.exists() and not scripts_archive.exists() else "archive experiment tree present",
         ),
     ]
 
@@ -146,7 +180,7 @@ def remote_check(root: Path, url: str | None) -> ReleaseCheck:
     actual = url if url is not None else remote_url(root)
     lowered = actual.lower()
     last_path = lowered.rstrip("/").removesuffix(".git").split("/")[-1]
-    passed = bool(actual) and last_path == "optimus" and LEGACY_REPO not in lowered
+    passed = bool(actual) and last_path == "optimus" and FORBIDDEN_REPO not in lowered
     detail = f"origin={actual!r}" if actual else "origin remote not found"
     return ReleaseCheck("github_remote_is_optimus", passed, detail)
 
@@ -250,6 +284,7 @@ def build_release_checks(
     checks.extend(pyproject_checks(root))
     checks.extend(public_doc_checks(root))
     checks.extend(package_code_checks(root))
+    checks.extend(repo_structure_checks(root))
     checks.append(remote_check(root, remote))
     checks.extend(systems_report_checks(systems_out))
     checks.extend(gpu_artifact_checks(gpu_root, systems_out, populations, bench_adapters, run_halving))

@@ -37,6 +37,18 @@ For vLLM serving work:
 python -m pip install -e ".[serving]"
 ```
 
+For LightEval-backed confirmation:
+
+```bash
+python -m pip install -e ".[eval]"
+```
+
+For LightEval confirmation through the vLLM backend:
+
+```bash
+python -m pip install -e ".[eval,serving]"
+```
+
 For local development:
 
 ```bash
@@ -145,6 +157,18 @@ optimus release-check \
   --strict
 ```
 
+Plan a LightEval confirmation run:
+
+```bash
+optimus lighteval \
+  --backend vllm \
+  --model Qwen/Qwen2.5-3B-Instruct \
+  --tensor-parallel-size 4 \
+  --tasks ifeval \
+  --out results/lighteval/ifeval_qwen25_3b \
+  --plan-out results/lighteval/ifeval_qwen25_3b/plan.json
+```
+
 ## Evidence Rules
 
 Quality claims require:
@@ -154,7 +178,8 @@ Quality claims require:
 - Exact-answer, malformed, cap-hit, and answer-closure rates reported separately.
 - Prompt-robust selection when prompt variants are part of the claim.
 - vLLM selection only after adapter tensor checks and ranking/output parity pass.
-- Dense-reference or HF/PEFT confirmation for promoted candidates.
+- Dense-reference, HF/PEFT, or LightEval-backed confirmation for promoted
+  candidates.
 - Clear separation between prompt-local lift, heldout lift vs base, and
   dense-Gaussian parity.
 

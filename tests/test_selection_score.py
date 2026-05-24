@@ -7,13 +7,9 @@ from optimus.search.selection import (
     parse_prompt_variants,
     protocol_valid_variants,
 )
-from randopt_lora_lab.selection_score import combine_candidate_conditions as legacy_combine_candidate_conditions
 
 
 class SelectionScoreTests(unittest.TestCase):
-    def test_legacy_namespace_reexports_public_condition_combiner(self):
-        self.assertIs(legacy_combine_candidate_conditions, combine_candidate_conditions)
-
     def test_parse_prompt_variants_defaults(self):
         self.assertEqual(parse_prompt_variants(""), ["default"])
         self.assertEqual(parse_prompt_variants("default,reordered"), ["default", "reordered"])

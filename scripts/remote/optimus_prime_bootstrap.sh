@@ -79,14 +79,8 @@ fi
 python -m pip install -e ".[dev]"
 python -m pip install --upgrade "${OPTIMUS_TRANSFORMERS_PACKAGE:-transformers==4.51.3}"
 optimus --help >/dev/null
-compile_dirs=()
-for source_dir in optimus randopt_lora_lab; do
-  if [[ -d "$source_dir" ]]; then
-    find "$source_dir" -name '._*' -delete
-    compile_dirs+=("$source_dir")
-  fi
-done
-python -m compileall -q "${compile_dirs[@]}"
+find optimus -name '._*' -delete
+python -m compileall -q optimus
 
 if command -v nvidia-smi >/dev/null 2>&1; then
   nvidia-smi

@@ -34,10 +34,7 @@ def read_summary(path: Path) -> dict:
 
 
 def systems_summaries(root: Path) -> list[dict]:
-    patterns = [
-        "phase8*/**/summary.json",
-        "optimus*/**/summary.json",
-    ]
+    patterns = ["optimus*/**/summary.json"]
     paths = []
     seen = set()
     for pattern in patterns:
@@ -47,14 +44,6 @@ def systems_summaries(root: Path) -> list[dict]:
             seen.add(path)
             paths.append(path)
     return [read_summary(path) for path in paths]
-
-
-def legacy_systems_summaries(root: Path) -> list[dict]:
-    return systems_summaries(root)
-
-
-phase8_summaries = legacy_systems_summaries
-
 
 def csv_write(path: Path, rows: list[dict], columns: list[str]) -> None:
     with path.open("w", newline="") as f:
@@ -192,16 +181,6 @@ def quality_rows(rows: list[dict]) -> list[dict]:
                 "promoted_holdout_oracle_delta_vs_base": None
                 if promoted_holdout_oracle_exact is None
                 else promoted_holdout_oracle_exact - as_float(base_holdout_exact),
-                # Backward-compatible aliases for older plot consumers. New reports should use
-                # the explicit screen-selected and holdout-oracle names above.
-                "best_screen_exact": screen_selected_exact,
-                "best_holdout_exact": promoted_holdout_oracle_exact,
-                "screen_delta_vs_base": None
-                if screen_selected_exact is None
-                else screen_selected_exact - as_float(base_screen_exact),
-                "holdout_delta_vs_base": None
-                if promoted_holdout_oracle_exact is None
-                else promoted_holdout_oracle_exact - as_float(base_holdout_exact),
                 "best_ensemble_holdout_exact": row.get("best_ensemble_holdout_exact"),
                 "best_strict_ensemble_holdout_exact": row.get("best_strict_ensemble_holdout_exact"),
                 "candidate_sec": row.get("candidate_sec"),
@@ -246,22 +225,23 @@ def best_of_n_rows(full: list[dict]) -> list[dict]:
 def parity_rows(rows: list[dict]) -> list[dict]:
     out = []
     for row in rows:
-        if row.get("kind") != "backend_parity":
+        if row.get("kind") != "backend_parity_gate":
             continue
+        ranking = row.get("ranking") or {}
         out.append(
             {
                 "suite": row["suite"],
                 "run": row["run"],
-                "trusted_name": row.get("trusted_name"),
-                "candidate_name": row.get("candidate_name"),
-                "n_common": row.get("n_common"),
-                "spearman": row.get("spearman"),
-                "top8_overlap": row.get("top8_overlap"),
-                "top8_possible": row.get("top8_possible"),
-                "selected_regret_vs_trusted": row.get("selected_regret_vs_trusted"),
+                "trusted_name": row.get("trusted_name") or ranking.get("trusted_name"),
+                "candidate_name": row.get("candidate_name") or ranking.get("candidate_name"),
+                "n_common": ranking.get("n_common"),
+                "spearman": ranking.get("spearman"),
+                "top8_overlap": ranking.get("top8_overlap"),
+                "top8_possible": ranking.get("top8_possible"),
+                "selected_regret_vs_trusted": ranking.get("selected_regret_vs_trusted"),
                 "pass": row.get("pass"),
-                "trusted_best_candidate": row.get("trusted_best_candidate"),
-                "candidate_best_candidate": row.get("candidate_best_candidate"),
+                "trusted_best_candidate": ranking.get("trusted_best_candidate"),
+                "candidate_best_candidate": ranking.get("candidate_best_candidate"),
             }
         )
     return sorted(out, key=lambda r: (str(r.get("suite")), str(r.get("run"))))
@@ -304,10 +284,7 @@ def plot_full_search(path: Path, rows: list[dict]) -> None:
         and row.get("max_new_tokens") in {16, 32}
         and row.get("screen_prompts") in {64, 128}
     ][:18]
-    labels = [
-        f"{row['suite'].replace('phase8_', '')}/{row['run'].replace('search_', '')}"
-        for row in selected
-    ]
+    labels = [f"{row['suite']}/{row['run'].replace('search_', '')}" for row in selected]
     values = [row.get("candidate_sec") or 0.0 for row in selected]
     fig, ax = plt.subplots(figsize=(11, max(4, 0.38 * len(selected))))
     ax.barh(range(len(selected)), values, color="#2f6f73")
@@ -362,10 +339,7 @@ def plot_token_throughput(path: Path, rows: list[dict]) -> None:
         and row.get("screen_prompts") in {64, 128}
         and (row.get("screen_tokens_per_sec") is not None or row.get("best_tokens_per_sec") is not None)
     ][:18]
-    labels = [
-        f"{row['suite'].replace('phase8_', '')}/{row['run'].replace('search_', '')}/tp{row.get('tensor_parallel_size') or 1}"
-        for row in selected
-    ]
+    labels = [f"{row['suite']}/{row['run'].replace('search_', '')}/tp{row.get('tensor_parallel_size') or 1}" for row in selected]
     screen_values = [row.get("screen_tokens_per_sec") or 0.0 for row in selected]
     best_values = [row.get("best_tokens_per_sec") or 0.0 for row in selected]
     fig, ax = plt.subplots(figsize=(11, max(4, 0.42 * len(selected))))

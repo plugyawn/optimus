@@ -14,6 +14,7 @@ except ModuleNotFoundError:  # Python 3.10
 from optimus import __version__
 from optimus.cli import resolve_command
 from optimus.core.candidates import SearchCandidate, parse_candidate_key
+from optimus.evaluation.release import FORBIDDEN_PACKAGE
 from optimus.modeling.qwen import qwen_lora_shapes
 
 
@@ -29,11 +30,12 @@ def test_cli_exposes_professional_run_commands():
     assert resolve_command("run-plan") == "optimus.runs.gpu_suite"
     assert resolve_command("validate-run") == "optimus.evaluation.validation"
     assert resolve_command("release-check") == "optimus.evaluation.release"
+    assert resolve_command("lighteval") == "optimus.commands.lighteval"
     assert resolve_command("peft-search") == "optimus.commands.peft_search"
     assert resolve_command("run-suite") == "optimus.runs.gpu_suite_runner"
 
 
-def test_cli_does_not_resolve_source_only_legacy_commands():
+def test_cli_does_not_resolve_unsupported_commands():
     for command in ["upstream-baseline-audit", "multirun-gate", "prompt-robustness", "score-sanity-audit"]:
         try:
             resolve_command(command)
@@ -48,13 +50,13 @@ def test_cli_command_modules_stay_under_optimus_namespace():
         assert module.startswith("optimus."), (command, module)
 
 
-def test_supported_command_wrappers_do_not_call_legacy_modules():
+def test_supported_command_wrappers_do_not_call_old_modules():
     supported = resolve_command.__globals__["SUPPORTED_COMMANDS"]
     for command, module_name in supported.items():
         spec = importlib.util.find_spec(module_name)
         assert spec is not None and spec.origin is not None, (command, module_name)
         source = Path(spec.origin).read_text()
-        assert "randopt_lora_lab" not in source, (command, module_name)
+        assert FORBIDDEN_PACKAGE not in source, (command, module_name)
 
 
 def test_no_generic_experiment_command_module_is_packaged():
@@ -65,6 +67,7 @@ def test_pyproject_declares_serving_and_dev_extras():
     pyproject = tomllib.loads(Path("pyproject.toml").read_text())
     extras = pyproject["project"]["optional-dependencies"]
     assert "vllm" in extras["serving"]
+    assert any(dep.startswith("lighteval") for dep in extras["eval"])
     assert "pytest" in extras["dev"]
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
     assert pyproject["tool"]["setuptools"]["packages"]["find"]["include"] == ["optimus*"]
@@ -107,25 +110,10 @@ def test_peft_search_help_is_lightweight_and_optimus_owned():
     assert "usage: optimus peft-search" in result.stdout
     assert "PyTorch" not in result.stderr
     assert "NumPy" not in result.stderr
-    assert "randopt_lora_lab" not in result.stdout
+    assert FORBIDDEN_PACKAGE not in result.stdout
 
 
-def test_peft_search_driver_implementation_is_optimus_owned():
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "from optimus.search.peft import run_search; from randopt_lora_lab.experiments import run_search as legacy; print(run_search.__module__, run_search is legacy)",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    assert "optimus.search.peft True" in result.stdout
-
-
-def test_source_only_legacy_command_is_not_available_through_cli():
+def test_unsupported_command_is_not_available_through_cli():
     result = subprocess.run(
         [sys.executable, "-m", "optimus.cli", "prompt-robustness", "--help"],
         capture_output=True,
@@ -136,7 +124,7 @@ def test_source_only_legacy_command_is_not_available_through_cli():
     assert "unknown Optimus command" in result.stderr
 
 
-def test_public_cli_does_not_expose_legacy_experiment_catchall():
+def test_public_cli_does_not_expose_experiment_catchall():
     result = subprocess.run(
         [sys.executable, "-m", "optimus.cli", "--help"],
         check=True,
@@ -196,36 +184,6 @@ def test_lora_modeling_metadata_import_is_lightweight():
     assert result.stderr == ""
 
 
-def test_lora_noise_implementation_is_optimus_owned():
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "from optimus.modeling.noise import lora_noise_tensors; from randopt_lora_lab.lora_space import lora_noise_tensors as legacy; print(lora_noise_tensors.__module__, lora_noise_tensors is legacy)",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    assert "optimus.modeling.noise True" in result.stdout
-
-
-def test_transformers_backend_implementation_is_optimus_owned():
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "from optimus.serving.transformers import visible_token_count; from randopt_lora_lab.backends import visible_token_count as legacy; print(visible_token_count.__module__, visible_token_count is legacy)",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    assert "optimus.serving.transformers True" in result.stdout
-
-
 def test_serving_namespace_import_is_lightweight():
     result = subprocess.run(
         [sys.executable, "-c", "import optimus.serving; print(optimus.serving.__all__)"],
@@ -268,39 +226,39 @@ def test_serving_runtime_helpers_import_from_public_namespace():
 
 def test_vllm_search_driver_import_is_metadata_lightweight():
     result = subprocess.run(
-        [sys.executable, "-c", "from optimus.serving.search import run_search; from randopt_lora_lab.vllm_lora_search import run_search as legacy; print(run_search.__module__, run_search is legacy)"],
+        [sys.executable, "-c", "from optimus.serving.search import run_search; print(run_search.__module__)"],
         check=True,
         capture_output=True,
         text=True,
     )
 
-    assert "optimus.serving.search True" in result.stdout
+    assert "optimus.serving.search" in result.stdout
     assert "NumPy" not in result.stderr
     assert "PyTorch" not in result.stderr
 
 
 def test_vllm_benchmark_driver_import_is_metadata_lightweight():
     result = subprocess.run(
-        [sys.executable, "-c", "from optimus.serving.benchmark import run_benchmark; from randopt_lora_lab.vllm_lora_bench import run_benchmark as legacy; print(run_benchmark.__module__, run_benchmark is legacy)"],
+        [sys.executable, "-c", "from optimus.serving.benchmark import run_benchmark; print(run_benchmark.__module__)"],
         check=True,
         capture_output=True,
         text=True,
     )
 
-    assert "optimus.serving.benchmark True" in result.stdout
+    assert "optimus.serving.benchmark" in result.stdout
     assert "NumPy" not in result.stderr
     assert "PyTorch" not in result.stderr
 
 
 def test_vllm_halving_driver_import_is_metadata_lightweight():
     result = subprocess.run(
-        [sys.executable, "-c", "from optimus.serving.halving import run_halving; from randopt_lora_lab.vllm_lora_halving import run_halving as legacy; print(run_halving.__module__, run_halving is legacy)"],
+        [sys.executable, "-c", "from optimus.serving.halving import run_halving; print(run_halving.__module__)"],
         check=True,
         capture_output=True,
         text=True,
     )
 
-    assert "optimus.serving.halving True" in result.stdout
+    assert "optimus.serving.halving" in result.stdout
     assert "NumPy" not in result.stderr
     assert "PyTorch" not in result.stderr
 
@@ -325,24 +283,8 @@ def test_evaluation_namespace_import_is_lightweight():
         text=True,
     )
 
-    assert "build_systems_report" in result.stdout
+    assert "lighteval_command" in result.stdout
     assert "backend_parity_main" in result.stdout
-    assert result.stderr == ""
-
-
-def test_systems_report_implementation_is_optimus_owned():
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "from optimus.evaluation.systems import systems_summaries; from randopt_lora_lab.systems_report import systems_summaries as legacy; print(systems_summaries.__module__, systems_summaries is legacy)",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    assert "optimus.evaluation.systems True" in result.stdout
     assert result.stderr == ""
 
 
@@ -359,3 +301,10 @@ def test_qwen3_vl_text_shapes_use_language_model_prefix():
     assert qwen_lora_shapes(config, ["k_proj"]) == [
         ("model.language_model.layers.0.self_attn.k_proj", 16, 8)
     ]
+
+
+def test_repo_root_has_no_old_project_namespace_or_tracked_results():
+    assert not any(Path(".").glob(f"{FORBIDDEN_PACKAGE}/*.py"))
+    tracked = subprocess.run(["git", "ls-files"], check=True, capture_output=True, text=True).stdout.splitlines()
+    assert not any(path.startswith(f"{FORBIDDEN_PACKAGE}/") for path in tracked)
+    assert not any(path.startswith("results/") for path in tracked)

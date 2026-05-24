@@ -14,10 +14,5 @@ produce auditable research results.
 | `gpu_suite.md` | Required P1024/P4096 workloads, acceptance gates, and output contracts. |
 | `prime_gpu_runbook.md` | Prime GPU launch, sync, validation, and cleanup workflow. |
 | `release_checklist.md` | Pre-release identity, evidence, systems, and upstreaming gates. |
+| `evaluation.md` | LightEval-backed confirmation lane and trusted-eval policy. |
 | `reports/l40sx4_20260523_2237/` | Current committed 4x L40S P1024/P4096 report bundle and plot artifacts. |
-
-## Archive
-
-Historical validation notes live under `archive/experiments/`. They are useful
-for audit trails, but they are not part of the public API or recommended user
-workflow.

@@ -26,8 +26,6 @@ common options:
   --max-new-tokens N                Generation token cap.
   --stop-at-answer                  Stop generation after the answer close tag.
   --antithetic                      Pair candidates by sign.
-
-advanced options are preserved for compatibility with existing run manifests.
 """
 
 
@@ -104,28 +102,4 @@ common options:
   --max-new-tokens N                Generation token cap.
   --stop-at-answer                  Stop generation after the answer close tag.
   --antithetic                      Pair candidates by sign.
-"""
-
-
-AGGREGATE_LORA_HELP = """\
-usage: optimus aggregate-lora --source-run SOURCE_RUN --out OUT [options]
-
-Evaluate a serveable aggregate of top LoRA perturbations.
-
-required:
-  --source-run SOURCE_RUN           Source run with candidate_summary.jsonl.
-  --out OUT                         Output directory for aggregate evaluation files.
-
-common options:
-  --model MODEL                     Base model name or path.
-  --data DATA                       Countdown JSON data path.
-  --prompts N                       Screen prompts.
-  --holdout-prompts N               Heldout prompts.
-  --base-rank N                     Rank of each source candidate.
-  --top-k N                         Number of source candidates to aggregate.
-  --weight-mode MODE                uniform, score, or centered.
-  --targets LIST                    Comma-separated target modules.
-  --max-new-tokens N                Generation token cap.
-  --batch-size N                    HF/PEFT generation batch size.
-  --stop-at-answer                  Stop generation after the answer close tag.
 """
