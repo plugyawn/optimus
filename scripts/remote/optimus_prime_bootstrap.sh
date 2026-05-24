@@ -80,7 +80,7 @@ if [[ "${INSTALL_VLLM:-1}" == "1" ]]; then
   python -m pip install --upgrade "${OPTIMUS_VLLM_PACKAGE:-vllm>=0.19.0}"
 fi
 
-if [[ "${OPTIMUS_INSTALL_FLASHINFER:-1}" == "1" ]]; then
+if [[ "${OPTIMUS_INSTALL_FLASHINFER:-0}" == "1" ]]; then
   if ! python -m pip install --upgrade "${OPTIMUS_FLASHINFER_PACKAGE:-flashinfer-python}"; then
     if [[ "${OPTIMUS_REQUIRE_FLASHINFER:-0}" == "1" ]]; then
       exit 1
@@ -103,6 +103,31 @@ python -m pip install --upgrade "${OPTIMUS_TRANSFORMERS_PACKAGE:-transformers>=4
 optimus --help >/dev/null
 find optimus -name '._*' -delete
 python -m compileall -q optimus
+python - <<'PY'
+from importlib import metadata
+
+names = [
+    "torch",
+    "transformers",
+    "vllm",
+    "flashinfer-python",
+    "flashinfer-cubin",
+    "nvidia-cutlass-dsl",
+    "triton",
+    "lighteval",
+]
+for name in names:
+    try:
+        print(f"{name}=={metadata.version(name)}")
+    except metadata.PackageNotFoundError:
+        print(f"{name}==not-installed")
+
+try:
+    import vllm  # noqa: F401
+    import flashinfer  # noqa: F401
+except Exception as exc:
+    raise SystemExit(f"runtime import check failed: {type(exc).__name__}: {exc}")
+PY
 
 if command -v nvidia-smi >/dev/null 2>&1; then
   nvidia-smi

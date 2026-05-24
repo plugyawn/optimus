@@ -28,6 +28,8 @@ def test_prime_bootstrap_installs_declared_dev_extra():
 
     assert 'python -m pip install -e ".[dev,eval]"' in text
     assert "python -m pip install pytest" not in text
+    assert 'OPTIMUS_INSTALL_FLASHINFER:-0' in text
+    assert "runtime import check failed" in text
 
 
 def test_gpu_suite_launcher_delegates_execution_to_optimus_runner():
