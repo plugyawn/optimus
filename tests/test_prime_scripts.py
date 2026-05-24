@@ -34,6 +34,8 @@ def test_prime_bootstrap_installs_declared_dev_extra():
     assert "cuda-libraries-dev-13-0" in text
     assert "cublasLt.h" in text
     assert "nvrtc.h" in text
+    assert "OPTIMUS_PATCH_VLLM09_AIMV2" in text
+    assert "transformers>=4.54,<4.55" in text
     assert "runtime import check failed" in text
 
 

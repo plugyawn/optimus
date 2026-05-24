@@ -84,6 +84,10 @@ source .venv/bin/activate
 
 python -m pip install --upgrade pip setuptools wheel
 
+if [[ -z "${OPTIMUS_TRANSFORMERS_PACKAGE:-}" && "${OPTIMUS_VLLM_PACKAGE:-}" == vllm==0.9.* ]]; then
+  OPTIMUS_TRANSFORMERS_PACKAGE="transformers>=4.54,<4.55"
+fi
+
 if [[ "${INSTALL_VLLM:-1}" == "1" ]]; then
   python -m pip install --upgrade "${OPTIMUS_VLLM_PACKAGE:-vllm>=0.19.0}"
 fi
@@ -108,6 +112,29 @@ fi
 
 python -m pip install -e ".[dev,eval]"
 python -m pip install --upgrade "${OPTIMUS_TRANSFORMERS_PACKAGE:-transformers>=4.51,<5}"
+if [[ "${OPTIMUS_PATCH_VLLM09_AIMV2:-1}" == "1" ]]; then
+python - <<'PY'
+from importlib import metadata
+from pathlib import Path
+
+try:
+    version = metadata.version("vllm")
+except metadata.PackageNotFoundError:
+    raise SystemExit(0)
+
+if not version.startswith("0.9."):
+    raise SystemExit(0)
+
+dist = metadata.distribution("vllm")
+path = Path(dist.locate_file("vllm/transformers_utils/configs/ovis.py"))
+target = 'AutoConfig.register("aimv2", AIMv2Config)'
+replacement = 'AutoConfig.register("aimv2", AIMv2Config, exist_ok=True)'
+text = path.read_text()
+if target in text:
+    path.write_text(text.replace(target, replacement))
+    print("patched vLLM 0.9.x aimv2 registration for transformers>=4.54 compatibility")
+PY
+fi
 optimus --help >/dev/null
 find optimus -name '._*' -delete
 python -m compileall -q optimus
