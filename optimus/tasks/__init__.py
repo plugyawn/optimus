@@ -21,6 +21,7 @@ from .countdown import (
 from .generation import GeneratedCountdown, generate_examples
 from .prompt_variants import (
     UPSTREAM_SYSTEM_MESSAGE,
+    bare_expression_prompt,
     compact_tagged_prompt,
     direct_tagged_prompt,
     make_variant_prompts,
@@ -37,6 +38,7 @@ __all__ = [
     "answer_spans",
     "assert_unique_example_ids",
     "assert_unique_example_semantics",
+    "bare_expression_prompt",
     "built_in_examples",
     "compact_tagged_prompt",
     "direct_tagged_prompt",

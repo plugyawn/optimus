@@ -28,6 +28,13 @@ class GpuSuiteConfig:
     seed: int = 2468
     targets: str = DEFAULT_TARGETS
     max_new_tokens: int = 32
+    prompt_variants: str = "default"
+    prompt_input: str = "text"
+    use_chat_template: bool = False
+    max_base_malformed_for_selection: float = 0.05
+    max_base_cap_hit_for_selection: float = 0.05
+    min_selection_prompt_variants: int = 1
+    require_all_prompt_variants_valid: bool = False
     chunk_adapters: int = 32
     max_loras: int = 32
     max_cpu_loras: int = 8192
@@ -108,9 +115,28 @@ def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int
         str(config.max_cpu_loras),
         "--max-new-tokens",
         str(config.max_new_tokens),
+        "--prompt-variants",
+        config.prompt_variants,
+        "--prompt-input",
+        config.prompt_input,
+        "--max-base-malformed-for-selection",
+        f"{config.max_base_malformed_for_selection:g}",
+        "--max-base-cap-hit-for-selection",
+        f"{config.max_base_cap_hit_for_selection:g}",
+        "--min-selection-prompt-variants",
+        str(config.min_selection_prompt_variants),
         "--stop-at-answer",
         "--antithetic",
-    ] + _vllm_runtime_args(config) + _search_artifact_args(config)
+    ] + _search_prompt_args(config) + _vllm_runtime_args(config) + _search_artifact_args(config)
+
+
+def _search_prompt_args(config: GpuSuiteConfig) -> list[str]:
+    args = []
+    if config.use_chat_template:
+        args.append("--use-chat-template")
+    if config.require_all_prompt_variants_valid:
+        args.append("--require-all-prompt-variants-valid")
+    return args
 
 
 def _vllm_runtime_args(config: GpuSuiteConfig) -> list[str]:
@@ -144,6 +170,13 @@ def search_identity(config: GpuSuiteConfig, population: int) -> dict[str, Any]:
         "seed": config.seed,
         "targets": config.targets,
         "max_new_tokens": config.max_new_tokens,
+        "prompt_variants": config.prompt_variants,
+        "prompt_input": config.prompt_input,
+        "use_chat_template": config.use_chat_template,
+        "max_base_malformed_for_selection": config.max_base_malformed_for_selection,
+        "max_base_cap_hit_for_selection": config.max_base_cap_hit_for_selection,
+        "min_selection_prompt_variants": config.min_selection_prompt_variants,
+        "require_all_prompt_variants_valid": config.require_all_prompt_variants_valid,
         "chunk_adapters": config.chunk_adapters,
         "max_loras": config.max_loras,
         "max_cpu_loras": config.max_cpu_loras,
@@ -219,6 +252,8 @@ def bench_specs(config: GpuSuiteConfig) -> list[RunSpec]:
                     str(config.max_cpu_loras),
                     "--max-new-tokens",
                     str(config.max_new_tokens),
+                    "--prompt-input",
+                    config.prompt_input,
                     "--stop-at-answer",
                     "--preload",
                     "--mixed-batch",
@@ -476,6 +511,13 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--seed", type=int, default=2468)
     parser.add_argument("--targets", default=DEFAULT_TARGETS)
     parser.add_argument("--max-new-tokens", type=int, default=32)
+    parser.add_argument("--prompt-variants", default="default")
+    parser.add_argument("--prompt-input", default="text", choices=["text", "token_ids"])
+    parser.add_argument("--use-chat-template", action="store_true")
+    parser.add_argument("--max-base-malformed-for-selection", type=float, default=0.05)
+    parser.add_argument("--max-base-cap-hit-for-selection", type=float, default=0.05)
+    parser.add_argument("--min-selection-prompt-variants", type=int, default=1)
+    parser.add_argument("--require-all-prompt-variants-valid", action="store_true")
     parser.add_argument("--chunk-adapters", type=int, default=32)
     parser.add_argument("--max-loras", type=int, default=32)
     parser.add_argument("--max-cpu-loras", type=int, default=8192)
@@ -507,6 +549,13 @@ def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:
         seed=args.seed,
         targets=args.targets,
         max_new_tokens=args.max_new_tokens,
+        prompt_variants=args.prompt_variants,
+        prompt_input=args.prompt_input,
+        use_chat_template=args.use_chat_template,
+        max_base_malformed_for_selection=args.max_base_malformed_for_selection,
+        max_base_cap_hit_for_selection=args.max_base_cap_hit_for_selection,
+        min_selection_prompt_variants=args.min_selection_prompt_variants,
+        require_all_prompt_variants_valid=args.require_all_prompt_variants_valid,
         chunk_adapters=args.chunk_adapters,
         max_loras=args.max_loras,
         max_cpu_loras=args.max_cpu_loras,

@@ -41,6 +41,8 @@ def test_gpu_suite_launcher_delegates_execution_to_optimus_runner():
     assert "optimus run-plan" in text
     assert "optimus run-suite" in text
     assert "--execution-log \"$OUT_ROOT/execution.json\"" in text
+    assert "PROMPT_VARIANTS=${PROMPT_VARIANTS:-default}" in text
+    assert "--prompt-variants \"$PROMPT_VARIANTS\"" in text
     assert "run_bench()" not in text
     assert "run_search()" not in text
 
@@ -54,6 +56,9 @@ def test_population_lighteval_pipeline_closes_eval_loop():
     assert "optimus lighteval-sweep" in text
     assert "optimus lighteval-report" in text
     assert "KEEP_ADAPTERS=${KEEP_ADAPTERS:-1}" in text
+    assert "MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}" in text
+    assert "PROMPT_VARIANTS=${PROMPT_VARIANTS:-bare}" in text
+    assert "LIGHTEVAL_USE_CHAT_TEMPLATE=${LIGHTEVAL_USE_CHAT_TEMPLATE:-1}" in text
 
 
 def test_prime_sync_bundle_does_not_copy_local_agent_state():
@@ -61,6 +66,9 @@ def test_prime_sync_bundle_does_not_copy_local_agent_state():
 
     assert "--exclude='.git'" in text
     assert "--exclude='.opencode'" in text
+    assert "MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}" in text
+    assert "PROMPT_VARIANTS=${PROMPT_VARIANTS:-bare}" in text
+    assert "PROMPT_VARIANTS='$PROMPT_VARIANTS'" in text
 
 
 def test_backend_parity_launcher_uses_supported_cli_commands():

@@ -70,6 +70,17 @@ def xml_tagged_prompt(example: CountdownExample) -> str:
     )
 
 
+def bare_expression_prompt(example: CountdownExample) -> str:
+    nums = ", ".join(str(x) for x in example.numbers)
+    return (
+        "Return exactly one line in this form: <answer>EXPRESSION</answer>. "
+        "Inside the tags, write only a bare arithmetic expression using numbers, +, -, *, /, and parentheses. "
+        "Do not write an equals sign, the target value, words, reasoning, units, or multiple answers. "
+        "Use each provided number exactly once. "
+        f"Provided numbers: {nums}. Target: {example.target}."
+    )
+
+
 def prompt_fn(name: str) -> PromptFn:
     if name == "default":
         return default_prompt
@@ -79,6 +90,8 @@ def prompt_fn(name: str) -> PromptFn:
         return reordered_tagged_prompt
     if name == "xml":
         return xml_tagged_prompt
+    if name == "bare":
+        return bare_expression_prompt
     if name == "compact":
         return compact_tagged_prompt
     if name == "direct":
@@ -135,6 +148,7 @@ def make_variant_prompts(
 __all__ = [
     "PromptFn",
     "UPSTREAM_SYSTEM_MESSAGE",
+    "bare_expression_prompt",
     "compact_tagged_prompt",
     "direct_tagged_prompt",
     "make_variant_prompts",

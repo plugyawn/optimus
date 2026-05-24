@@ -449,6 +449,8 @@ def run_search(args) -> dict:
         rows, metrics = base_eval(llm, sampling, holdout, args, mode="base_holdout", prompt_variant=variant)
         base_holdout_rows.extend(rows)
         base_holdout_by_variant[variant] = metrics
+    write_jsonl(out / "per_prompt.jsonl", base_screen_rows)
+    write_jsonl(out / "holdout_per_prompt.jsonl", base_holdout_rows)
     screen_selection_variants = selection_variants_or_raise(base_screen_by_variant, args, split="screen")
     holdout_selection_variants = selection_variants_or_raise(base_holdout_by_variant, args, split="holdout")
     if args.require_all_prompt_variants_valid:
@@ -461,8 +463,6 @@ def run_search(args) -> dict:
         )
     screen_stress_variants = sorted(set(prompt_variants) - set(screen_selection_variants))
     holdout_stress_variants = sorted(set(prompt_variants) - set(holdout_selection_variants))
-    write_jsonl(out / "per_prompt.jsonl", base_screen_rows)
-    write_jsonl(out / "holdout_per_prompt.jsonl", base_holdout_rows)
 
     screen_rows = []
     screen_condition_rows = []

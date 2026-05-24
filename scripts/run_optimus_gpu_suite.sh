@@ -13,6 +13,13 @@ SIGMA=${SIGMA:-0.0075}
 SEED=${SEED:-2468}
 TARGETS=${TARGETS:-q_proj,v_proj}
 MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-32}
+PROMPT_VARIANTS=${PROMPT_VARIANTS:-default}
+PROMPT_INPUT=${PROMPT_INPUT:-text}
+USE_CHAT_TEMPLATE=${USE_CHAT_TEMPLATE:-0}
+MAX_BASE_MALFORMED_FOR_SELECTION=${MAX_BASE_MALFORMED_FOR_SELECTION:-0.05}
+MAX_BASE_CAP_HIT_FOR_SELECTION=${MAX_BASE_CAP_HIT_FOR_SELECTION:-0.05}
+MIN_SELECTION_PROMPT_VARIANTS=${MIN_SELECTION_PROMPT_VARIANTS:-1}
+REQUIRE_ALL_PROMPT_VARIANTS_VALID=${REQUIRE_ALL_PROMPT_VARIANTS_VALID:-0}
 CHUNK_ADAPTERS=${CHUNK_ADAPTERS:-32}
 MAX_LORAS=${MAX_LORAS:-32}
 MAX_CPU_LORAS=${MAX_CPU_LORAS:-8192}
@@ -40,6 +47,19 @@ artifact_arg=()
 if [[ "$KEEP_ADAPTERS" == "1" ]]; then
   artifact_arg=(--keep-adapters)
 fi
+prompt_contract_args=(
+  --prompt-variants "$PROMPT_VARIANTS"
+  --prompt-input "$PROMPT_INPUT"
+  --max-base-malformed-for-selection "$MAX_BASE_MALFORMED_FOR_SELECTION"
+  --max-base-cap-hit-for-selection "$MAX_BASE_CAP_HIT_FOR_SELECTION"
+  --min-selection-prompt-variants "$MIN_SELECTION_PROMPT_VARIANTS"
+)
+case "$USE_CHAT_TEMPLATE" in
+  1|true|TRUE|yes|YES) prompt_contract_args+=(--use-chat-template) ;;
+esac
+case "$REQUIRE_ALL_PROMPT_VARIANTS_VALID" in
+  1|true|TRUE|yes|YES) prompt_contract_args+=(--require-all-prompt-variants-valid) ;;
+esac
 
 vllm_runtime_args=()
 case "${ENABLE_PREFIX_CACHING:-}" in
@@ -71,6 +91,7 @@ optimus run-plan \
   --seed "$SEED" \
   --targets "$TARGETS" \
   --max-new-tokens "$MAX_NEW_TOKENS" \
+  "${prompt_contract_args[@]}" \
   --chunk-adapters "$CHUNK_ADAPTERS" \
   --max-loras "$MAX_LORAS" \
   --max-cpu-loras "$MAX_CPU_LORAS" \
@@ -95,6 +116,7 @@ optimus run-suite \
   --seed "$SEED" \
   --targets "$TARGETS" \
   --max-new-tokens "$MAX_NEW_TOKENS" \
+  "${prompt_contract_args[@]}" \
   --chunk-adapters "$CHUNK_ADAPTERS" \
   --max-loras "$MAX_LORAS" \
   --max-cpu-loras "$MAX_CPU_LORAS" \

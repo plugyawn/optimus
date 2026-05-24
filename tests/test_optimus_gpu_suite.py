@@ -178,6 +178,8 @@ def test_plan_payload_respects_full_config_surface(tmp_path: Path):
         seed=999,
         targets="q_proj,k_proj,v_proj,o_proj",
         max_new_tokens=48,
+        prompt_variants="tight,compact",
+        use_chat_template=True,
         chunk_adapters=4,
         max_loras=4,
         max_cpu_loras=2048,
@@ -196,6 +198,9 @@ def test_plan_payload_respects_full_config_surface(tmp_path: Path):
     assert "16" in search["command"]
     assert "--targets" in search["command"]
     assert "q_proj,k_proj,v_proj,o_proj" in search["command"]
+    assert "--prompt-variants" in search["command"]
+    assert "tight,compact" in search["command"]
+    assert "--use-chat-template" in search["command"]
 
 
 def test_plan_payload_can_keep_search_adapters_for_external_eval(tmp_path: Path):

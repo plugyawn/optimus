@@ -11,6 +11,7 @@ from optimus.tasks.countdown import (
     unique_semantic_example_count,
     voted_answer_exact,
 )
+from optimus.tasks import prompt_fn
 from optimus.serving.transformers import TransformersLoraBackend
 
 
@@ -47,6 +48,12 @@ class CountdownDataTests(unittest.TestCase):
             CountdownExample(3, (3, 2, 1), 7),
         ]
         self.assertEqual(unique_semantic_example_count(examples), 2)
+
+    def test_bare_prompt_disallows_equations(self):
+        text = prompt_fn("bare")(CountdownExample(1, (3, 7, 8, 8), 24))
+
+        self.assertIn("<answer>EXPRESSION</answer>", text)
+        self.assertIn("Do not write an equals sign", text)
 
 
 class CountdownParserTests(unittest.TestCase):
