@@ -64,6 +64,34 @@ def test_lighteval_cli_writes_plan_without_importing_lighteval(tmp_path: Path):
     assert payload["command"][:2] == ["lighteval", "vllm"]
 
 
+def test_lighteval_vllm_plan_omits_unsupported_chat_template_arg(tmp_path: Path):
+    plan = tmp_path / "plan.json"
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "optimus.cli",
+            "lighteval",
+            "--tasks",
+            "ifeval",
+            "--model",
+            "Qwen/Qwen3-4B",
+            "--use-chat-template",
+            "--out",
+            str(tmp_path / "out"),
+            "--plan-out",
+            str(plan),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(plan.read_text())
+    assert "use_chat_template" not in payload["model_args"]
+    assert all("use_chat_template" not in item for item in payload["command"])
+
+
 def test_lighteval_sweep_builds_population_model_paths(tmp_path: Path):
     args = type(
         "Args",

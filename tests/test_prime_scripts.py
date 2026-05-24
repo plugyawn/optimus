@@ -62,7 +62,7 @@ def test_population_lighteval_pipeline_closes_eval_loop():
     assert "KEEP_ADAPTERS=${KEEP_ADAPTERS:-1}" in text
     assert "MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}" in text
     assert "PROMPT_VARIANTS=${PROMPT_VARIANTS:-bare}" in text
-    assert "LIGHTEVAL_USE_CHAT_TEMPLATE=${LIGHTEVAL_USE_CHAT_TEMPLATE:-1}" in text
+    assert "LIGHTEVAL_USE_CHAT_TEMPLATE=${LIGHTEVAL_USE_CHAT_TEMPLATE:-auto}" in text
 
 
 def test_prime_sync_bundle_does_not_copy_local_agent_state():

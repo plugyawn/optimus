@@ -113,6 +113,15 @@ def model_args_from_options(
     return ",".join(rendered)
 
 
+def effective_use_chat_template(backend: str, requested: bool | None) -> bool | None:
+    # LightEval 0.13 validates vLLM model args against VLLMModelConfig, which
+    # does not accept use_chat_template. Keep the flag available for backends
+    # that support it, but do not poison vLLM eval plans.
+    if backend == "vllm":
+        return None
+    return requested
+
+
 def build_lighteval_command(
     *,
     backend: str,
@@ -145,7 +154,7 @@ def build_plan(args: argparse.Namespace) -> LightEvalPlan:
         gpu_memory_utilization=args.gpu_memory_utilization,
         max_model_length=args.max_model_length,
         trust_remote_code=args.trust_remote_code,
-        use_chat_template=args.use_chat_template,
+        use_chat_template=effective_use_chat_template(args.backend, args.use_chat_template),
         model_key=args.model_key,
         extra_model_args=tuple(args.model_arg),
     )
@@ -223,7 +232,7 @@ def build_sweep(args: argparse.Namespace) -> LightEvalSweepPlan:
                 gpu_memory_utilization=args.gpu_memory_utilization,
                 max_model_length=args.max_model_length,
                 trust_remote_code=args.trust_remote_code,
-                use_chat_template=args.use_chat_template,
+                use_chat_template=effective_use_chat_template(args.backend, args.use_chat_template),
                 model_key=args.model_key,
                 extra_model_args=tuple(format_population_template(arg, template_values) for arg in args.model_arg),
             )
