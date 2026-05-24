@@ -51,6 +51,13 @@ def test_population_lighteval_pipeline_closes_eval_loop():
     assert "KEEP_ADAPTERS=${KEEP_ADAPTERS:-1}" in text
 
 
+def test_prime_sync_bundle_does_not_copy_local_agent_state():
+    text = Path("scripts/prime_sync_and_run.sh").read_text()
+
+    assert "--exclude='.git'" in text
+    assert "--exclude='.opencode'" in text
+
+
 def test_backend_parity_launcher_uses_supported_cli_commands():
     text = Path("scripts/run_backend_parity_gate.sh").read_text()
 
