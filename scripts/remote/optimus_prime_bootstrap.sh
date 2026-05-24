@@ -48,7 +48,13 @@ install_cuda_compiler_if_available() {
       fi
     done
   fi
-  for pkg in libcurand-dev-13-0 libcurand-dev-12-2 cuda-libraries-dev-13-0 cuda-libraries-dev-12-2; do
+  for pkg in libcurand-dev-13-0 libcurand-dev-12-2; do
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      apt_get install -y --no-install-recommends "$pkg" || true
+      break
+    fi
+  done
+  for pkg in cuda-libraries-dev-13-0 cuda-libraries-dev-12-2; do
     if apt-cache show "$pkg" >/dev/null 2>&1; then
       apt_get install -y --no-install-recommends "$pkg" || true
       break
@@ -103,6 +109,12 @@ python -m pip install --upgrade "${OPTIMUS_TRANSFORMERS_PACKAGE:-transformers>=4
 optimus --help >/dev/null
 find optimus -name '._*' -delete
 python -m compileall -q optimus
+for header in cublasLt.h nvrtc.h; do
+  if [[ ! -f "/usr/local/cuda/include/$header" ]]; then
+    printf '%s\n' "missing CUDA development header: /usr/local/cuda/include/$header" >&2
+    exit 1
+  fi
+done
 python - <<'PY'
 from importlib import metadata
 
