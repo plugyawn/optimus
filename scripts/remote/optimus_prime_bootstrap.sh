@@ -74,7 +74,9 @@ install_cuda_compiler_if_available() {
   fi
 }
 
-install_cuda_compiler_if_available || true
+if [[ "${OPTIMUS_INSTALL_CUDA_COMPILER:-1}" == "1" ]]; then
+  install_cuda_compiler_if_available || true
+fi
 
 python_bin=${PYTHON_BIN:-python3}
 "$python_bin" -m venv .venv
@@ -109,12 +111,14 @@ python -m pip install --upgrade "${OPTIMUS_TRANSFORMERS_PACKAGE:-transformers>=4
 optimus --help >/dev/null
 find optimus -name '._*' -delete
 python -m compileall -q optimus
-for header in cublasLt.h nvrtc.h; do
-  if [[ ! -f "/usr/local/cuda/include/$header" ]]; then
-    printf '%s\n' "missing CUDA development header: /usr/local/cuda/include/$header" >&2
-    exit 1
-  fi
-done
+if [[ "${OPTIMUS_REQUIRE_CUDA_DEV_HEADERS:-1}" == "1" ]]; then
+  for header in cublasLt.h nvrtc.h; do
+    if [[ ! -f "/usr/local/cuda/include/$header" ]]; then
+      printf '%s\n' "missing CUDA development header: /usr/local/cuda/include/$header" >&2
+      exit 1
+    fi
+  done
+fi
 python - <<'PY'
 from importlib import metadata
 

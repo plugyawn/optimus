@@ -29,6 +29,8 @@ def test_prime_bootstrap_installs_declared_dev_extra():
     assert 'python -m pip install -e ".[dev,eval]"' in text
     assert "python -m pip install pytest" not in text
     assert 'OPTIMUS_INSTALL_FLASHINFER:-0' in text
+    assert "OPTIMUS_INSTALL_CUDA_COMPILER" in text
+    assert "OPTIMUS_REQUIRE_CUDA_DEV_HEADERS" in text
     assert "cuda-libraries-dev-13-0" in text
     assert "cublasLt.h" in text
     assert "nvrtc.h" in text
@@ -69,6 +71,8 @@ def test_prime_sync_bundle_does_not_copy_local_agent_state():
     assert "MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}" in text
     assert "PROMPT_VARIANTS=${PROMPT_VARIANTS:-bare}" in text
     assert "PROMPT_VARIANTS='$PROMPT_VARIANTS'" in text
+    assert "OPTIMUS_VLLM_PACKAGE" in text
+    assert "OPTIMUS_REQUIRE_CUDA_DEV_HEADERS" in text
 
 
 def test_backend_parity_launcher_uses_supported_cli_commands():

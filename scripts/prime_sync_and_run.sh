@@ -75,7 +75,30 @@ else
   ssh $SSH_OPTIONS "$SSH_TARGET" "mkdir -p '$REMOTE_ROOT'"
 fi
 scp $SSH_OPTIONS "$bundle" "$SSH_TARGET:$REMOTE_ROOT/source.tar.gz"
-ssh $SSH_OPTIONS "$SSH_TARGET" "cd '$REMOTE_ROOT' && tar -xzf source.tar.gz && bash scripts/remote/optimus_prime_bootstrap.sh"
+
+bootstrap_env=""
+for name in \
+  PYTHON_BIN \
+  INSTALL_VLLM \
+  OPTIMUS_VLLM_PACKAGE \
+  OPTIMUS_INSTALL_FLASHINFER \
+  OPTIMUS_FLASHINFER_PACKAGE \
+  OPTIMUS_REQUIRE_FLASHINFER \
+  OPTIMUS_INSTALL_FLASH_ATTN \
+  OPTIMUS_FLASH_ATTN_PACKAGE \
+  OPTIMUS_REQUIRE_FLASH_ATTN \
+  OPTIMUS_INSTALL_CUDA_COMPILER \
+  OPTIMUS_REQUIRE_CUDA_DEV_HEADERS \
+  OPTIMUS_TRANSFORMERS_PACKAGE \
+  OPTIMUS_VLLM_ATTENTION_BACKEND
+do
+  if [[ -n "${!name:-}" ]]; then
+    printf -v quoted "%q" "${!name}"
+    bootstrap_env+="$name=$quoted "
+  fi
+done
+
+ssh $SSH_OPTIONS "$SSH_TARGET" "cd '$REMOTE_ROOT' && tar -xzf source.tar.gz && ${bootstrap_env}bash scripts/remote/optimus_prime_bootstrap.sh"
 
 if [[ "$MODE" == "smoke" ]]; then
   ssh $SSH_OPTIONS "$SSH_TARGET" "cd '$REMOTE_ROOT' && TENSOR_PARALLEL_SIZE='$TENSOR_PARALLEL_SIZE' bash scripts/remote/optimus_prime_smoke.sh"
