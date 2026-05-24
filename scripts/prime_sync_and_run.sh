@@ -39,6 +39,8 @@ else
     --exclude='*.pyc' \
     --exclude='*.egg-info' \
     --exclude='external' \
+    --exclude='data' \
+    --exclude='docs/reports' \
     --exclude='logs' \
     --exclude='results' \
     --exclude='*.safetensors' \

@@ -1,6 +1,6 @@
-"""Search-space construction and candidate-panel utilities."""
+"""Search-space construction, selection, and zeroth-order study utilities."""
 
-from optimus.core.candidates import SearchCandidate, candidate_panel, parse_candidate_key, read_candidate_file
+from optimus.core.perturbations import PerturbationSpec, perturbation_panel, read_perturbation_file
 from .ensemble import (
     anzo_anchor_prompts,
     ensemble_ks_from_values,
@@ -19,12 +19,15 @@ from .selection import (
     parse_prompt_variants,
     protocol_valid_variants,
 )
+from .zeroth_order import EvaluationRecord, SearchResult, ZerothOrderStudy, select_top_k, sorted_records
 
 __all__ = [
-    "SearchCandidate",
+    "EvaluationRecord",
+    "PerturbationSpec",
+    "SearchResult",
+    "ZerothOrderStudy",
     "anzo_anchor_prompts",
     "base_protocol_valid",
-    "candidate_panel",
     "combine_candidate_conditions",
     "condition_score",
     "ensemble_ks_from_values",
@@ -35,12 +38,14 @@ __all__ = [
     "parse_k_list",
     "parse_ratio_list",
     "parse_prompt_variants",
-    "parse_candidate_key",
-    "read_candidate_file",
+    "perturbation_panel",
+    "read_perturbation_file",
     "rows_by_candidate_and_example",
     "protocol_valid_variants",
     "run_adaptive_search",
     "run_peft_search",
+    "select_top_k",
+    "sorted_records",
 ]
 
 

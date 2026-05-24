@@ -11,6 +11,7 @@ SUPPORTED_COMMANDS: dict[str, str] = {
     "lighteval": "optimus.commands.lighteval",
     "make-countdown-data": "optimus.commands.make_countdown_data",
     "peft-search": "optimus.commands.peft_search",
+    "perturbation-panel": "optimus.commands.perturbation_panel",
     "release-check": "optimus.evaluation.release",
     "run-plan": "optimus.runs.gpu_suite",
     "run-suite": "optimus.runs.gpu_suite_runner",
@@ -37,7 +38,9 @@ def build_parser() -> argparse.ArgumentParser:
     choices = ", ".join(sorted(SUPPORTED_COMMANDS))
     parser = argparse.ArgumentParser(
         prog="optimus",
-        description=f"Run Optimus zeroth-order search, validation, and reporting commands. Supported commands: {choices}",
+        description="Run Optimus perturbation search, GPU validation, and reporting commands.",
+        epilog="Supported commands: " + choices,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("command", metavar="command")
     parser.add_argument("args", nargs=argparse.REMAINDER)

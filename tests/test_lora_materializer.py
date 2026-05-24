@@ -7,8 +7,8 @@ from pathlib import Path
 import torch
 from safetensors.torch import load_file
 
-from optimus.core.candidates import SearchCandidate as Candidate
-from optimus.core.candidates import canonical_module_name
+from optimus.core.perturbations import PerturbationSpec as Candidate
+from optimus.core.perturbations import canonical_module_name
 from optimus.modeling import qwen_lora_shapes, save_seed_adapter
 from optimus.modeling.dense import dense_noise_tensor
 from optimus.modeling.geometry import best_rank_projection, lora_update
@@ -106,7 +106,7 @@ class LoraMaterializerTests(unittest.TestCase):
         module = "model.layers.0.self_attn.q_proj"
 
         a, b = lora_noise_tensors(module, (rank, 8), (7, rank), candidate, rank)
-        dense = dense_noise_tensor(module, (7, 8), Candidate("dense_gaussian", seed=456, sigma=0.01, sign=1))
+        dense = dense_noise_tensor(module, (7, 8), Candidate("dense_gaussian", seed=456, sigma=0.01, sign=1, method="dense"))
         projected = best_rank_projection(dense, rank)
 
         self.assertEqual(tuple(a.shape), (rank, 8))
@@ -143,7 +143,7 @@ class LoraMaterializerTests(unittest.TestCase):
         dense = dense_noise_tensor(
             "model.layers.0.self_attn.q_proj",
             (7, 8),
-            Candidate("dense_gaussian", seed=456, sigma=0.02, sign=-1),
+            Candidate("dense_gaussian", seed=456, sigma=0.02, sign=-1, method="dense"),
         )
         expected = torch.zeros_like(dense)
         expected[:, :rank] = dense[:, :rank]
@@ -169,7 +169,7 @@ class LoraMaterializerTests(unittest.TestCase):
         dense = dense_noise_tensor(
             "model.layers.0.self_attn.q_proj",
             (7, 8),
-            Candidate("dense_gaussian", seed=456, sigma=0.02, sign=-1),
+            Candidate("dense_gaussian", seed=456, sigma=0.02, sign=-1, method="dense"),
         )
         expected = torch.zeros_like(dense)
         expected[:, :rank] = dense[:, :rank]

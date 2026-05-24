@@ -2,9 +2,9 @@
 
 Optimus separates candidate proposal from trusted evaluation.
 
-The high-throughput path uses vLLM adapter swapping to screen thousands of LoRA
-candidates. That path is optimized for proposal throughput and selector
-diagnostics.
+The high-throughput vLLM path screens thousands of LoRA perturbations through
+adapter swapping. Dense perturbations use the trusted Transformers path because
+they mutate model weights directly.
 
 The trusted-eval path uses HF/PEFT, dense-reference checks, backend parity gates,
 and LightEval. LightEval is the standard harness for benchmark/task execution,
@@ -39,18 +39,19 @@ optimus lighteval \
 
 Execute the same run by adding `--run`.
 
-Use LightEval for final confirmation of selected base/LoRA candidates, not for
-the full P1024/P4096 candidate-screening loop. The search loop requires
-per-candidate adapter swapping and candidate manifests; LightEval is the
-right tool once Optimus has selected a small set of candidates to evaluate on a
-standard task or a custom HF-hosted task.
+Use LightEval for final confirmation of an externally materialized model path,
+for example a base model, merged adapter checkpoint, or other final model
+artifact. It is not the full P1024/P4096 candidate-screening loop and the
+current Optimus command does not bind `candidate_summary.jsonl` rows directly to
+LightEval jobs.
 
 ## Required Evidence
 
 Publication-grade selector evidence should include:
 
 - screen-only candidate selection;
-- HF/PEFT or LightEval confirmation for the selected candidates;
+- Transformers, dense-reference, or LightEval confirmation for the selected
+  materialized model state;
 - sample-level details saved for every evaluated example;
 - confidence intervals or paired significance tests;
 - no headline selector claim based on holdout-oracle selection.

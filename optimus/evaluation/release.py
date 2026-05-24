@@ -41,6 +41,13 @@ def _list_values(section: str, key: str) -> list[str]:
     return re.findall(r'"([^"]+)"', match.group(1))
 
 
+def as_int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def pyproject_checks(root: Path) -> list[ReleaseCheck]:
     path = root / "pyproject.toml"
     if not path.exists():
@@ -136,16 +143,30 @@ def repo_structure_checks(root: Path) -> list[ReleaseCheck]:
     docs_archive = root / "docs" / "archive"
     scripts_archive = root / "scripts" / "archive"
     tracked_results: list[str] = []
+    tracked_report_bundles: list[str] = []
+    tracked_generated_data: list[str] = []
     if (root / ".git").exists():
-        result = subprocess.run(
-            ["git", "ls-files", "results"],
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            tracked_results = [line for line in result.stdout.splitlines() if line.strip()]
+        for label, pathspec in [
+            ("results", "results"),
+            ("report_bundles", "docs/reports"),
+            ("generated_data", "data"),
+        ]:
+            result = subprocess.run(
+                ["git", "ls-files", pathspec],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                continue
+            lines = [line for line in result.stdout.splitlines() if line.strip()]
+            if label == "results":
+                tracked_results = lines
+            elif label == "report_bundles":
+                tracked_report_bundles = lines
+            elif label == "generated_data":
+                tracked_generated_data = lines
     return [
         ReleaseCheck(
             "repo_has_no_top_level_old_namespace",
@@ -158,9 +179,65 @@ def repo_structure_checks(root: Path) -> list[ReleaseCheck]:
             "no tracked raw result files" if not tracked_results else f"files={tracked_results[:8]!r}",
         ),
         ReleaseCheck(
+            "repo_has_no_tracked_report_bundles",
+            not tracked_report_bundles,
+            "no tracked docs/reports bundles" if not tracked_report_bundles else f"files={tracked_report_bundles[:8]!r}",
+        ),
+        ReleaseCheck(
+            "repo_has_no_tracked_generated_data",
+            not tracked_generated_data,
+            "no tracked generated data files" if not tracked_generated_data else f"files={tracked_generated_data[:8]!r}",
+        ),
+        ReleaseCheck(
             "repo_has_no_archive_experiment_tree",
             not docs_archive.exists() and not scripts_archive.exists(),
             "no public archive experiment tree" if not docs_archive.exists() and not scripts_archive.exists() else "archive experiment tree present",
+        ),
+    ]
+
+
+def git_state_checks(root: Path) -> list[ReleaseCheck]:
+    if not (root / ".git").exists():
+        return [ReleaseCheck("git_state_checked", True, "not a git checkout")]
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    dirty_lines = [line for line in status.stdout.splitlines() if line.strip()] if status.returncode == 0 else ["git status failed"]
+    branch = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    upstream_detail = branch.stdout.strip() if branch.returncode == 0 else "no upstream"
+    pushed = False
+    if branch.returncode == 0:
+        counts = subprocess.run(
+            ["git", "rev-list", "--left-right", "--count", "HEAD...@{u}"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if counts.returncode == 0:
+            ahead_behind = counts.stdout.split()
+            pushed = len(ahead_behind) == 2 and ahead_behind == ["0", "0"]
+            upstream_detail = f"{upstream_detail} ahead={ahead_behind[0]} behind={ahead_behind[1]}"
+    return [
+        ReleaseCheck(
+            "git_worktree_clean",
+            status.returncode == 0 and not dirty_lines,
+            "clean" if status.returncode == 0 and not dirty_lines else f"dirty={dirty_lines[:12]!r}",
+        ),
+        ReleaseCheck(
+            "git_head_pushed_to_upstream",
+            pushed,
+            upstream_detail,
         ),
     ]
 
@@ -223,6 +300,29 @@ def systems_report_checks(systems_out: Path | None) -> list[ReleaseCheck]:
                 str(report),
             )
         )
+    parity = systems_out / "parity.csv"
+    if parity.exists():
+        with parity.open(newline="") as f:
+            rows = list(csv.DictReader(f))
+        def row_passes(row: dict) -> bool:
+            required_true = ["pass", "pass_protocol", "pass_base_rows", "pass_adapter_tensors", "pass_output_diff"]
+            return (
+                all(str(row.get(key, "")).lower() == "true" for key in required_true)
+                and as_int(row.get("n_common"), 0) > 0
+                and str(row.get("trusted_name", "")).strip()
+                and str(row.get("candidate_name", "")).strip()
+            )
+
+        passing = [row for row in rows if row_passes(row)]
+        checks.append(
+            ReleaseCheck(
+                "parity_report_has_passing_gate",
+                bool(passing),
+                f"strict_passing={len(passing)} total={len(rows)}",
+            )
+        )
+    else:
+        checks.append(ReleaseCheck("parity_report_has_passing_gate", False, f"missing {parity}"))
     return checks
 
 
@@ -248,11 +348,16 @@ def gpu_artifact_checks(
         for check in payload["checks"]
         if check["missing"]
     ]
+    invalid = [
+        f"{check['name']}:{','.join(check['invalid'])}"
+        for check in payload["checks"]
+        if check.get("invalid")
+    ]
     return [
         ReleaseCheck(
             "gpu_suite_artifacts_complete",
             bool(payload["pass"]),
-            "all required artifacts present" if payload["pass"] else f"missing={missing!r}",
+            "all required artifacts present and valid" if payload["pass"] else f"missing={missing!r} invalid={invalid!r}",
         )
     ]
 
@@ -285,6 +390,7 @@ def build_release_checks(
     checks.extend(public_doc_checks(root))
     checks.extend(package_code_checks(root))
     checks.extend(repo_structure_checks(root))
+    checks.extend(git_state_checks(root))
     checks.append(remote_check(root, remote))
     checks.extend(systems_report_checks(systems_out))
     checks.extend(gpu_artifact_checks(gpu_root, systems_out, populations, bench_adapters, run_halving))

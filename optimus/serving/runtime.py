@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import platform
+import sys
 import time
 from collections.abc import Iterable
 from importlib import metadata
@@ -28,6 +30,48 @@ def package_version(name: str) -> str | None:
         return metadata.version(name)
     except metadata.PackageNotFoundError:
         return None
+
+
+def runtime_environment() -> dict:
+    payload = {
+        "python": sys.version,
+        "platform": platform.platform(),
+        "versions": {
+            "torch": package_version("torch"),
+            "transformers": package_version("transformers"),
+            "peft": package_version("peft"),
+            "vllm": package_version("vllm"),
+            "safetensors": package_version("safetensors"),
+        },
+    }
+    try:
+        import torch
+
+        cuda_available = bool(torch.cuda.is_available())
+        gpus = []
+        if cuda_available:
+            for idx in range(torch.cuda.device_count()):
+                props = torch.cuda.get_device_properties(idx)
+                gpus.append(
+                    {
+                        "index": idx,
+                        "name": props.name,
+                        "total_memory_bytes": int(props.total_memory),
+                        "major": int(props.major),
+                        "minor": int(props.minor),
+                        "max_memory_allocated_bytes": int(torch.cuda.max_memory_allocated(idx)),
+                        "max_memory_reserved_bytes": int(torch.cuda.max_memory_reserved(idx)),
+                    }
+                )
+        payload["cuda"] = {
+            "available": cuda_available,
+            "device_count": len(gpus),
+            "torch_cuda_version": torch.version.cuda,
+            "gpus": gpus,
+        }
+    except Exception as exc:
+        payload["cuda"] = {"available": False, "error": f"{type(exc).__name__}: {exc}"}
+    return payload
 
 
 def configure_vllm_logging() -> None:
@@ -199,6 +243,7 @@ __all__ = [
     "import_vllm_lora_request",
     "make_sampling_params",
     "package_version",
+    "runtime_environment",
     "score_mixed_rows",
     "score_rows",
     "timed_generate",

@@ -9,10 +9,16 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from optimus.core.candidates import SearchCandidate as Candidate
-from optimus.core.candidates import candidate_panel, parse_candidate_key, read_candidate_file
+from optimus.core.perturbations import (
+    PerturbationSpec as Candidate,
+    parse_perturbation_key,
+    perturbation_panel,
+    read_perturbation_file,
+    require_materialization_contract,
+)
 
 from optimus.modeling.dense import normalize_dense_noise_mode
+from optimus.serving.runtime import runtime_environment
 from optimus.serving.transformers import TransformersDenseGaussianBackend, TransformersLoraBackend
 from optimus.tasks.countdown import (
     extract_numeric_vote,
@@ -23,6 +29,10 @@ from optimus.tasks.countdown import (
     voted_answer_exact,
 )
 from optimus.tasks.prompt_variants import make_variant_prompts
+
+
+def perturbation_method(args) -> str:
+    return "dense" if args.perturbation_backend == "dense" else "lora"
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
@@ -155,17 +165,19 @@ def run_oracle(args):
     out.mkdir(parents=True, exist_ok=True)
     reset_outputs(out, ["probes.jsonl"])
     backend = make_backend(args)
+    method = perturbation_method(args)
     examples = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     sig0 = backend.logits_signature(make_prompts_for_backend(backend, args, examples[:4]))
     base = evaluate_candidate(backend, None, examples, args)
-    zero = evaluate_candidate(backend, Candidate("isotropic", 0, 0.0), examples, args)
-    random_candidate = Candidate("isotropic", args.seed + 1, args.sigma)
+    zero = evaluate_candidate(backend, Candidate(args.family, 0, 0.0, method=method), examples, args)
+    random_candidate = Candidate(args.family, args.seed + 1, args.sigma, method=method)
     rand = evaluate_candidate(backend, random_candidate, examples, args)
     backend.clear_candidate()
     sig1 = backend.logits_signature(make_prompts_for_backend(backend, args, examples[:4]))
     restore_max_abs = float((sig0 - sig1).abs().max().item())
     summary = {
         "kind": "oracle",
+        "method": method,
         "model": args.model,
         "data": args.data,
         "seed": args.seed,
@@ -186,6 +198,7 @@ def run_oracle(args):
         "random_elapsed_s": rand["elapsed_s"],
         "pass_zero_score": base["exact_mean"] == zero["exact_mean"],
         "pass_restore_logits": restore_max_abs == 0.0,
+        "runtime": runtime_environment(),
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     write_jsonl(out / "probes.jsonl", base["rows"] + zero["rows"] + rand["rows"])
@@ -378,6 +391,7 @@ def run_search(args):
     out.mkdir(parents=True, exist_ok=True)
     reset_outputs(out, ["per_prompt.jsonl", "candidate_summary.jsonl", "holdout_per_prompt.jsonl", "ensemble_per_prompt.jsonl"])
     backend = make_backend(args)
+    method = perturbation_method(args)
     screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     holdout = load_examples(
         args.data,
@@ -395,9 +409,27 @@ def run_search(args):
         record_loaded_family_state(args.family_state_file, out, args)
     sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
     candidates = (
-        read_candidate_file(args.candidate_file)
+        read_perturbation_file(args.candidate_file, default_method=method)
         if args.candidate_file
-        else candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
+        else perturbation_panel(
+            method,
+            args.family,
+            args.population,
+            args.sigma,
+            args.seed,
+            args.antithetic,
+            sigma_values,
+            rank=args.rank if method == "lora" else None,
+            targets=args.targets,
+        )
+    )
+    require_materialization_contract(
+        candidates,
+        backend=f"Transformers {method} search",
+        method=method,
+        rank=args.rank if method == "lora" else None,
+        targets=args.targets,
+        require_explicit=bool(args.candidate_file),
     )
     summaries = []
     start = time.time()
@@ -412,7 +444,7 @@ def run_search(args):
     holdout_rows = []
     holdout_per_candidate_rows = []
     for row in top:
-        ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, args, family_state)
+        ev = evaluate_candidate(backend, parse_perturbation_key(row["candidate"]), holdout, args, family_state)
         holdout_rows.append({k: v for k, v in ev.items() if k != "rows"})
         tagged = tag_rows(ev["rows"], mode="holdout")
         holdout_per_candidate_rows.extend(tagged)
@@ -438,6 +470,7 @@ def run_search(args):
     total_s = time.time() - start
     summary = {
         "kind": "search",
+        "method": method,
         "model": args.model,
         "data": args.data,
         "family": args.family,
@@ -481,6 +514,7 @@ def run_search(args):
         "best_strict_ensemble_holdout_exact": max((row["exact_mean"] for row in strict_ensemble_rows), default=None),
         "top_screen": top,
         "top_holdout": holdout_rows,
+        "runtime": runtime_environment(),
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     write_jsonl(out / "candidate_summary.jsonl", summaries)
@@ -501,6 +535,7 @@ def run_halving(args):
         ],
     )
     backend = make_backend(args)
+    method = perturbation_method(args)
     screen = load_examples(args.data, args.prompts, args.seed, allow_repeat=args.allow_repeat_data)
     holdout = load_examples(
         args.data,
@@ -521,9 +556,27 @@ def run_halving(args):
         record_loaded_family_state(args.family_state_file, out, args)
     sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
     candidates = (
-        read_candidate_file(args.candidate_file)
+        read_perturbation_file(args.candidate_file, default_method=method)
         if args.candidate_file
-        else candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
+        else perturbation_panel(
+            method,
+            args.family,
+            args.population,
+            args.sigma,
+            args.seed,
+            args.antithetic,
+            sigma_values,
+            rank=args.rank if method == "lora" else None,
+            targets=args.targets,
+        )
+    )
+    require_materialization_contract(
+        candidates,
+        backend=f"Transformers {method} halving",
+        method=method,
+        rank=args.rank if method == "lora" else None,
+        targets=args.targets,
+        require_explicit=bool(args.candidate_file),
     )
     stage_rows = []
     start = time.time()
@@ -537,7 +590,7 @@ def run_halving(args):
     survivors = sorted(stage_rows, key=lambda r: r["exact_mean"], reverse=True)[:survivor_n]
     full_rows = []
     for i, row in enumerate(survivors):
-        cand = parse_candidate_key(row["candidate"])
+        cand = parse_perturbation_key(row["candidate"])
         ev = evaluate_candidate(backend, cand, screen, args, family_state)
         full = {k: v for k, v in ev.items() if k != "rows"}
         full["stage_exact_mean"] = row["exact_mean"]
@@ -547,7 +600,7 @@ def run_halving(args):
     top = sorted(full_rows, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(full_rows))]
     holdout_rows = []
     for row in top:
-        ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, args, family_state)
+        ev = evaluate_candidate(backend, parse_perturbation_key(row["candidate"]), holdout, args, family_state)
         holdout_rows.append({k: v for k, v in ev.items() if k != "rows"})
         write_jsonl(out / "holdout_per_prompt.jsonl", tag_rows(ev["rows"], mode="holdout"))
     total_s = time.time() - start
@@ -555,6 +608,7 @@ def run_halving(args):
     full_prompt_evals = len(candidates) * len(screen) + len(top) * len(holdout)
     summary = {
         "kind": "halving",
+        "method": method,
         "model": args.model,
         "data": args.data,
         "family": args.family,
@@ -597,6 +651,7 @@ def run_halving(args):
         "top_stage": sorted(stage_rows, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(stage_rows))],
         "top_screen": top,
         "top_holdout": holdout_rows,
+        "runtime": runtime_environment(),
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     write_jsonl(out / "stage_candidate_summary.jsonl", stage_rows)
@@ -613,13 +668,14 @@ def run_sysbench(args):
     out.mkdir(parents=True, exist_ok=True)
     reset_outputs(out, ["rows.jsonl"])
     backend = make_backend(args)
+    method = perturbation_method(args)
     examples = load_examples(
         args.data,
         max(parse_int_list(args.prompt_counts)),
         args.seed,
         allow_repeat=args.allow_repeat_data,
     )
-    candidate = Candidate(args.family, args.seed + 17, args.sigma)
+    candidate = Candidate(args.family, args.seed + 17, args.sigma, method=method, rank=args.rank if method == "lora" else None, targets=args.targets)
     rows = []
     for batch_size in parse_int_list(args.batch_sizes):
         backend.batch_size = batch_size
@@ -649,6 +705,7 @@ def run_sysbench(args):
     best = max(rows, key=lambda r: r["tokens_per_sec"]) if rows else {}
     summary = {
         "kind": "sysbench",
+        "method": method,
         "model": args.model,
         "family": args.family,
         "rank": args.rank,
@@ -663,6 +720,7 @@ def run_sysbench(args):
         "max_new_tokens": args.max_new_tokens,
         "stop_at_answer": args.stop_at_answer,
         "rows": rows,
+        "runtime": runtime_environment(),
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     write_jsonl(out / "rows.jsonl", rows)
@@ -699,73 +757,7 @@ def main(argv: list[str] | None = None):
             help="Dense perturbation RNG contract.",
         )
         sp.add_argument("--stop-at-answer", action="store_true")
-        sp.add_argument(
-            "--family",
-            default="isotropic",
-            choices=[
-                "isotropic",
-                "factor_gaussian_lora",
-                "projected_gaussian_rank_r",
-                "randomized_projected_gaussian_rank_r",
-                "spectral_projected_gaussian_rank_r",
-                "spectral_projected_gaussian_rank_r_c0p5",
-                "spectral_projected_gaussian_rank_r_c0p75",
-                "spectral_projected_gaussian_rank_r_c1p25",
-                "spectral_projected_gaussian_rank_r_c1p5",
-                "spectral_projected_gaussian_rank_r_c2",
-                "activation_projected_gaussian_rank_r",
-                "activation_projected_gaussian_rank_r_c0p5",
-                "activation_projected_gaussian_rank_r_c0p75",
-                "activation_projected_gaussian_rank_r_c1p25",
-                "activation_projected_gaussian_rank_r_c1p5",
-                "activation_projected_gaussian_rank_r_c2",
-                "activation_generalized_projected_gaussian_rank_r",
-                "activation_generalized_projected_gaussian_rank_r_c0p5",
-                "activation_generalized_projected_gaussian_rank_r_c0p75",
-                "activation_generalized_projected_gaussian_rank_r_c1p25",
-                "activation_generalized_projected_gaussian_rank_r_c1p5",
-                "activation_generalized_projected_gaussian_rank_r_c2",
-                "activation_generalized_spectral_lora",
-                "activation_generalized_spectral_lora_c0p5",
-                "activation_generalized_spectral_lora_c0p75",
-                "activation_generalized_spectral_lora_c1p25",
-                "activation_generalized_spectral_lora_c1p5",
-                "activation_generalized_spectral_lora_c2",
-                "activation_generalized_spectral_lora_sv",
-                "activation_generalized_spectral_lora_sv_c0p75",
-                "activation_generalized_spectral_lora_sv_c1p25",
-                "activation_generalized_spectral_lora_sv_c1p5",
-                "activation_generalized_spectral_lora_sv_c2",
-                "activation_spectral_lora",
-                "activation_spectral_lora_c0p5",
-                "activation_spectral_lora_c0p75",
-                "activation_spectral_lora_c1p25",
-                "activation_spectral_lora_c1p5",
-                "activation_spectral_lora_c2",
-                "activation_spectral_lora_c3",
-                "activation_spectral_lora_c4",
-                "activation_spectral_lora_tscale_q2_v1",
-                "activation_spectral_lora_tscale_q2_v1p045",
-                "activation_spectral_lora_tscale_q1p886_v0p985",
-                "activation_spectral_lora_tscale_q2_k1_v1_o2",
-                "activation_spectral_lora_tscale_q2_k1p045_v1p045_o2",
-                "activation_spectral_lora_tscale_q1p333_k0p697_v0p697_o1p333",
-                "activation_spectral_lora_sv",
-                "activation_spectral_lora_sv_c0p75",
-                "activation_spectral_lora_sv_c1p25",
-                "activation_spectral_lora_sv_c1p5",
-                "activation_spectral_lora_sv_c2",
-                "sparse_low_rank_lora",
-                "sparse_low_rank_lora_d0p125",
-                "sparse_low_rank_lora_d0p25",
-                "sparse_low_rank_lora_d0p5",
-                "dense_gaussian",
-                "anzo",
-                "target_svd",
-                "random_ortho",
-                "anzo_random_target",
-            ],
-        )
+        sp.add_argument("--family", default="isotropic")
         sp.add_argument("--population", type=int, default=32)
         sp.add_argument("--candidate-file", default="", help="Optional JSONL/list of exact candidate keys to evaluate.")
         sp.add_argument("--family-state-file", default="", help="Optional saved activation family_state.pt to reuse.")

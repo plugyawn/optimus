@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
-from dataclasses import asdict, dataclass
+import time
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Mapping
+
+from optimus.core.experiments import ExperimentKey, status_record
 
 
 @dataclass(frozen=True)
@@ -40,6 +44,26 @@ class RunSpec:
     kind: str
     output_path: Path
     command: tuple[str, ...]
+    backend: str = "vllm"
+    method: str = "lora"
+    population: int | None = None
+    identity: Mapping[str, Any] = field(default_factory=dict)
+
+    @property
+    def key(self) -> ExperimentKey:
+        command_text = json.dumps(list(self.command), sort_keys=True)
+        extra = dict(self.identity)
+        extra["command_sha256"] = hashlib.sha256(command_text.encode("utf-8")).hexdigest()
+        return ExperimentKey(
+            name=self.name,
+            kind=self.kind,
+            method=self.method,
+            backend=self.backend,
+            population=self.population,
+            model=str(extra.get("model")) if extra.get("model") is not None else None,
+            seed=int(extra["seed"]) if extra.get("seed") is not None else None,
+            extra=extra,
+        )
 
 
 def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int) -> list[str]:
@@ -83,6 +107,57 @@ def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int
     ]
 
 
+def search_identity(config: GpuSuiteConfig, population: int) -> dict[str, Any]:
+    return {
+        "model": config.model,
+        "data": str(config.data),
+        "family": "isotropic",
+        "population": population,
+        "screen_prompts": config.prompts,
+        "holdout_prompts": config.holdout_prompts,
+        "promote": config.promote,
+        "rank": config.rank,
+        "sigma": config.sigma,
+        "seed": config.seed,
+        "targets": config.targets,
+        "max_new_tokens": config.max_new_tokens,
+        "chunk_adapters": config.chunk_adapters,
+        "max_loras": config.max_loras,
+        "max_cpu_loras": config.max_cpu_loras,
+        "tensor_parallel_size": config.tensor_parallel_size,
+        "antithetic": True,
+    }
+
+
+def bench_identity(config: GpuSuiteConfig, adapters: int) -> dict[str, Any]:
+    return {
+        "model": config.model,
+        "data": str(config.data),
+        "family": "isotropic",
+        "adapters": adapters,
+        "prompts": config.prompts,
+        "rank": config.rank,
+        "sigma": config.sigma,
+        "seed": config.seed,
+        "targets": config.targets,
+        "max_new_tokens": config.max_new_tokens,
+        "max_loras": adapters,
+        "max_cpu_loras": config.max_cpu_loras,
+        "tensor_parallel_size": config.tensor_parallel_size,
+    }
+
+
+def halving_identity(config: GpuSuiteConfig) -> dict[str, Any]:
+    identity = search_identity(config, config.halving_population)
+    identity.update(
+        {
+            "stage_prompts": config.halving_stage_prompts,
+            "survivors": config.halving_survivors,
+        }
+    )
+    return identity
+
+
 def bench_specs(config: GpuSuiteConfig) -> list[RunSpec]:
     specs = []
     for adapters in config.bench_adapters:
@@ -92,6 +167,8 @@ def bench_specs(config: GpuSuiteConfig) -> list[RunSpec]:
                 name=f"bench_a{adapters}_p{config.prompts}",
                 kind="bench",
                 output_path=out,
+                population=adapters,
+                identity=bench_identity(config, adapters),
                 command=(
                     "optimus",
                     "vllm-bench",
@@ -139,6 +216,8 @@ def search_specs(config: GpuSuiteConfig) -> list[RunSpec]:
                 name=f"search_p{population}_chunk{config.chunk_adapters}",
                 kind="search",
                 output_path=out,
+                population=population,
+                identity=search_identity(config, population),
                 command=tuple(_base_search_args(config, out, population)),
             )
         )
@@ -150,11 +229,14 @@ def halving_specs(config: GpuSuiteConfig) -> list[RunSpec]:
         config.output_root
         / f"halving_p{config.halving_population}_stage{config.halving_stage_prompts}_surv{config.halving_survivors}"
     )
+    reference = config.output_root / f"search_p{config.halving_population}_chunk{config.chunk_adapters}"
     return [
         RunSpec(
             name=out.name,
             kind="halving",
             output_path=out,
+            population=config.halving_population,
+            identity=halving_identity(config),
             command=(
                 "optimus",
                 "vllm-halving",
@@ -196,18 +278,24 @@ def halving_specs(config: GpuSuiteConfig) -> list[RunSpec]:
                 str(config.max_new_tokens),
                 "--stop-at-answer",
                 "--antithetic",
+                "--full-search-reference",
+                str(reference),
             ),
         )
     ]
 
 
 def report_specs(config: GpuSuiteConfig) -> list[RunSpec]:
+    report_root = config.output_root.parent
     return [
         RunSpec(
             name="systems_report",
             kind="report",
             output_path=config.systems_output_root,
-            command=("optimus", "systems-report", "--root", "results", "--out", str(config.systems_output_root)),
+            backend="local",
+            method="report",
+            identity={"root": str(report_root), "systems_out": str(config.systems_output_root)},
+            command=("optimus", "systems-report", "--root", str(report_root), "--out", str(config.systems_output_root)),
         )
     ]
 
@@ -233,48 +321,91 @@ def spec_is_complete(spec: RunSpec) -> bool:
         payload = json.loads(marker.read_text())
     except (json.JSONDecodeError, OSError):
         return False
-    return not str(payload.get("kind", "")).endswith("_failure")
+    if str(payload.get("kind", "")).endswith("_failure"):
+        return False
+    for key, expected in spec.identity.items():
+        if key in {"command_sha256", "data"}:
+            continue
+        if key not in payload:
+            return False
+        observed = payload[key]
+        if isinstance(observed, list):
+            observed = ",".join(str(item) for item in observed)
+        if str(observed) != str(expected):
+            return False
+    return True
 
 
-def execute_specs(specs: list[RunSpec], *, dry_run: bool = False, skip_existing: bool = True) -> list[dict[str, Any]]:
+def execute_specs(
+    specs: list[RunSpec],
+    *,
+    dry_run: bool = False,
+    skip_existing: bool = True,
+    on_update: Callable[[list[dict[str, Any]]], None] | None = None,
+) -> list[dict[str, Any]]:
     rows = []
     for spec in specs:
         marker = completion_marker(spec)
         if skip_existing and spec_is_complete(spec):
             rows.append(
-                {
-                    "name": spec.name,
-                    "kind": spec.kind,
-                    "output_path": str(spec.output_path),
-                    "command": list(spec.command),
-                    "status": "skipped",
-                    "marker": str(marker),
-                }
+                status_record(
+                    key=spec.key,
+                    output_path=spec.output_path,
+                    command=spec.command,
+                    status="skipped",
+                    marker=marker,
+                )
             )
+            if on_update:
+                on_update(rows)
             continue
         if dry_run:
             rows.append(
-                {
-                    "name": spec.name,
-                    "kind": spec.kind,
-                    "output_path": str(spec.output_path),
-                    "command": list(spec.command),
-                    "status": "dry_run",
-                    "marker": str(marker),
-                }
+                status_record(
+                    key=spec.key,
+                    output_path=spec.output_path,
+                    command=spec.command,
+                    status="dry_run",
+                    marker=marker,
+                )
             )
+            if on_update:
+                on_update(rows)
             continue
-        subprocess.run(spec.command, check=True)
+        started_at = time.time()
+        try:
+            completed = subprocess.run(spec.command, check=True)
+        except subprocess.CalledProcessError as exc:
+            rows.append(
+                status_record(
+                    key=spec.key,
+                    output_path=spec.output_path,
+                    command=spec.command,
+                    status="failed",
+                    marker=marker,
+                    started_at=started_at,
+                    finished_at=time.time(),
+                    returncode=exc.returncode,
+                    error=str(exc),
+                )
+            )
+            if on_update:
+                on_update(rows)
+            raise
         rows.append(
-            {
-                "name": spec.name,
-                "kind": spec.kind,
-                "output_path": str(spec.output_path),
-                "command": list(spec.command),
-                "status": "completed",
-                "marker": str(marker),
-            }
+            status_record(
+                key=spec.key,
+                output_path=spec.output_path,
+                command=spec.command,
+                status="completed",
+                marker=marker,
+                started_at=started_at,
+                finished_at=time.time(),
+                returncode=completed.returncode,
+            )
         )
+        if on_update:
+            on_update(rows)
     return rows
 
 
@@ -288,6 +419,9 @@ def plan_payload(config: GpuSuiteConfig) -> dict:
             {
                 "name": spec.name,
                 "kind": spec.kind,
+                "backend": spec.backend,
+                "method": spec.method,
+                "population": spec.population,
                 "output_path": str(spec.output_path),
                 "command": list(spec.command),
             }

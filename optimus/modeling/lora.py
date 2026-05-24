@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from optimus.core.candidates import SearchCandidate as Candidate
+from optimus.core.perturbations import PerturbationSpec as Candidate
 from optimus.modeling.qwen import SUPPORTED_QWEN_LORA_TARGETS, qwen_lora_shapes
 
 
@@ -18,6 +18,7 @@ class AdapterSpec:
     seed: int
     sigma: float
     sign: int
+    method: str = "lora"
 
 
 def parse_targets(text: str) -> list[str]:
@@ -71,6 +72,8 @@ def save_seed_adapter(
     tensor_dtype: str,
     family_state: dict | None = None,
 ) -> None:
+    if candidate.method != "lora":
+        raise ValueError(f"LoRA adapter materialization requires lora perturbations, got {candidate.method!r}")
     import torch
     from safetensors.torch import save_file
 

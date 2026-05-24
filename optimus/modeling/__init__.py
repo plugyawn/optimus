@@ -1,4 +1,4 @@
-"""Model-specific adapter materialization helpers."""
+"""Dense and low-rank perturbation materialization helpers."""
 
 from .lora import AdapterSpec, adapter_config, parse_targets, save_seed_adapter
 from .qwen import SUPPORTED_QWEN_LORA_TARGETS, load_qwen_lora_config, normalize_qwen_text_config, qwen_lora_shapes

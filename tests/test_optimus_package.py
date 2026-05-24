@@ -13,7 +13,7 @@ except ModuleNotFoundError:  # Python 3.10
 
 from optimus import __version__
 from optimus.cli import resolve_command
-from optimus.core.candidates import SearchCandidate, parse_candidate_key
+from optimus.core.perturbations import PerturbationSpec, parse_perturbation_key
 from optimus.evaluation.release import FORBIDDEN_PACKAGE
 from optimus.modeling.qwen import qwen_lora_shapes
 
@@ -32,6 +32,7 @@ def test_cli_exposes_professional_run_commands():
     assert resolve_command("release-check") == "optimus.evaluation.release"
     assert resolve_command("lighteval") == "optimus.commands.lighteval"
     assert resolve_command("peft-search") == "optimus.commands.peft_search"
+    assert resolve_command("perturbation-panel") == "optimus.commands.perturbation_panel"
     assert resolve_command("run-suite") == "optimus.runs.gpu_suite_runner"
 
 
@@ -139,14 +140,25 @@ def test_public_cli_does_not_expose_experiment_catchall():
     assert "score-sanity-audit" not in result.stdout
 
 
-def test_search_candidate_surface_uses_existing_candidate_key_contract():
-    candidate = SearchCandidate("isotropic", seed=123, sigma=0.0075, sign=-1)
-    assert parse_candidate_key(candidate.key) == candidate
+def test_perturbation_surface_uses_stable_key_contract():
+    candidate = PerturbationSpec("isotropic", seed=123, sigma=0.0075, sign=-1, method="lora")
+    assert parse_perturbation_key(candidate.key) == candidate
+    assert parse_perturbation_key(candidate.legacy_key) == candidate
 
 
-def test_candidate_core_import_is_lightweight():
+def test_core_perturbation_spec_supports_dense_and_lora_keys():
+    lora = PerturbationSpec("isotropic", seed=123, sigma=0.0075, sign=1, method="lora", rank=8, targets="q_proj,v_proj")
+    dense = PerturbationSpec("dense_gaussian", seed=456, sigma=0.01, sign=-1, method="dense")
+
+    assert lora.key.startswith("lora:")
+    assert dense.key.startswith("dense:")
+    assert parse_perturbation_key(lora.key) == lora
+    assert parse_perturbation_key(dense.legacy_key) == dense
+
+
+def test_perturbation_core_import_is_lightweight():
     result = subprocess.run(
-        [sys.executable, "-c", "import optimus.core.candidates"],
+        [sys.executable, "-c", "import optimus.core.perturbations"],
         check=True,
         capture_output=True,
         text=True,
@@ -200,13 +212,14 @@ def test_serving_namespace_import_is_lightweight():
 
 def test_vllm_serving_metadata_import_is_lightweight():
     result = subprocess.run(
-        [sys.executable, "-c", "from optimus.serving.vllm import AdapterSpec, candidate_panel; print(AdapterSpec.__name__)"],
+        [sys.executable, "-c", "from optimus.serving.vllm import AdapterSpec, perturbation_panel; print(AdapterSpec.__name__, perturbation_panel.__name__)"],
         check=True,
         capture_output=True,
         text=True,
     )
 
     assert "AdapterSpec" in result.stdout
+    assert "perturbation_panel" in result.stdout
     assert result.stderr == ""
 
 
@@ -308,3 +321,5 @@ def test_repo_root_has_no_old_project_namespace_or_tracked_results():
     tracked = subprocess.run(["git", "ls-files"], check=True, capture_output=True, text=True).stdout.splitlines()
     assert not any(path.startswith(f"{FORBIDDEN_PACKAGE}/") for path in tracked)
     assert not any(path.startswith("results/") for path in tracked)
+    assert not any(path.startswith("docs/reports/") for path in tracked)
+    assert not any(path.startswith("data/") for path in tracked)

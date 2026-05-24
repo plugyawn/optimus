@@ -4,6 +4,8 @@ __pycache__/
 build/
 dist/
 .venv/
+data/
+docs/reports/
 results/
 wandb/
 *.log

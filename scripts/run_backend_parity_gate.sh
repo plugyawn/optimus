@@ -69,18 +69,10 @@ optimus vllm-search \
   --antithetic \
   --keep-adapters
 
-optimus backend-output-diff \
-  --trusted "$OUT_ROOT/peft" \
-  --candidate "$OUT_ROOT/vllm" \
-  --trusted-name peft \
-  --candidate-name vllm \
-  --out "$OUT_ROOT/output_diff"
-
 optimus backend-parity-gate \
   --trusted "$OUT_ROOT/peft" \
   --candidate "$OUT_ROOT/vllm" \
   --trusted-name peft \
   --candidate-name vllm \
   --out "$OUT_ROOT/gate" \
-  --adapter-sample "$ADAPTER_SAMPLE" \
-  --output-diff-summary "$OUT_ROOT/output_diff/summary.json"
+  --adapter-sample "$ADAPTER_SAMPLE"

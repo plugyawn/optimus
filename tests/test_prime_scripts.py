@@ -9,6 +9,7 @@ SCRIPTS = [
     Path("scripts/remote/optimus_prime_bootstrap.sh"),
     Path("scripts/remote/optimus_prime_smoke.sh"),
     Path("scripts/remote/optimus_prime_gpu_suite.sh"),
+    Path("scripts/run_backend_parity_gate.sh"),
     Path("scripts/run_optimus_gpu_suite.sh"),
 ]
 
@@ -33,3 +34,13 @@ def test_gpu_suite_launcher_delegates_execution_to_optimus_runner():
     assert "--execution-log \"$OUT_ROOT/execution.json\"" in text
     assert "run_bench()" not in text
     assert "run_search()" not in text
+
+
+def test_backend_parity_launcher_uses_supported_cli_commands():
+    text = Path("scripts/run_backend_parity_gate.sh").read_text()
+
+    assert "optimus peft-search" in text
+    assert "optimus vllm-search" in text
+    assert "optimus backend-parity-gate" in text
+    assert "backend-output-diff" not in text
+    assert "--allow-missing-output-diff" not in text

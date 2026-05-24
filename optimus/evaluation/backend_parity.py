@@ -9,6 +9,9 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
+from optimus.core.perturbations import parse_perturbation_key
+from optimus.tasks.countdown import extract_answer
+
 
 PROTOCOL_KEYS = [
     "family",
@@ -29,6 +32,7 @@ class ParsedCandidate:
     seed: int
     sigma: float
     sign: int
+    method: str = "lora"
 
 
 def read_json(path: Path) -> dict:
@@ -99,6 +103,20 @@ def top_candidates(rows: list[dict], score_col: str, k: int) -> set[str]:
     return {row["candidate"] for row in sorted(rows, key=lambda r: r[score_col], reverse=True)[:k]}
 
 
+def candidate_join_key(key: str) -> str:
+    parsed = parse_parity_key(key)
+    return f"{parsed.method}:{parsed.family}:seed{parsed.seed}:s{parsed.sigma:g}:sign{parsed.sign}"
+
+
+def output_join_candidate(key: str) -> str:
+    if key == "base":
+        return key
+    try:
+        return candidate_join_key(key)
+    except ValueError:
+        return key
+
+
 def compare_rankings(
     trusted_dir: Path,
     candidate_dir: Path,
@@ -113,13 +131,21 @@ def compare_rankings(
     candidate_backend_rows = candidate_rows(candidate_dir)
     trusted_score = f"{trusted_name}_exact_mean"
     candidate_score = f"{candidate_name}_exact_mean"
-    by_candidate = {
-        row["candidate"]: {trusted_score: float(row["exact_mean"])}
-        for row in trusted_rows
-    }
+    by_candidate = {}
+    for row in trusted_rows:
+        try:
+            key = candidate_join_key(str(row["candidate"]))
+        except ValueError:
+            key = str(row["candidate"])
+        by_candidate[key] = {trusted_score: float(row["exact_mean"]), "trusted_candidate": row["candidate"]}
     for row in candidate_backend_rows:
-        if row["candidate"] in by_candidate:
-            by_candidate[row["candidate"]][candidate_score] = float(row["exact_mean"])
+        try:
+            key = candidate_join_key(str(row["candidate"]))
+        except ValueError:
+            key = str(row["candidate"])
+        if key in by_candidate:
+            by_candidate[key][candidate_score] = float(row["exact_mean"])
+            by_candidate[key]["candidate_backend_candidate"] = row["candidate"]
     joined = [
         {"candidate": key, **value}
         for key, value in by_candidate.items()
@@ -189,16 +215,12 @@ def write_csv(path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
-def parse_candidate_key(key: str) -> ParsedCandidate:
-    parts = key.split(":")
-    if len(parts) != 4:
+def parse_parity_key(key: str) -> ParsedCandidate:
+    try:
+        parsed = parse_perturbation_key(key)
+    except ValueError as exc:
         raise ValueError(f"cannot parse candidate key: {key!r}")
-    return ParsedCandidate(
-        parts[0],
-        int(parts[1].removeprefix("seed")),
-        float(parts[2].removeprefix("s")),
-        int(parts[3].removeprefix("sign")),
-    )
+    return ParsedCandidate(parsed.family, parsed.seed, parsed.sigma, parsed.sign, parsed.method)
 
 
 def normalize(value):
@@ -338,7 +360,7 @@ def check_adapter_tensors(
     family_state_path = candidate_dir / "family_state.pt"
     family_state = torch.load(family_state_path, map_location="cpu") if family_state_path.exists() else None
     for spec, adapter_path in existing_specs:
-        candidate = parse_candidate_key(spec["candidate"])
+        candidate = parse_parity_key(spec["candidate"])
         tensors = load_file(str(adapter_path))
         for module, in_features, out_features in shapes:
             a_key = f"base_model.model.{module}.lora_A.weight"
@@ -371,6 +393,72 @@ def check_adapter_tensors(
                 checked += int(got is not None)
     reason = "" if checked > 0 else "no sampled adapter tensors checked"
     return rows, {"pass": ok and checked > 0, "checked": checked, "sampled_adapters": len(specs), "reason": reason}
+
+
+def output_row_key(row: dict) -> tuple[str, int, str, str]:
+    return (
+        output_join_candidate(str(row.get("candidate", ""))),
+        int(row.get("example_id", -1)),
+        str(row.get("mode", "")),
+        str(row.get("prompt_variant", "default")),
+    )
+
+
+def comparable_output_rows(run_dir: Path) -> list[dict]:
+    return read_jsonl(run_dir / "per_prompt.jsonl") + read_jsonl(run_dir / "holdout_per_prompt.jsonl")
+
+
+def answer_value(row: dict) -> str:
+    answer = row.get("answer")
+    if answer is not None:
+        return str(answer).strip()
+    return extract_answer(str(row.get("text", "")))
+
+
+def build_output_diff_summary(trusted_dir: Path, candidate_dir: Path) -> dict:
+    trusted_rows = comparable_output_rows(trusted_dir)
+    candidate_rows = comparable_output_rows(candidate_dir)
+    trusted_by_key = {output_row_key(row): row for row in trusted_rows}
+    candidate_by_key = {output_row_key(row): row for row in candidate_rows}
+    common_keys = sorted(set(trusted_by_key) & set(candidate_by_key))
+    by_candidate: dict[str, dict[str, float]] = {}
+    exact_disagreements = 0
+    answer_equal = 0
+    for key in common_keys:
+        trusted = trusted_by_key[key]
+        candidate = candidate_by_key[key]
+        candidate_key = key[0]
+        bucket = by_candidate.setdefault(
+            candidate_key,
+            {
+                "max_abs_exact_delta": 0.0,
+                "max_abs_cap_hit_delta": 0.0,
+                "max_abs_malformed_delta": 0.0,
+            },
+        )
+        exact_delta = abs(float(trusted.get("exact", 0.0)) - float(candidate.get("exact", 0.0)))
+        cap_delta = abs(float(trusted.get("cap_hit", 0.0)) - float(candidate.get("cap_hit", 0.0)))
+        malformed_delta = abs(float(trusted.get("malformed", 0.0)) - float(candidate.get("malformed", 0.0)))
+        bucket["max_abs_exact_delta"] = max(bucket["max_abs_exact_delta"], exact_delta)
+        bucket["max_abs_cap_hit_delta"] = max(bucket["max_abs_cap_hit_delta"], cap_delta)
+        bucket["max_abs_malformed_delta"] = max(bucket["max_abs_malformed_delta"], malformed_delta)
+        exact_disagreements += int(exact_delta != 0.0)
+        answer_equal += int(answer_value(trusted) == answer_value(candidate))
+    total = max(len(common_keys), 1)
+    return {
+        "kind": "backend_output_diff",
+        "trusted": str(trusted_dir),
+        "candidate": str(candidate_dir),
+        "n_trusted": len(trusted_rows),
+        "n_candidate": len(candidate_rows),
+        "n_common": len(common_keys),
+        "exact_disagreement_rate": exact_disagreements / total,
+        "max_abs_exact_delta_by_candidate": max((row["max_abs_exact_delta"] for row in by_candidate.values()), default=None),
+        "max_abs_cap_hit_delta_by_candidate": max((row["max_abs_cap_hit_delta"] for row in by_candidate.values()), default=None),
+        "max_abs_malformed_delta_by_candidate": max((row["max_abs_malformed_delta"] for row in by_candidate.values()), default=None),
+        "answer_equal_rate": answer_equal / total,
+        "reason": "" if common_keys else "no common per-prompt rows",
+    }
 
 
 def check_output_diff(
@@ -526,8 +614,14 @@ def main(argv: list[str] | None = None) -> int:
         local_files_only=args.local_files_only,
     )
     pass_adapters = bool(adapter_summary["pass"] or args.allow_missing_adapters)
+    output_diff_path = args.output_diff_summary
+    if output_diff_path is None and not args.allow_missing_output_diff:
+        output_diff_path = args.out / "output_diff_summary.json"
+        output_diff_path.write_text(
+            json.dumps(build_output_diff_summary(args.trusted, args.candidate), indent=2, sort_keys=True) + "\n"
+        )
     output_diff_rows, output_diff_summary = check_output_diff(
-        args.output_diff_summary,
+        output_diff_path,
         allow_missing=args.allow_missing_output_diff,
         max_exact_disagreement_rate=args.max_exact_disagreement_rate,
         max_abs_exact_delta=args.max_abs_exact_delta,

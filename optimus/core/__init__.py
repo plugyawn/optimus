@@ -1,13 +1,30 @@
 """Core Optimus types and utilities."""
 
-from .candidates import SearchCandidate, candidate_panel, parse_candidate_key, read_candidate_file
+from .experiments import ExperimentKey, RunRecord, ThroughputRecord
 from .hooks import HookRegistry, OptimusEvent
+from .perturbations import (
+    PerturbationEvaluator,
+    PerturbationMaterializer,
+    PerturbationScore,
+    PerturbationSpec,
+    parse_perturbation_key,
+    perturbation_panel,
+    read_perturbation_file,
+    write_perturbation_file,
+)
 
 __all__ = [
     "HookRegistry",
     "OptimusEvent",
-    "SearchCandidate",
-    "candidate_panel",
-    "parse_candidate_key",
-    "read_candidate_file",
+    "ExperimentKey",
+    "PerturbationEvaluator",
+    "PerturbationMaterializer",
+    "PerturbationScore",
+    "PerturbationSpec",
+    "RunRecord",
+    "ThroughputRecord",
+    "parse_perturbation_key",
+    "perturbation_panel",
+    "read_perturbation_file",
+    "write_perturbation_file",
 ]

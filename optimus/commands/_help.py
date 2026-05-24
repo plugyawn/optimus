@@ -4,7 +4,7 @@ from __future__ import annotations
 VLLM_SEARCH_HELP = """\
 usage: optimus vllm-search --out OUT [options]
 
-Run a vLLM LoRA candidate search.
+Run a vLLM-backed LoRA perturbation search.
 
 required:
   --out OUT                         Output directory for run files.
@@ -57,7 +57,7 @@ common options:
 VLLM_HALVING_HELP = """\
 usage: optimus vllm-halving --out OUT [options]
 
-Run staged candidate screening and heldout confirmation.
+Run staged vLLM-backed LoRA perturbation screening and heldout confirmation.
 
 required:
   --out OUT                         Output directory for staged-search files.
@@ -83,7 +83,7 @@ common options:
 PEFT_SEARCH_HELP = """\
 usage: optimus peft-search --out OUT [options]
 
-Run a trusted HF/PEFT LoRA candidate search.
+Run a trusted Transformers search with either LoRA adapters or dense in-memory perturbations.
 
 required:
   --out OUT                         Output directory for run files.
@@ -98,6 +98,8 @@ common options:
   --rank N                          LoRA rank.
   --sigma FLOAT                     Candidate perturbation scale.
   --targets LIST                    Comma-separated target modules.
+  --perturbation-backend {lora,dense}
+                                    Materialize candidates as LoRA adapters or dense patches.
   --batch-size N                    HF/PEFT generation batch size.
   --max-new-tokens N                Generation token cap.
   --stop-at-answer                  Stop generation after the answer close tag.

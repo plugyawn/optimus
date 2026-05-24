@@ -11,7 +11,7 @@ import traceback
 from dataclasses import asdict
 from pathlib import Path
 
-from optimus.core.candidates import SearchCandidate as Candidate
+from optimus.core.perturbations import PerturbationSpec as Candidate
 from optimus.modeling.lora import AdapterSpec, parse_targets, save_seed_adapter
 from optimus.modeling.qwen import SUPPORTED_QWEN_LORA_TARGETS, load_qwen_lora_config, qwen_lora_shapes
 from optimus.serving.prompting import make_vllm_prompt_inputs
@@ -19,6 +19,7 @@ from optimus.serving.runtime import (
     import_vllm_lora_request,
     make_sampling_params,
     package_version,
+    runtime_environment,
     score_mixed_rows,
     score_rows,
     timed_generate,
@@ -50,8 +51,8 @@ def make_adapter_specs(args, out: Path, targets: list[str]) -> list[AdapterSpec]
     seeds = [rng.randrange(1, 2**31 - 1) for _ in range(args.adapters)]
     specs = []
     for idx, seed in enumerate(seeds):
-        candidate = Candidate(args.family, seed, args.sigma, 1)
-        name = f"randopt_seed{seed}_s{args.sigma:g}"
+        candidate = Candidate(args.family, seed, args.sigma, 1, method="lora", rank=args.rank, targets=targets)
+        name = f"optimus_seed{seed}_s{args.sigma:g}"
         path = adapter_root / f"{idx:04d}_{name}"
         save_seed_adapter(
             path,
@@ -95,11 +96,13 @@ def run_benchmark(args) -> dict:
     if args.prepare_only:
         summary = {
             "kind": "vllm_lora_bench_prepare_only",
+            "method": "lora",
             "model": args.model,
             "adapters": len(specs),
             "rank": args.rank,
             "targets": targets,
             "adapter_build_s": adapter_build_s,
+            "runtime": runtime_environment(),
         }
         write_json(out / "summary.json", summary)
         return summary
@@ -240,13 +243,16 @@ def run_benchmark(args) -> dict:
     mixed = next((r for r in adapter_rows if r["mode"] == "mixed"), {})
     summary = {
         "kind": "vllm_lora_bench",
+        "method": "lora",
         "model": args.model,
+        "data": args.data,
         "vllm_version": package_version("vllm"),
         "transformers_version": package_version("transformers"),
         "torch_version": package_version("torch"),
         "adapters": len(specs),
         "rank": args.rank,
         "sigma": args.sigma,
+        "seed": args.seed,
         "family": args.family,
         "targets": targets,
         "prompts": len(prompt_texts),
@@ -257,6 +263,8 @@ def run_benchmark(args) -> dict:
         "enforce_eager": args.enforce_eager,
         "tensor_parallel_size": args.tensor_parallel_size,
         "max_num_batched_tokens": args.max_num_batched_tokens,
+        "max_loras": args.max_loras,
+        "max_cpu_loras": args.max_cpu_loras,
         "adapter_build_s": adapter_build_s,
         "load_s": load_s,
         "preload": args.preload,
@@ -279,6 +287,7 @@ def run_benchmark(args) -> dict:
         "mixed_tokens_per_sec": mixed.get("tokens_per_sec"),
         "mixed_prompts_per_sec": mixed.get("prompts_per_sec"),
         "mixed_exact_mean": mixed.get("exact_mean"),
+        "runtime": runtime_environment(),
     }
     write_json(out / "summary.json", summary)
     return summary
@@ -318,49 +327,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rank", type=int, default=8)
     p.add_argument("--sigma", type=float, default=0.02)
     p.add_argument("--targets", default=DEFAULT_TARGETS)
-    p.add_argument(
-        "--family",
-        default="isotropic",
-        choices=[
-            "isotropic",
-            "factor_gaussian_lora",
-            "projected_gaussian_rank_r",
-            "randomized_projected_gaussian_rank_r",
-            "spectral_projected_gaussian_rank_r",
-            "spectral_projected_gaussian_rank_r_c0p5",
-            "spectral_projected_gaussian_rank_r_c0p75",
-            "spectral_projected_gaussian_rank_r_c1p25",
-            "spectral_projected_gaussian_rank_r_c1p5",
-            "spectral_projected_gaussian_rank_r_c2",
-            "activation_projected_gaussian_rank_r",
-            "activation_projected_gaussian_rank_r_c0p5",
-            "activation_projected_gaussian_rank_r_c0p75",
-            "activation_projected_gaussian_rank_r_c1p25",
-            "activation_projected_gaussian_rank_r_c1p5",
-            "activation_projected_gaussian_rank_r_c2",
-            "activation_generalized_projected_gaussian_rank_r",
-            "activation_generalized_projected_gaussian_rank_r_c0p5",
-            "activation_generalized_projected_gaussian_rank_r_c0p75",
-            "activation_generalized_projected_gaussian_rank_r_c1p25",
-            "activation_generalized_projected_gaussian_rank_r_c1p5",
-            "activation_generalized_projected_gaussian_rank_r_c2",
-            "activation_generalized_spectral_lora",
-            "activation_generalized_spectral_lora_c0p5",
-            "activation_generalized_spectral_lora_c0p75",
-            "activation_generalized_spectral_lora_c1p25",
-            "activation_generalized_spectral_lora_c1p5",
-            "activation_generalized_spectral_lora_c2",
-            "activation_generalized_spectral_lora_sv",
-            "activation_generalized_spectral_lora_sv_c0p75",
-            "activation_generalized_spectral_lora_sv_c1p25",
-            "activation_generalized_spectral_lora_sv_c1p5",
-            "activation_generalized_spectral_lora_sv_c2",
-            "sparse_low_rank_lora",
-            "sparse_low_rank_lora_d0p125",
-            "sparse_low_rank_lora_d0p25",
-            "sparse_low_rank_lora_d0p5",
-        ],
-    )
+    p.add_argument("--family", default="isotropic")
     p.add_argument("--max-new-tokens", type=int, default=32)
     p.add_argument("--prompt-input", default="text", choices=["text", "token_ids"])
     p.add_argument("--stop-at-answer", action="store_true")

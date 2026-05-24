@@ -9,7 +9,7 @@ from pathlib import Path
 
 import torch
 
-from optimus.core.candidates import SearchCandidate as Candidate, candidate_panel, parse_candidate_key
+from optimus.core.perturbations import PerturbationSpec as Candidate, parse_perturbation_key, perturbation_panel
 from optimus.modeling.noise import lora_noise_tensors
 from optimus.search.ensemble import anzo_anchor_prompts
 from optimus.search.peft import evaluate_candidate, make_backend, reset_outputs, tag_rows, write_jsonl
@@ -69,7 +69,7 @@ def candidate_score_rows(paths: list[Path], top_k: int, min_score: float) -> lis
         if score < min_score:
             continue
         try:
-            parse_candidate_key(key)
+            parse_perturbation_key(key)
         except Exception:
             continue
         prev = best_by_key.get(key)
@@ -87,7 +87,7 @@ def lora_a_modules(model):
 
 
 def candidate_a_noise(name: str, weight: torch.Tensor, candidate: Candidate) -> torch.Tensor:
-    unit_candidate = Candidate(candidate.family, candidate.seed, 1.0, candidate.sign)
+    unit_candidate = Candidate(candidate.family, candidate.seed, 1.0, candidate.sign, method=candidate.method)
     noise, _ = lora_noise_tensors(name, tuple(weight.shape), (1, 1), unit_candidate, rank=max(1, weight.shape[0]))
     return noise.detach().cpu()
 
@@ -145,7 +145,7 @@ def build_family_state(args, backend, screen, prior_rows: list[dict], current_ro
             source_counts["activation"] += int(act.shape[0])
 
         for row in scored_rows[: args.basis_elites]:
-            cand = parse_candidate_key(row["candidate"])
+            cand = parse_perturbation_key(row["candidate"])
             if cand.family == "anzo" and name in activation_state:
                 noise = cand.sign * activation_state[name].detach().cpu().float()
             else:
@@ -230,7 +230,8 @@ def run_search(args):
         torch.save(state, out / f"family_state_round{round_idx}.pt")
         round_basis_summaries.append({"round": round_idx, "modules": basis_summary})
         family = f"adaptive_{args.mode.replace('-', '_')}_r{round_idx}"
-        candidates = candidate_panel(
+        candidates = perturbation_panel(
+            "lora",
             family,
             args.population,
             args.sigma,
@@ -255,7 +256,7 @@ def run_search(args):
     holdout_rows = []
     for row in top:
         state = round_states[int(row["round"])]
-        ev = evaluate_candidate(backend, parse_candidate_key(row["candidate"]), holdout, args, state)
+        ev = evaluate_candidate(backend, parse_perturbation_key(row["candidate"]), holdout, args, state)
         holdout_row = jsonable_eval(ev, round=int(row["round"]), mode=args.mode, screen_exact_mean=row["exact_mean"])
         holdout_rows.append(holdout_row)
         write_jsonl(
@@ -330,7 +331,7 @@ def add_common_args(sp):
 
 
 def main(argv: list[str] | None = None):
-    p = argparse.ArgumentParser(description="Adaptive RandOpt LoRA research-axis experiments.")
+    p = argparse.ArgumentParser(description="Adaptive LoRA perturbation-basis experiments.")
     sub = p.add_subparsers(dest="cmd", required=True)
     sp = sub.add_parser("search", help="Run elite-basis or covariance-lite adaptive perturbation search.")
     add_common_args(sp)

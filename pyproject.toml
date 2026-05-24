@@ -1,10 +1,10 @@
 [project]
 name = "optimus"
 version = "0.1.0"
-description = "Zeroth-order LoRA search infrastructure for large language models."
+description = "GPU-oriented zeroth-order optimization for dense and low-rank model perturbations."
 readme = "README.md"
 requires-python = ">=3.10"
-keywords = ["llm", "lora", "zeroth-order-optimization", "vllm"]
+keywords = ["llm", "gpu", "lora", "dense-perturbations", "zeroth-order-optimization", "vllm"]
 dependencies = [
   "torch",
   "transformers>=4.48,<5",

@@ -5,8 +5,8 @@ import re
 
 import torch
 import torch.nn.functional as F
-from optimus.core.candidates import SearchCandidate as Candidate
-from optimus.core.candidates import canonical_module_name, stable_int
+from optimus.core.perturbations import PerturbationSpec as Candidate
+from optimus.core.perturbations import canonical_module_name, stable_int
 
 from optimus.modeling.geometry import (
     low_rank_factors_from_dense,

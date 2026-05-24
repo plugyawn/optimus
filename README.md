@@ -1,22 +1,24 @@
 # Optimus
 
 Optimus is a research library for zeroth-order post-training of large language
-models. The current focus is deterministic LoRA candidate search: generate a
-large panel of candidate adapters, screen them quickly through vLLM adapter
-swapping, and confirm winners with strict trusted-backend and heldout gates.
+models. It gives perturbations stable identities, materializes them as dense
+weight patches or LoRA adapters, runs high-throughput GPU screens, and keeps the
+systems and validation records needed to decide whether a candidate actually
+transfers.
 
 The supported public interface is the `optimus` package and CLI.
 
 ## What Optimus Is For
 
-- High-throughput LoRA candidate screening with vLLM.
-- Dense-reference and HF/PEFT confirmation of candidate quality.
+- Backend-neutral perturbation panels with explicit `dense` and `lora` methods.
+- High-throughput GPU screening through vLLM adapter swapping when the method is
+  LoRA, and trusted Transformers execution for LoRA or dense perturbations.
 - Population scaling studies for P1024/P4096 zeroth-order search.
-- Systems plots: candidate/sec, prompts/sec, token throughput, adapter
+- Systems plots: candidate/sec, prompts/sec, token throughput, backend/method
   throughput, best-of-N scaling, quality scaling, and staged-search savings
   when a staged run is present.
 - Auditable run outputs: candidate manifests, per-prompt rows, validation
-  reports, parity gates, and plot inputs.
+  reports, execution logs, parity gates, and plot inputs.
 
 Optimus is intentionally narrow. It is not a general RLHF stack and it is not a
 serving product; serving code exists to make candidate evaluation fast and
@@ -28,8 +30,9 @@ auditable.
 python -m pip install -e .
 ```
 
-GPU runs additionally need a CUDA build of PyTorch, vLLM with LoRA support, and
-the model weights available locally or through Hugging Face authentication.
+GPU runs additionally need a CUDA build of PyTorch and the model weights
+available locally or through Hugging Face authentication. vLLM is only required
+for the adapter-swapping backend.
 
 For vLLM serving work:
 
@@ -59,12 +62,12 @@ python -m pip install -e ".[dev]"
 
 ```text
 optimus/
-  core/        candidate identities, seed replay, shared types
+  core/        perturbation identities, experiment records, seed replay
   tasks/       benchmark data models, prompt builders, and scorers
-  modeling/    model-specific adapter geometry and LoRA materialization
+  modeling/    dense patches, low-rank geometry, and adapter materialization
   runs/        reusable workload specifications for GPU validation suites
-  search/      population construction and search utilities
-  serving/     vLLM adapter-swapping execution
+  search/      zeroth-order studies, selection, and trusted HF execution
+  serving/     vLLM adapter-swapping and throughput-oriented execution
   evaluation/  reports, gates, and plot-oriented summaries
 ```
 
@@ -83,7 +86,40 @@ optimus make-countdown-data \
   --seed 20260507
 ```
 
-Run a vLLM LoRA search:
+Write a backend-neutral perturbation panel:
+
+```bash
+optimus perturbation-panel \
+  --out results/panels/p1024_lora.jsonl \
+  --method lora \
+  --family isotropic \
+  --population 1024 \
+  --sigma 0.0075 \
+  --rank 8 \
+  --targets q_proj,v_proj \
+  --seed 2468 \
+  --antithetic
+```
+
+Run a trusted dense or LoRA search with Transformers:
+
+```bash
+optimus peft-search \
+  --out results/p1024_dense_reference \
+  --data data/countdown_generated_1200_seed20260507.json \
+  --model Qwen/Qwen2.5-3B-Instruct \
+  --perturbation-backend dense \
+  --family dense_gaussian \
+  --population 1024 \
+  --prompts 64 \
+  --holdout-prompts 256 \
+  --targets q_proj,v_proj \
+  --sigma-values 0.0075 \
+  --max-new-tokens 32 \
+  --stop-at-answer
+```
+
+Run a high-throughput vLLM LoRA search:
 
 ```bash
 DATA=data/countdown_generated_1200_seed20260507.json
@@ -149,11 +185,10 @@ Check release readiness:
 
 ```bash
 optimus release-check \
-  --gpu-root results/prime_runs/l40sx4_20260523_2237/results/optimus_gpu_suite_v092_noflash_tp4 \
-  --systems-out results/prime_runs/l40sx4_20260523_2237/results/report/optimus_systems_v092_noflash_tp4 \
+  --gpu-root results/optimus_gpu_suite \
+  --systems-out results/report/optimus_systems \
   --populations 1024,4096 \
   --bench-adapters 8 \
-  --skip-halving \
   --strict
 ```
 
@@ -178,57 +213,34 @@ Quality claims require:
 - Exact-answer, malformed, cap-hit, and answer-closure rates reported separately.
 - Prompt-robust selection when prompt variants are part of the claim.
 - vLLM selection only after adapter tensor checks and ranking/output parity pass.
-- Dense-reference, HF/PEFT, or LightEval-backed confirmation for promoted
-  candidates.
+- Dense-reference, HF/PEFT, or LightEval-backed confirmation for the selected
+  materialized model state.
 - Clear separation between prompt-local lift, heldout lift vs base, and
   dense-Gaussian parity.
 
 Rank-`r` LoRA should not be described as full dense-Gaussian parity unless the
 run actually uses the dense reference family and passes the parity gate.
 
-## Current Evidence Snapshot
+## Evidence Snapshot
 
-The largest completed population-scale run is the Prime 4x L40S P1024/P4096
-suite under:
+Optimus keeps concrete run artifacts under ignored local `results/` paths.
+Public claims should be regenerated from those artifacts with
+`optimus systems-report` and `optimus release-check`; the repository does not
+ship stale run bundles as source files.
 
-```text
-results/prime_runs/l40sx4_20260523_2237/results
-```
-
-The validated report is:
-
-```text
-results/prime_runs/l40sx4_20260523_2237/results/report/optimus_systems_v092_noflash_tp4/report.md
-```
-
-The same report artifacts are committed for public inspection under:
-
-```text
-docs/reports/l40sx4_20260523_2237/
-```
-
-The key quality result is deliberately reported in two columns:
-
-- P1024 screen-selected heldout transfer: base `18/256`, selected `26/256`,
-  lift `+8/256`.
-- P4096 screen-selected heldout transfer: base `18/256`, selected `28/256`,
-  lift `+10/256`.
-- P1024 and P4096 promoted holdout-oracle candidates: `38/256`, lift
-  `+20/256`.
-
-That means the current run shows positive heldout transfer for the vLLM
-screen-selected candidates and stronger candidate-generation capacity under the
-post-hoc promoted holdout oracle. Optimus reports those separately so a
-screen-selector claim cannot be hidden by a best-of-promoted number.
+Reports must separate selector evidence from post-hoc candidate-generation
+evidence. The screen-selected holdout column is the selector claim. The promoted
+holdout-oracle column is only candidate-generation evidence and is not a
+substitute for trusted confirmation.
 
 ## GPU Suite Run Plan
 
 The reference GPU workload is encoded in `scripts/run_optimus_gpu_suite.sh`:
 
-1. P1024 full vLLM search with complete throughput and heldout outputs.
-2. P4096 full vLLM search for best-of-N and scaling plots.
+1. P1024 full perturbation search with complete throughput and heldout outputs.
+2. P4096 full perturbation search for best-of-N and scaling plots.
 3. P1024 staged search to measure prompt-eval savings and selected-regret.
-4. Trusted confirmation for promoted candidates.
+4. Trusted confirmation for selected candidates or final materialized models.
 5. `optimus validate-run` to verify the required run outputs.
 6. A final report with best-of-N curves and MFU/scaling-style
    plots for zeroth-order optimization.
@@ -236,9 +248,6 @@ The reference GPU workload is encoded in `scripts/run_optimus_gpu_suite.sh`:
 Prime GPU use must be logged in the project ledger before launch, and active
 pods must be shut down or explicitly reported at the end of the run.
 
-The 4x L40S run completed items 1, 2, 5, the adapter-throughput bench, and the
-core report plots with `BENCH_ADAPTERS=8` and `RUN_HALVING=0`. The intended
-8xA100 run was attempted, but provider provisioning never reached SSH; the 4x
-fallback was used instead. Remaining publication-grade extensions are
-staged-search evidence and trusted-backend confirmation for the promoted
-candidates.
+Publication-grade claims additionally require staged-search evidence when
+staging is claimed and a passing trusted-backend or LightEval confirmation for
+the selected model state.

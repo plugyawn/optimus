@@ -1,2 +1,0 @@
-suite,run,adapters,prompts,tensor_parallel_size,max_new_tokens,max_loras,preload,lora_tokens_per_sec,lora_prompts_per_sec,best_adapter_tokens_per_sec,best_adapter_prompts_per_sec,base_tokens_per_sec,mixed_tokens_per_sec,mixed_prompts_per_sec,load_s,preload_s
-optimus_gpu_suite_v092_noflash_tp4,bench_a8_p64,8,64,4,32,,True,,,,,,2718.419161497481,146.0319599923104,138.8359730243683,0.21812081336975098

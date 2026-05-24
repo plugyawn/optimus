@@ -11,7 +11,7 @@ import traceback
 from dataclasses import asdict
 from pathlib import Path
 
-from optimus.core.candidates import candidate_panel
+from optimus.core.perturbations import perturbation_panel, require_materialization_contract
 from optimus.modeling import parse_targets
 from optimus.serving.search import (
     base_eval,
@@ -23,10 +23,62 @@ from optimus.serving.runtime import (
     import_vllm_lora_request,
     make_sampling_params,
     package_version,
+    runtime_environment,
     write_json,
     write_jsonl,
 )
 from optimus.tasks.countdown import load_examples, unique_example_count, unique_semantic_example_count
+
+
+def read_jsonl(path: Path) -> list[dict]:
+    if not path.exists():
+        raise FileNotFoundError(f"missing JSONL file: {path}")
+    rows = []
+    with path.open() as f:
+        for line in f:
+            if line.strip():
+                rows.append(json.loads(line))
+    return rows
+
+
+def full_reference_metrics(reference_dir: Path | None, survivors: list[dict], selected: list[dict]) -> dict:
+    if reference_dir is None:
+        return {
+            "full_search_reference": None,
+            "full_reference_common": 0,
+            "top8_survivor_recall": None,
+            "top8_possible": None,
+            "full_best_candidate": None,
+            "full_best_exact": None,
+            "full_best_survived": None,
+            "halving_selected_candidate": selected[0]["candidate"] if selected else None,
+            "halving_selected_full_exact": None,
+            "halving_selected_regret_vs_full": None,
+        }
+    reference_rows = read_jsonl(reference_dir / "candidate_summary.jsonl")
+    survivor_keys = {row["candidate"] for row in survivors}
+    reference_by_candidate = {str(row["candidate"]): row for row in reference_rows if row.get("candidate")}
+    full_sorted = sorted(reference_rows, key=lambda row: float(row.get("exact_mean", 0.0)), reverse=True)
+    top8 = full_sorted[: min(8, len(full_sorted))]
+    top8_possible = len(top8)
+    top8_survivors = [row for row in top8 if row.get("candidate") in survivor_keys]
+    full_best = full_sorted[0] if full_sorted else {}
+    selected_key = selected[0]["candidate"] if selected else None
+    selected_reference = reference_by_candidate.get(str(selected_key)) if selected_key is not None else None
+    full_best_exact = None if not full_best else float(full_best.get("exact_mean", 0.0))
+    selected_exact = None if selected_reference is None else float(selected_reference.get("exact_mean", 0.0))
+    return {
+        "full_search_reference": str(reference_dir),
+        "full_reference_common": len(set(reference_by_candidate) & survivor_keys),
+        "top8_survivor_recall": None if top8_possible == 0 else len(top8_survivors) / top8_possible,
+        "top8_possible": top8_possible,
+        "full_best_candidate": full_best.get("candidate"),
+        "full_best_exact": full_best_exact,
+        "full_best_survived": bool(full_best and full_best.get("candidate") in survivor_keys),
+        "halving_selected_candidate": selected_key,
+        "halving_selected_full_exact": selected_exact,
+        "halving_selected_regret_vs_full": None if full_best_exact is None or selected_exact is None else full_best_exact - selected_exact,
+    }
 
 
 def reset_outputs(out: Path) -> None:
@@ -59,7 +111,23 @@ def run_halving(args) -> dict:
         allow_repeat=args.allow_repeat_data,
         exclude_ids={ex.id for ex in screen},
     )
-    candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic)
+    candidates = perturbation_panel(
+        "lora",
+        args.family,
+        args.population,
+        args.sigma,
+        args.seed,
+        args.antithetic,
+        rank=args.rank,
+        targets=targets,
+    )
+    require_materialization_contract(
+        candidates,
+        backend="vLLM staged search",
+        method="lora",
+        rank=args.rank,
+        targets=targets,
+    )
 
     family_state = build_activation_family_state(args, out, screen, ["default"])
     adapter_start = time.time()
@@ -138,6 +206,7 @@ def run_halving(args) -> dict:
     write_jsonl(out / "holdout_per_prompt.jsonl", holdout_rows)
     holdout_by_candidate = {row["candidate"]: row for row in holdout_candidate_rows}
     top_holdout = [holdout_by_candidate[row["candidate"]] for row in top if row["candidate"] in holdout_by_candidate]
+    reference_metrics = full_reference_metrics(args.full_search_reference, survivors, top)
 
     effective_prompt_evals = len(specs) * len(stage) + len(survivor_specs) * len(screen) + len(top_specs) * len(holdout)
     full_prompt_evals = len(specs) * len(screen) + len(top_specs) * len(holdout)
@@ -147,13 +216,16 @@ def run_halving(args) -> dict:
         shutil.rmtree(out / "adapters", ignore_errors=True)
     summary = {
         "kind": "vllm_lora_halving",
+        "method": "lora",
         "model": args.model,
+        "data": args.data,
         "family": args.family,
         "population": len(specs),
         "survivors": len(survivor_specs),
         "promote": args.promote,
         "rank": args.rank,
         "sigma": args.sigma,
+        "seed": args.seed,
         "targets": targets,
         "antithetic": args.antithetic,
         "stage_prompts": len(stage),
@@ -167,6 +239,7 @@ def run_halving(args) -> dict:
         "holdout_unique_semantic_prompts": unique_semantic_example_count(holdout),
         "screen_holdout_overlap": len({ex.id for ex in screen} & {ex.id for ex in holdout}),
         "max_loras": args.max_loras,
+        "max_cpu_loras": args.max_cpu_loras,
         "chunk_adapters": args.chunk_adapters,
         "enforce_eager": args.enforce_eager,
         "tensor_parallel_size": args.tensor_parallel_size,
@@ -192,9 +265,11 @@ def run_halving(args) -> dict:
         "full_prompt_evals": full_prompt_evals,
         "prompt_eval_savings": 1.0 - (effective_prompt_evals / max(full_prompt_evals, 1)),
         "candidate_sec": len(specs) / max(eval_elapsed_s, 1e-9),
+        **reference_metrics,
         "top_stage": sorted(stage_candidate_rows, key=lambda r: r["exact_mean"], reverse=True)[: min(args.promote, len(stage_candidate_rows))],
         "top_screen": top,
         "top_holdout": top_holdout,
+        "runtime": runtime_environment(),
     }
     write_json(out / "summary.json", summary)
     print(json.dumps(summary, indent=2, sort_keys=True))
@@ -221,7 +296,7 @@ def diagnostic_payload(args, exc: BaseException) -> dict:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Run staged mixed-batch vLLM LoRA RandOpt search.")
+    p = argparse.ArgumentParser(description="Run staged mixed-batch vLLM LoRA perturbation search.")
     p.add_argument("--out", required=True)
     p.add_argument("--model", default="Qwen/Qwen2.5-3B-Instruct")
     p.add_argument("--data", default=None)
@@ -235,45 +310,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rank", type=int, default=8)
     p.add_argument("--sigma", type=float, default=0.0075)
     p.add_argument("--targets", default="q_proj,v_proj")
-    p.add_argument(
-        "--family",
-        default="isotropic",
-        choices=[
-            "isotropic",
-            "factor_gaussian_lora",
-            "projected_gaussian_rank_r",
-            "randomized_projected_gaussian_rank_r",
-            "spectral_projected_gaussian_rank_r",
-            "spectral_projected_gaussian_rank_r_c0p5",
-            "spectral_projected_gaussian_rank_r_c0p75",
-            "spectral_projected_gaussian_rank_r_c1p25",
-            "spectral_projected_gaussian_rank_r_c1p5",
-            "spectral_projected_gaussian_rank_r_c2",
-            "activation_projected_gaussian_rank_r",
-            "activation_projected_gaussian_rank_r_c0p5",
-            "activation_projected_gaussian_rank_r_c0p75",
-            "activation_projected_gaussian_rank_r_c1p25",
-            "activation_projected_gaussian_rank_r_c1p5",
-            "activation_projected_gaussian_rank_r_c2",
-            "activation_generalized_projected_gaussian_rank_r",
-            "activation_generalized_projected_gaussian_rank_r_c0p5",
-            "activation_generalized_projected_gaussian_rank_r_c0p75",
-            "activation_generalized_projected_gaussian_rank_r_c1p25",
-            "activation_generalized_projected_gaussian_rank_r_c1p5",
-            "activation_generalized_projected_gaussian_rank_r_c2",
-            "activation_generalized_spectral_lora",
-            "activation_generalized_spectral_lora_c0p5",
-            "activation_generalized_spectral_lora_c0p75",
-            "activation_generalized_spectral_lora_c1p25",
-            "activation_generalized_spectral_lora_c1p5",
-            "activation_generalized_spectral_lora_c2",
-            "activation_generalized_spectral_lora_sv",
-            "activation_generalized_spectral_lora_sv_c0p75",
-            "activation_generalized_spectral_lora_sv_c1p25",
-            "activation_generalized_spectral_lora_sv_c1p5",
-            "activation_generalized_spectral_lora_sv_c2",
-        ],
-    )
+    p.add_argument("--family", default="isotropic")
     p.add_argument("--antithetic", action="store_true")
     p.add_argument("--max-new-tokens", type=int, default=32)
     p.add_argument("--prompt-input", default="text", choices=["text", "token_ids"])
@@ -290,6 +327,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--chunk-adapters", type=int, default=16)
     p.add_argument("--adapter-dir", default=None)
     p.add_argument("--keep-adapters", action="store_true")
+    p.add_argument("--full-search-reference", type=Path, help="Full-search run directory used to compute staged-search regret/recall metrics.")
     p.add_argument("--local-files-only", action="store_true")
     p.add_argument("--allow-repeat-data", action="store_true")
     p.add_argument("--use-chat-template", action="store_true")

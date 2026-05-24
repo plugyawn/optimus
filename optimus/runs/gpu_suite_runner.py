@@ -44,11 +44,30 @@ def main(argv: list[str] | None = None) -> int:
     config = config_from_args(args)
     if args.ensure_data and not args.dry_run:
         ensure_countdown_data(config.data, count=args.data_count, seed=args.data_seed)
-    rows = execute_specs(
-        gpu_suite_specs(config),
-        dry_run=args.dry_run,
-        skip_existing=not args.no_skip_existing,
-    )
+    rows = []
+
+    def write_log(updated_rows: list[dict]) -> None:
+        nonlocal rows
+        rows = list(updated_rows)
+        if args.execution_log:
+            args.execution_log.parent.mkdir(parents=True, exist_ok=True)
+            args.execution_log.write_text(json.dumps({"dry_run": args.dry_run, "runs": rows}, indent=2, sort_keys=True) + "\n")
+
+    try:
+        rows = execute_specs(
+            gpu_suite_specs(config),
+            dry_run=args.dry_run,
+            skip_existing=not args.no_skip_existing,
+            on_update=write_log,
+        )
+    except subprocess.CalledProcessError as exc:
+        payload = {"dry_run": args.dry_run, "runs": rows}
+        text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+        if args.execution_log:
+            args.execution_log.parent.mkdir(parents=True, exist_ok=True)
+            args.execution_log.write_text(text)
+        print(text, end="")
+        return exc.returncode
     payload = {"dry_run": args.dry_run, "runs": rows}
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     if args.execution_log:

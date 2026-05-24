@@ -34,7 +34,7 @@ def read_summary(path: Path) -> dict:
 
 
 def systems_summaries(root: Path) -> list[dict]:
-    patterns = ["optimus*/**/summary.json"]
+    patterns = ["**/summary.json"]
     paths = []
     seen = set()
     for pattern in patterns:
@@ -67,6 +67,29 @@ def candidate_identity(row: dict) -> str:
     return str(row.get("candidate") or row.get("adapter") or row.get("name") or "")
 
 
+def run_backend(row: dict) -> str:
+    kind = str(row.get("kind", ""))
+    if kind.startswith("vllm_"):
+        return "vllm"
+    if row.get("perturbation_backend") in {"dense", "lora"}:
+        return "transformers"
+    return str(row.get("backend") or "")
+
+
+def run_method(row: dict) -> str:
+    if row.get("method"):
+        return str(row["method"])
+    if row.get("perturbation_backend") in {"dense", "lora"}:
+        return str(row["perturbation_backend"])
+    if "lora" in str(row.get("kind", "")):
+        return "lora"
+    return ""
+
+
+def is_search_summary(row: dict) -> bool:
+    return row.get("kind") in {"vllm_lora_search", "search"}
+
+
 def md_table(rows: list[dict], columns: list[str], *, limit: int | None = None) -> str:
     shown = rows[:limit] if limit is not None else rows
     lines = ["| " + " | ".join(columns) + " |", "| " + " | ".join("---" for _ in columns) + " |"]
@@ -84,12 +107,14 @@ def md_table(rows: list[dict], columns: list[str], *, limit: int | None = None) 
 def full_search_rows(rows: list[dict]) -> list[dict]:
     out = []
     for row in rows:
-        if row.get("kind") != "vllm_lora_search":
+        if not is_search_summary(row):
             continue
         out.append(
             {
                 "suite": row["suite"],
                 "run": row["run"],
+                "backend": run_backend(row),
+                "method": run_method(row),
                 "run_dir": row["run_dir"],
                 "summary_path": row["summary_path"],
                 "population": row.get("population"),
@@ -101,7 +126,7 @@ def full_search_rows(rows: list[dict]) -> list[dict]:
                 "enforce_eager": row.get("enforce_eager"),
                 "max_num_batched_tokens": row.get("max_num_batched_tokens"),
                 "candidate_sec": row.get("candidate_sec"),
-                "screen_prompts_per_sec": row.get("screen_prompts_per_sec"),
+                "screen_prompts_per_sec": row.get("screen_prompts_per_sec") or row.get("pair_sec"),
                 "screen_tokens_per_sec": row.get("screen_tokens_per_sec"),
                 "holdout_tokens_per_sec": row.get("holdout_tokens_per_sec"),
                 "best_tokens_per_sec": row.get("best_tokens_per_sec"),
@@ -121,6 +146,8 @@ def bench_rows(rows: list[dict]) -> list[dict]:
             {
                 "suite": row["suite"],
                 "run": row["run"],
+                "backend": run_backend(row),
+                "method": run_method(row),
                 "adapters": row.get("adapters"),
                 "prompts": row.get("prompts"),
                 "tensor_parallel_size": row.get("tensor_parallel_size"),
@@ -144,7 +171,7 @@ def bench_rows(rows: list[dict]) -> list[dict]:
 def quality_rows(rows: list[dict]) -> list[dict]:
     out = []
     for row in rows:
-        if row.get("kind") != "vllm_lora_search":
+        if not is_search_summary(row):
             continue
         top_screen = row.get("top_screen") or []
         top_holdout = row.get("top_holdout") or []
@@ -162,6 +189,8 @@ def quality_rows(rows: list[dict]) -> list[dict]:
             {
                 "suite": row["suite"],
                 "run": row["run"],
+                "backend": run_backend(row),
+                "method": run_method(row),
                 "population": row.get("population"),
                 "screen_prompts": row.get("screen_prompts"),
                 "holdout_prompts": row.get("holdout_prompts"),
@@ -210,6 +239,8 @@ def best_of_n_rows(full: list[dict]) -> list[dict]:
                 {
                     "suite": row["suite"],
                     "run": row["run"],
+                    "backend": row.get("backend"),
+                    "method": row.get("method"),
                     "population": row.get("population"),
                     "screen_prompts": row.get("screen_prompts"),
                     "n": idx,
@@ -240,6 +271,11 @@ def parity_rows(rows: list[dict]) -> list[dict]:
                 "top8_possible": ranking.get("top8_possible"),
                 "selected_regret_vs_trusted": ranking.get("selected_regret_vs_trusted"),
                 "pass": row.get("pass"),
+                "pass_protocol": row.get("pass_protocol"),
+                "pass_base_rows": row.get("pass_base_rows"),
+                "pass_adapter_tensors": row.get("pass_adapter_tensors"),
+                "pass_output_diff": row.get("pass_output_diff"),
+                "output_diff_reason": (row.get("output_diff_summary") or {}).get("reason", ""),
                 "trusted_best_candidate": ranking.get("trusted_best_candidate"),
                 "candidate_best_candidate": ranking.get("candidate_best_candidate"),
             }
@@ -250,12 +286,21 @@ def parity_rows(rows: list[dict]) -> list[dict]:
 def halving_rows(rows: list[dict]) -> list[dict]:
     out = []
     for row in rows:
-        if row.get("kind") != "halving_recall":
+        if row.get("kind") not in {"halving_recall", "vllm_lora_halving", "halving"}:
             continue
+        top_stage = row.get("top_stage") or []
+        top_screen = row.get("top_screen") or []
+        top_holdout = row.get("top_holdout") or []
+        stage_best = top_stage[0] if top_stage else {}
+        screen_best = top_screen[0] if top_screen else {}
+        holdout_by_candidate = {candidate_identity(item): item for item in top_holdout}
+        selected_holdout = holdout_by_candidate.get(candidate_identity(screen_best), {})
         out.append(
             {
                 "suite": row["suite"],
                 "run": row["run"],
+                "backend": run_backend(row),
+                "method": run_method(row),
                 "screen_prompts": row.get("screen_prompts"),
                 "stage_prompts": row.get("stage_prompts"),
                 "survivors": row.get("survivors"),
@@ -265,6 +310,11 @@ def halving_rows(rows: list[dict]) -> list[dict]:
                 "top8_possible": row.get("top8_possible"),
                 "full_best_survived": row.get("full_best_survived"),
                 "halving_selected_regret_vs_full": row.get("halving_selected_regret_vs_full"),
+                "stage_selected_candidate": candidate_identity(stage_best),
+                "stage_selected_exact": stage_best.get("exact_mean"),
+                "screen_selected_candidate": candidate_identity(screen_best),
+                "screen_selected_exact": screen_best.get("exact_mean"),
+                "screen_selected_holdout_exact": selected_holdout.get("exact_mean"),
                 "eval_elapsed_s": row.get("eval_elapsed_s"),
             }
         )
@@ -450,8 +500,10 @@ def plot_halving(path: Path, rows: list[dict]) -> None:
 
     fig, ax = plt.subplots(figsize=(7, 5))
     for row in rows:
-        savings = row.get("prompt_eval_savings") or 0.0
-        regret = row.get("halving_selected_regret_vs_full") or 0.0
+        if row.get("prompt_eval_savings") is None or row.get("halving_selected_regret_vs_full") is None:
+            continue
+        savings = row.get("prompt_eval_savings")
+        regret = row.get("halving_selected_regret_vs_full")
         color = "#1f7a4d" if row.get("full_best_survived") else "#b84a39"
         label = f"p{row.get('screen_prompts')}/s{row.get('stage_prompts')}/k{row.get('survivors')}"
         ax.scatter([savings], [regret], c=color, s=90, edgecolor="#222222", linewidth=0.4)
@@ -545,6 +597,8 @@ def write_report(
             [
                 "suite",
                 "run",
+                "backend",
+                "method",
                 "population",
                 "screen_prompts",
                 "chunk_adapters",
@@ -566,6 +620,8 @@ def write_report(
             [
                 "suite",
                 "run",
+                "backend",
+                "method",
                 "adapters",
                 "prompts",
                 "tensor_parallel_size",
@@ -584,6 +640,8 @@ def write_report(
             [
                 "suite",
                 "run",
+                "backend",
+                "method",
                 "population",
                 "base_holdout_exact",
                 "screen_selected_holdout_exact",
@@ -661,6 +719,8 @@ def main(argv: list[str] | None = None) -> int:
         [
             "suite",
             "run",
+            "backend",
+            "method",
             "population",
             "screen_prompts",
             "chunk_adapters",
@@ -684,6 +744,8 @@ def main(argv: list[str] | None = None) -> int:
         [
             "suite",
             "run",
+            "backend",
+            "method",
             "adapters",
             "prompts",
             "tensor_parallel_size",
@@ -707,6 +769,8 @@ def main(argv: list[str] | None = None) -> int:
         [
             "suite",
             "run",
+            "backend",
+            "method",
             "population",
             "screen_prompts",
             "holdout_prompts",
@@ -733,6 +797,8 @@ def main(argv: list[str] | None = None) -> int:
         [
             "suite",
             "run",
+            "backend",
+            "method",
             "population",
             "screen_prompts",
             "n",
@@ -758,6 +824,11 @@ def main(argv: list[str] | None = None) -> int:
             "pass",
             "trusted_best_candidate",
             "candidate_best_candidate",
+            "pass_protocol",
+            "pass_base_rows",
+            "pass_adapter_tensors",
+            "pass_output_diff",
+            "output_diff_reason",
         ],
     )
     csv_write(
@@ -766,6 +837,8 @@ def main(argv: list[str] | None = None) -> int:
         [
             "suite",
             "run",
+            "backend",
+            "method",
             "screen_prompts",
             "stage_prompts",
             "survivors",
@@ -775,6 +848,11 @@ def main(argv: list[str] | None = None) -> int:
             "top8_possible",
             "full_best_survived",
             "halving_selected_regret_vs_full",
+            "stage_selected_candidate",
+            "stage_selected_exact",
+            "screen_selected_candidate",
+            "screen_selected_exact",
+            "screen_selected_holdout_exact",
             "eval_elapsed_s",
         ],
     )

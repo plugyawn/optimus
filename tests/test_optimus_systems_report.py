@@ -6,7 +6,9 @@ from pathlib import Path
 from optimus.evaluation.systems import (
     best_of_n_rows,
     full_search_rows,
+    halving_rows,
     main as systems_report_main,
+    parity_rows,
     quality_rows,
     systems_summaries,
 )
@@ -65,6 +67,10 @@ def test_systems_report_discovers_optimus_p4096_runs(tmp_path: Path):
     assert full[0]["tensor_parallel_size"] == 8
     assert full[0]["screen_tokens_per_sec"] == 4096.0
     assert [row["best_screen_exact"] for row in best] == [0.08, 0.12, 0.20]
+
+    direct_rows = systems_summaries(tmp_path / "optimus_gpu_suite")
+    assert len(direct_rows) == 1
+    assert full_search_rows(direct_rows)[0]["run"] == "search_p4096_chunk8"
 
 
 def test_systems_report_writes_best_of_n_and_scaling_outputs(tmp_path: Path):
@@ -183,3 +189,52 @@ def test_quality_rows_separate_selected_transfer_from_holdout_oracle(tmp_path: P
     assert row["promoted_holdout_oracle_candidate"] == "holdout-winner"
     assert row["promoted_holdout_oracle_exact"] == 0.16
     assert row["promoted_holdout_oracle_delta_vs_base"] == 0.08
+
+
+def test_systems_report_includes_halving_and_strict_parity_rows(tmp_path: Path):
+    halving = tmp_path / "optimus_gpu_suite" / "halving_p1024_stage8_surv64"
+    halving.mkdir(parents=True)
+    (halving / "summary.json").write_text(
+        json.dumps(
+            {
+                "kind": "vllm_lora_halving",
+                "method": "lora",
+                "screen_prompts": 64,
+                "stage_prompts": 8,
+                "survivors": 64,
+                "candidate_sec": 2.0,
+                "prompt_eval_savings": 0.5,
+                "top_stage": [{"candidate": "c1", "exact_mean": 0.2}],
+                "top_screen": [{"candidate": "c1", "exact_mean": 0.3}],
+                "top_holdout": [{"candidate": "c1", "exact_mean": 0.25}],
+                "eval_elapsed_s": 100.0,
+            }
+        )
+        + "\n"
+    )
+    gate = tmp_path / "backend_parity_gate" / "gate"
+    gate.mkdir(parents=True)
+    (gate / "summary.json").write_text(
+        json.dumps(
+            {
+                "kind": "backend_parity_gate",
+                "trusted_name": "peft",
+                "candidate_name": "vllm",
+                "pass": True,
+                "pass_protocol": True,
+                "pass_base_rows": True,
+                "pass_adapter_tensors": True,
+                "pass_output_diff": True,
+                "ranking": {"n_common": 8, "spearman": 1.0, "top8_overlap": 8, "top8_possible": 8},
+            }
+        )
+        + "\n"
+    )
+
+    rows = systems_summaries(tmp_path)
+    staged = halving_rows(rows)
+    parity = parity_rows(rows)
+
+    assert staged[0]["run"] == "halving_p1024_stage8_surv64"
+    assert staged[0]["screen_selected_holdout_exact"] == 0.25
+    assert parity[0]["pass_output_diff"] is True

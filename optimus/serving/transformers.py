@@ -98,6 +98,8 @@ class TransformersLoraBackend:
         zero_lora(self.model)
 
     def set_candidate(self, candidate: Candidate, family_state: dict | None = None):
+        if candidate.method != "lora":
+            raise ValueError(f"TransformersLoraBackend requires lora perturbations, got {candidate.method!r}")
         fill_lora_gaussian(self.model, candidate, self.rank, family_state)
 
     def clear_candidate(self):
@@ -245,6 +247,8 @@ class TransformersDenseGaussianBackend:
         self.patcher.clear()
 
     def set_candidate(self, candidate: Candidate, family_state: dict | None = None):
+        if candidate.method != "dense":
+            raise ValueError(f"TransformersDenseGaussianBackend requires dense perturbations, got {candidate.method!r}")
         if family_state:
             raise ValueError("dense Gaussian backend does not support structured family_state")
         self.patcher.set_candidate(candidate)

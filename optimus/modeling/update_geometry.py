@@ -14,11 +14,12 @@ from optimus.modeling.noise import Candidate, lora_noise_tensors
 
 def matrix_update_for_family(spec: MatrixSpec, candidate: Candidate, family: str) -> torch.Tensor:
     if family == "dense_gaussian":
-        return dense_noise_tensor(spec.name, spec.shape, candidate).double()
+        dense_candidate = Candidate(family, candidate.seed, candidate.sigma, candidate.sign, method="dense")
+        return dense_noise_tensor(spec.name, spec.shape, dense_candidate).double()
     if family in {"factor_gaussian_lora", "randomized_projected_gaussian_rank_r"} or family.startswith(
         "spectral_projected_gaussian_rank_r"
     ):
-        lora_candidate = Candidate(family, candidate.seed, candidate.sigma, candidate.sign)
+        lora_candidate = Candidate(family, candidate.seed, candidate.sigma, candidate.sign, method="lora")
         a, b = lora_noise_tensors(
             spec.name,
             (spec.rank, spec.in_features),
@@ -28,7 +29,7 @@ def matrix_update_for_family(spec: MatrixSpec, candidate: Candidate, family: str
         )
         return lora_update(a.double(), b.double())
     if family == "projected_gaussian_rank_r":
-        dense_candidate = Candidate("dense_gaussian", candidate.seed, candidate.sigma, candidate.sign)
+        dense_candidate = Candidate("dense_gaussian", candidate.seed, candidate.sigma, candidate.sign, method="dense")
         dense = dense_noise_tensor(spec.name, spec.shape, dense_candidate).double()
         return best_rank_projection(dense, spec.rank)
     raise ValueError(f"unsupported family: {family}")
@@ -189,7 +190,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--energy-threshold", type=float, default=0.99)
     args = parser.parse_args(argv)
 
-    candidate = Candidate("geometry", args.seed, args.sigma, args.sign)
+    candidate = Candidate("geometry", args.seed, args.sigma, args.sign, method="dense")
     specs = parse_shapes(args.shapes, args.rank)
     payload = {
         "candidate": {

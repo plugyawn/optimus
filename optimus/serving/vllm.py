@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from optimus.core.candidates import candidate_panel
+from optimus.core.perturbations import PerturbationSpec, perturbation_panel
 from optimus.modeling import AdapterSpec
 from optimus.serving.runtime import import_vllm_lora_request, make_sampling_params
 
@@ -20,9 +20,10 @@ def run_vllm_search(argv: list[str] | None = None) -> Any:
 
 __all__ = [
     "AdapterSpec",
+    "PerturbationSpec",
     "build_adapter_specs",
-    "candidate_panel",
     "import_vllm_lora_request",
     "make_sampling_params",
+    "perturbation_panel",
     "run_vllm_search",
 ]

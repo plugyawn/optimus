@@ -7,17 +7,14 @@ Run the machine-readable gate before release:
 
 ```bash
 optimus release-check \
-  --gpu-root results/prime_runs/l40sx4_20260523_2237/results/optimus_gpu_suite_v092_noflash_tp4 \
-  --systems-out results/prime_runs/l40sx4_20260523_2237/results/report/optimus_systems_v092_noflash_tp4 \
+  --gpu-root results/optimus_gpu_suite \
+  --systems-out results/report/optimus_systems \
   --populations 1024,4096 \
-  --bench-adapters 8 \
-  --skip-halving \
   --strict
 ```
 
-This gate passes for the current 4x L40S release evidence when the fetched GPU
-artifacts are present locally. The public GitHub remote is the `optimus`
-repository, not the old experiment-lab repository.
+The public GitHub remote is the `optimus` repository, not the old
+experiment-lab repository.
 
 ## Package Identity
 
@@ -25,8 +22,9 @@ repository, not the old experiment-lab repository.
 - The public CLI is `optimus`.
 - Public docs and examples use the `optimus` package and CLI only.
 - The checkout has no top-level old experiment source namespace.
-- Historical run outputs are not tracked under `results/`; curated report
-  artifacts live under `docs/reports/`.
+- Historical run outputs are not tracked under `results/`, and report bundles
+  are not committed as public docs. Keep large or run-specific artifacts local
+  under ignored result paths.
 
 ## Evidence Gates
 
@@ -38,6 +36,8 @@ repository, not the old experiment-lab repository.
 - Any selector-quality claim uses screen-selected heldout metrics.
 - Any candidate-generation claim using holdout-oracle metrics is labeled as
   post-hoc promoted-candidate evidence.
+- Fast-backend selector claims require a passing parity row in
+  `parity.csv`; a header-only parity file is not release evidence.
 
 ## Systems Gates
 
@@ -45,8 +45,7 @@ repository, not the old experiment-lab repository.
   launch.
 - No rented GPU pod is active after a completed or failed run unless an
   immediate follow-up command is running.
-- The intended 8xA100-class run is either completed and linked, or explicitly
-  listed as optional larger-systems evidence beyond the accepted 4x fallback.
+- The worktree is clean and the checked commit is pushed to its upstream.
 
 ## Upstream
 

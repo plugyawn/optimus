@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from optimus.evaluation.backend_parity import main, resolve_adapter_model_path
+from optimus.evaluation.backend_parity import candidate_join_key, main, resolve_adapter_model_path
 
 
 SUMMARY = {
@@ -46,6 +46,12 @@ def make_run(root: Path, name: str, scores: list[float], *, summary_extra: dict 
 
 
 class BackendParityGateTests(unittest.TestCase):
+    def test_candidate_join_key_matches_legacy_and_method_qualified_keys(self):
+        legacy = "isotropic:seed123:s0.0075:sign-1"
+        qualified = "lora:isotropic:seed123:s0.0075:sign-1:r8:tq_proj,v_proj"
+
+        self.assertEqual(candidate_join_key(legacy), candidate_join_key(qualified))
+
     def test_resolve_adapter_model_path_falls_back_to_local_run_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -76,7 +82,6 @@ class BackendParityGateTests(unittest.TestCase):
                     "--out",
                     str(out),
                     "--allow-missing-adapters",
-                    "--allow-missing-output-diff",
                     "--top8-gate",
                     "3",
                 ]
@@ -84,6 +89,7 @@ class BackendParityGateTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             summary = json.loads((out / "summary.json").read_text())
             self.assertTrue(summary["pass"])
+            self.assertTrue((out / "output_diff_summary.json").exists())
 
     def test_gate_fails_missing_adapters_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -107,7 +113,6 @@ class BackendParityGateTests(unittest.TestCase):
                     "--out",
                     str(root / "gate"),
                     "--allow-missing-adapters",
-                    "--allow-missing-output-diff",
                     "--top8-gate",
                     "3",
                 ]

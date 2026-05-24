@@ -13,8 +13,12 @@ from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
-from optimus.core.candidates import SearchCandidate as Candidate
-from optimus.core.candidates import candidate_panel, read_candidate_file
+from optimus.core.perturbations import (
+    PerturbationSpec as Candidate,
+    perturbation_panel,
+    read_perturbation_file,
+    require_materialization_contract,
+)
 from optimus.modeling import AdapterSpec, parse_targets, save_seed_adapter
 from optimus.modeling.qwen import load_qwen_lora_config, qwen_lora_shapes
 from optimus.search.ensemble import (
@@ -37,6 +41,7 @@ from optimus.serving.runtime import (
     import_vllm_lora_request,
     make_sampling_params,
     package_version,
+    runtime_environment,
     score_mixed_rows,
     score_rows,
     write_json,
@@ -49,7 +54,7 @@ from optimus.tasks.prompt_variants import make_variant_prompts
 
 def safe_name(candidate: Candidate) -> str:
     sign = "pos" if candidate.sign > 0 else "neg"
-    return f"randopt_seed{candidate.seed}_s{candidate.sigma:g}_{sign}"
+    return f"optimus_seed{candidate.seed}_s{candidate.sigma:g}_{sign}"
 
 
 def make_adapter_specs(
@@ -383,9 +388,27 @@ def run_search(args) -> dict:
     )
     sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else [args.sigma]
     if args.candidate_file:
-        candidates = read_candidate_file(args.candidate_file)
+        candidates = read_perturbation_file(args.candidate_file, default_method="lora")
     else:
-        candidates = candidate_panel(args.family, args.population, args.sigma, args.seed, args.antithetic, sigma_values)
+        candidates = perturbation_panel(
+            "lora",
+            args.family,
+            args.population,
+            args.sigma,
+            args.seed,
+            args.antithetic,
+            sigma_values,
+            rank=args.rank,
+            targets=targets,
+        )
+    require_materialization_contract(
+        candidates,
+        backend="vLLM adapter search",
+        method="lora",
+        rank=args.rank,
+        targets=targets,
+        require_explicit=bool(args.candidate_file),
+    )
 
     family_state = build_activation_family_state(args, out, screen, prompt_variants)
     adapter_start = time.time()
@@ -597,6 +620,7 @@ def run_search(args) -> dict:
         shutil.rmtree(out / "adapters", ignore_errors=True)
     summary = {
         "kind": "vllm_lora_search",
+        "method": "lora",
         "model": args.model,
         "data": args.data,
         "family": args.family,
@@ -638,6 +662,7 @@ def run_search(args) -> dict:
         "ensemble_ks": ensemble_ks,
         "ensemble_ratios": parse_ratio_list(args.ensemble_ratios) if args.ensemble_ratios else [],
         "max_loras": args.max_loras,
+        "max_cpu_loras": args.max_cpu_loras,
         "chunk_adapters": args.chunk_adapters,
         "enforce_eager": args.enforce_eager,
         "tensor_parallel_size": args.tensor_parallel_size,
@@ -668,6 +693,7 @@ def run_search(args) -> dict:
         "best_ensemble_holdout_exact": max((row["exact_mean"] for row in ensemble_holdout), default=None),
         "strict_ensemble_holdout": strict_ensemble_holdout,
         "best_strict_ensemble_holdout_exact": max((row["exact_mean"] for row in strict_ensemble_holdout), default=None),
+        "runtime": runtime_environment(),
     }
     write_json(out / "summary.json", summary)
     print(json.dumps(summary, indent=2, sort_keys=True))
@@ -694,7 +720,7 @@ def diagnostic_payload(args, exc: BaseException) -> dict:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Run mixed-batch vLLM LoRA RandOpt search.")
+    p = argparse.ArgumentParser(description="Run mixed-batch vLLM LoRA perturbation search.")
     p.add_argument("--out", required=True)
     p.add_argument("--model", default="Qwen/Qwen2.5-3B-Instruct")
     p.add_argument("--data", default=None)
@@ -723,68 +749,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail the run if any requested prompt variant is base-invalid on screen or holdout.",
     )
-    p.add_argument(
-        "--family",
-        default="isotropic",
-        choices=[
-            "isotropic",
-            "factor_gaussian_lora",
-            "projected_gaussian_rank_r",
-            "randomized_projected_gaussian_rank_r",
-            "spectral_projected_gaussian_rank_r",
-            "spectral_projected_gaussian_rank_r_c0p5",
-            "spectral_projected_gaussian_rank_r_c0p75",
-            "spectral_projected_gaussian_rank_r_c1p25",
-            "spectral_projected_gaussian_rank_r_c1p5",
-            "spectral_projected_gaussian_rank_r_c2",
-            "activation_projected_gaussian_rank_r",
-            "activation_projected_gaussian_rank_r_c0p5",
-            "activation_projected_gaussian_rank_r_c0p75",
-            "activation_projected_gaussian_rank_r_c1p25",
-            "activation_projected_gaussian_rank_r_c1p5",
-            "activation_projected_gaussian_rank_r_c2",
-            "activation_generalized_projected_gaussian_rank_r",
-            "activation_generalized_projected_gaussian_rank_r_c0p5",
-            "activation_generalized_projected_gaussian_rank_r_c0p75",
-            "activation_generalized_projected_gaussian_rank_r_c1p25",
-            "activation_generalized_projected_gaussian_rank_r_c1p5",
-            "activation_generalized_projected_gaussian_rank_r_c2",
-            "activation_generalized_spectral_lora",
-            "activation_generalized_spectral_lora_c0p5",
-            "activation_generalized_spectral_lora_c0p75",
-            "activation_generalized_spectral_lora_c1p25",
-            "activation_generalized_spectral_lora_c1p5",
-            "activation_generalized_spectral_lora_c2",
-            "activation_generalized_spectral_lora_sv",
-            "activation_generalized_spectral_lora_sv_c0p75",
-            "activation_generalized_spectral_lora_sv_c1p25",
-            "activation_generalized_spectral_lora_sv_c1p5",
-            "activation_generalized_spectral_lora_sv_c2",
-            "activation_spectral_lora",
-            "activation_spectral_lora_c0p5",
-            "activation_spectral_lora_c0p75",
-            "activation_spectral_lora_c1p25",
-            "activation_spectral_lora_c1p5",
-            "activation_spectral_lora_c2",
-            "activation_spectral_lora_c3",
-            "activation_spectral_lora_c4",
-            "activation_spectral_lora_tscale_q2_v1",
-            "activation_spectral_lora_tscale_q2_v1p045",
-            "activation_spectral_lora_tscale_q1p886_v0p985",
-            "activation_spectral_lora_tscale_q2_k1_v1_o2",
-            "activation_spectral_lora_tscale_q2_k1p045_v1p045_o2",
-            "activation_spectral_lora_tscale_q1p333_k0p697_v0p697_o1p333",
-            "activation_spectral_lora_sv",
-            "activation_spectral_lora_sv_c0p75",
-            "activation_spectral_lora_sv_c1p25",
-            "activation_spectral_lora_sv_c1p5",
-            "activation_spectral_lora_sv_c2",
-            "sparse_low_rank_lora",
-            "sparse_low_rank_lora_d0p125",
-            "sparse_low_rank_lora_d0p25",
-            "sparse_low_rank_lora_d0p5",
-        ],
-    )
+    p.add_argument("--family", default="isotropic")
     p.add_argument("--candidate-file", default="", help="Optional JSONL/list of exact candidate keys to evaluate.")
     p.add_argument("--antithetic", action="store_true")
     p.add_argument("--max-new-tokens", type=int, default=32)
