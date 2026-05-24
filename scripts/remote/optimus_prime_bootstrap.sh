@@ -140,9 +140,20 @@ for name in names:
 
 try:
     import vllm  # noqa: F401
-    import flashinfer  # noqa: F401
 except Exception as exc:
     raise SystemExit(f"runtime import check failed: {type(exc).__name__}: {exc}")
+
+require_flashinfer = "${OPTIMUS_REQUIRE_FLASHINFER:-0}" in {"1", "true", "TRUE", "yes", "YES"}
+try:
+    metadata.version("flashinfer-python")
+except metadata.PackageNotFoundError:
+    if require_flashinfer:
+        raise SystemExit("runtime import check failed: flashinfer-python is required but not installed")
+else:
+    try:
+        import flashinfer  # noqa: F401
+    except Exception as exc:
+        raise SystemExit(f"runtime import check failed: {type(exc).__name__}: {exc}")
 PY
 
 if command -v nvidia-smi >/dev/null 2>&1; then
