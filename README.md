@@ -34,6 +34,11 @@ GPU runs additionally need a CUDA build of PyTorch and the model weights
 available locally or through Hugging Face authentication. vLLM is only required
 for the adapter-swapping backend.
 
+The default public model is `Qwen/Qwen3-4B`, a dense Qwen3 text model close to
+the old 3B operating profile. Larger Qwen3.x models can be passed with
+`--model`, but direct LoRA materialization is only validated for Qwen2, dense
+Qwen3 text, and Qwen3-VL text configs.
+
 For vLLM serving work:
 
 ```bash
@@ -107,7 +112,7 @@ Run a trusted dense or LoRA search with Transformers:
 optimus peft-search \
   --out results/p1024_dense_reference \
   --data data/countdown_generated_1200_seed20260507.json \
-  --model Qwen/Qwen2.5-3B-Instruct \
+  --model Qwen/Qwen3-4B \
   --perturbation-backend dense \
   --family dense_gaussian \
   --population 1024 \
@@ -127,7 +132,7 @@ DATA=data/countdown_generated_1200_seed20260507.json
 optimus vllm-search \
   --out results/p1024_vllm_search \
   --data "$DATA" \
-  --model Qwen/Qwen2.5-3B-Instruct \
+  --model Qwen/Qwen3-4B \
   --family isotropic \
   --population 1024 \
   --prompts 64 \
@@ -197,11 +202,26 @@ Plan a LightEval confirmation run:
 ```bash
 optimus lighteval \
   --backend vllm \
-  --model Qwen/Qwen2.5-3B-Instruct \
-  --tensor-parallel-size 4 \
+  --model Qwen/Qwen3-4B \
+  --data-parallel-size 8 \
+  --max-model-length 4096 \
   --tasks ifeval \
-  --out results/lighteval/ifeval_qwen25_3b \
-  --plan-out results/lighteval/ifeval_qwen25_3b/plan.json
+  --out results/lighteval/ifeval_qwen3_4b \
+  --plan-out results/lighteval/ifeval_qwen3_4b/plan.json
+```
+
+Plan a matched LightEval sweep for materialized population artifacts:
+
+```bash
+optimus lighteval-sweep \
+  --backend vllm \
+  --tasks ifeval \
+  --model-template results/materialized/p{population} \
+  --populations 128,256,512,1024,4096 \
+  --data-parallel-size 8 \
+  --max-model-length 4096 \
+  --out-root results/lighteval/population_sweep \
+  --plan-out results/lighteval/population_sweep/plan.json
 ```
 
 ## Evidence Rules

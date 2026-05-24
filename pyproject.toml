@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 keywords = ["llm", "gpu", "lora", "dense-perturbations", "zeroth-order-optimization", "vllm"]
 dependencies = [
   "torch",
-  "transformers>=4.48,<5",
+  "transformers>=4.51,<5",
   "peft>=0.13",
   "accelerate",
   "datasets",
@@ -22,7 +22,7 @@ dependencies = [
 
 [project.optional-dependencies]
 serving = [
-  "vllm",
+  "vllm>=0.19.0",
 ]
 eval = [
   "lighteval>=0.13",
@@ -32,7 +32,7 @@ dev = [
   "tomli; python_version < '3.11'",
 ]
 all = [
-  "vllm",
+  "vllm>=0.19.0",
   "lighteval>=0.13",
   "pytest",
   "tomli; python_version < '3.11'",

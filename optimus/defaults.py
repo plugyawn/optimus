@@ -1,0 +1,7 @@
+from __future__ import annotations
+
+DEFAULT_MODEL = "Qwen/Qwen3-4B"
+DEFAULT_TARGETS = "q_proj,v_proj"
+
+DEFAULT_SEARCH_POPULATIONS = (1024, 4096)
+DEFAULT_LIGHTEVAL_POPULATIONS = (128, 256, 512, 1024, 4096)

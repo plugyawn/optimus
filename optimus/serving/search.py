@@ -19,6 +19,7 @@ from optimus.core.perturbations import (
     read_perturbation_file,
     require_materialization_contract,
 )
+from optimus.defaults import DEFAULT_MODEL, DEFAULT_TARGETS
 from optimus.modeling import AdapterSpec, parse_targets, save_seed_adapter
 from optimus.modeling.qwen import load_qwen_lora_config, qwen_lora_shapes
 from optimus.search.ensemble import (
@@ -40,6 +41,7 @@ from optimus.serving.prompting import make_vllm_prompt_inputs
 from optimus.serving.runtime import (
     import_vllm_lora_request,
     make_sampling_params,
+    optional_vllm_kwargs,
     package_version,
     runtime_environment,
     score_mixed_rows,
@@ -431,7 +433,7 @@ def run_search(args) -> dict:
         max_lora_rank=args.rank,
         max_cpu_loras=max(args.max_cpu_loras, len(specs)),
         enforce_eager=args.enforce_eager,
-        **({"max_num_batched_tokens": args.max_num_batched_tokens} if args.max_num_batched_tokens else {}),
+        **optional_vllm_kwargs(args),
     )
     load_s = time.time() - load_start
     write_prompt_contracts(out, llm, SamplingParams, args, screen, holdout, prompt_variants)
@@ -722,7 +724,7 @@ def diagnostic_payload(args, exc: BaseException) -> dict:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Run mixed-batch vLLM LoRA perturbation search.")
     p.add_argument("--out", required=True)
-    p.add_argument("--model", default="Qwen/Qwen2.5-3B-Instruct")
+    p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--data", default=None)
     p.add_argument("--prompts", type=int, default=32)
     p.add_argument("--holdout-prompts", type=int, default=32)
@@ -732,7 +734,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rank", type=int, default=8)
     p.add_argument("--sigma", type=float, default=0.01)
     p.add_argument("--sigma-values", default="")
-    p.add_argument("--targets", default="q_proj,v_proj")
+    p.add_argument("--targets", default=DEFAULT_TARGETS)
     p.add_argument("--ensemble-ks", default="")
     p.add_argument("--ensemble-ratios", default="")
     p.add_argument("--prompt-variants", default="default")
@@ -760,6 +762,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--gpu-memory-utilization", type=float, default=0.82)
     p.add_argument("--max-model-len", type=int, default=1024)
     p.add_argument("--max-num-batched-tokens", type=int, default=0)
+    p.add_argument("--enable-prefix-caching", action=argparse.BooleanOptionalAction, default=None)
+    p.add_argument("--enable-chunked-prefill", action=argparse.BooleanOptionalAction, default=None)
+    p.add_argument("--kv-cache-dtype", default="")
+    p.add_argument("--vllm-kwarg", action="append", default=[], help="Extra vLLM LLM() kwarg as KEY=VALUE.")
     p.add_argument("--enforce-eager", action="store_true")
     p.add_argument("--max-loras", type=int, default=32)
     p.add_argument("--max-cpu-loras", type=int, default=1024)

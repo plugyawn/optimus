@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from optimus.core.experiments import ExperimentKey, status_record
+from optimus.defaults import DEFAULT_MODEL, DEFAULT_SEARCH_POPULATIONS, DEFAULT_TARGETS
 
 
 @dataclass(frozen=True)
@@ -17,20 +18,24 @@ class GpuSuiteConfig:
     output_root: Path = Path("results/optimus_gpu_suite")
     systems_output_root: Path = Path("results/report/optimus_systems")
     data: Path = Path("data/countdown_generated_1200_seed20260507.json")
-    model: str = "Qwen/Qwen2.5-3B-Instruct"
-    populations: tuple[int, ...] = (1024, 4096)
+    model: str = DEFAULT_MODEL
+    populations: tuple[int, ...] = DEFAULT_SEARCH_POPULATIONS
     prompts: int = 64
     holdout_prompts: int = 256
     promote: int = 64
     rank: int = 8
     sigma: float = 0.0075
     seed: int = 2468
-    targets: str = "q_proj,v_proj"
+    targets: str = DEFAULT_TARGETS
     max_new_tokens: int = 32
-    chunk_adapters: int = 8
-    max_loras: int = 8
+    chunk_adapters: int = 32
+    max_loras: int = 32
     max_cpu_loras: int = 8192
-    tensor_parallel_size: int = 8
+    tensor_parallel_size: int = 1
+    enable_prefix_caching: bool | None = None
+    enable_chunked_prefill: bool | None = None
+    kv_cache_dtype: str = ""
+    vllm_kwargs: tuple[str, ...] = ()
     bench_adapters: tuple[int, ...] = (8, 16, 32)
     halving_population: int = 1024
     halving_stage_prompts: int = 8
@@ -104,7 +109,20 @@ def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int
         str(config.max_new_tokens),
         "--stop-at-answer",
         "--antithetic",
-    ]
+    ] + _vllm_runtime_args(config)
+
+
+def _vllm_runtime_args(config: GpuSuiteConfig) -> list[str]:
+    args = []
+    if config.enable_prefix_caching is not None:
+        args.append("--enable-prefix-caching" if config.enable_prefix_caching else "--no-enable-prefix-caching")
+    if config.enable_chunked_prefill is not None:
+        args.append("--enable-chunked-prefill" if config.enable_chunked_prefill else "--no-enable-chunked-prefill")
+    if config.kv_cache_dtype:
+        args.extend(["--kv-cache-dtype", config.kv_cache_dtype])
+    for item in config.vllm_kwargs:
+        args.extend(["--vllm-kwarg", item])
+    return args
 
 
 def search_identity(config: GpuSuiteConfig, population: int) -> dict[str, Any]:
@@ -201,6 +219,7 @@ def bench_specs(config: GpuSuiteConfig) -> list[RunSpec]:
                     "--mixed-batch",
                     "--skip-sequential",
                     "--no-include-base",
+                    *_vllm_runtime_args(config),
                 ),
             )
         )
@@ -280,6 +299,7 @@ def halving_specs(config: GpuSuiteConfig) -> list[RunSpec]:
                 "--antithetic",
                 "--full-search-reference",
                 str(reference),
+                *_vllm_runtime_args(config),
             ),
         )
     ]
@@ -441,7 +461,7 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--root", type=Path, default=Path("results/optimus_gpu_suite"))
     parser.add_argument("--systems-out", type=Path, default=Path("results/report/optimus_systems"))
     parser.add_argument("--data", type=Path, default=Path("data/countdown_generated_1200_seed20260507.json"))
-    parser.add_argument("--model", default="Qwen/Qwen2.5-3B-Instruct")
+    parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--populations", default="1024,4096")
     parser.add_argument("--prompts", type=int, default=64)
     parser.add_argument("--holdout-prompts", type=int, default=256)
@@ -449,12 +469,16 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--rank", type=int, default=8)
     parser.add_argument("--sigma", type=float, default=0.0075)
     parser.add_argument("--seed", type=int, default=2468)
-    parser.add_argument("--targets", default="q_proj,v_proj")
+    parser.add_argument("--targets", default=DEFAULT_TARGETS)
     parser.add_argument("--max-new-tokens", type=int, default=32)
-    parser.add_argument("--chunk-adapters", type=int, default=8)
-    parser.add_argument("--max-loras", type=int, default=8)
+    parser.add_argument("--chunk-adapters", type=int, default=32)
+    parser.add_argument("--max-loras", type=int, default=32)
     parser.add_argument("--max-cpu-loras", type=int, default=8192)
-    parser.add_argument("--tensor-parallel-size", type=int, default=8)
+    parser.add_argument("--tensor-parallel-size", type=int, default=1)
+    parser.add_argument("--enable-prefix-caching", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--enable-chunked-prefill", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--kv-cache-dtype", default="")
+    parser.add_argument("--vllm-kwarg", action="append", default=[], help="Extra vLLM LLM() kwarg as KEY=VALUE.")
     parser.add_argument("--bench-adapters", default="8,16,32")
     parser.add_argument("--halving-population", type=int, default=1024)
     parser.add_argument("--halving-stage-prompts", type=int, default=8)
@@ -481,6 +505,10 @@ def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:
         max_loras=args.max_loras,
         max_cpu_loras=args.max_cpu_loras,
         tensor_parallel_size=args.tensor_parallel_size,
+        enable_prefix_caching=args.enable_prefix_caching,
+        enable_chunked_prefill=args.enable_chunked_prefill,
+        kv_cache_dtype=args.kv_cache_dtype,
+        vllm_kwargs=tuple(args.vllm_kwarg),
         bench_adapters=parse_int_tuple(args.bench_adapters),
         halving_population=args.halving_population,
         halving_stage_prompts=args.halving_stage_prompts,

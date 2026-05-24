@@ -8,7 +8,7 @@ from optimus.evaluation.backend_parity import candidate_join_key, main, resolve_
 
 SUMMARY = {
     "kind": "search",
-    "model": "Qwen/Qwen2.5-3B-Instruct",
+    "model": "Qwen/Qwen3-4B",
     "family": "factor_gaussian_lora",
     "population": 3,
     "rank": 8,

@@ -7,8 +7,8 @@ search quality, GPU throughput, and staged-search behavior.
 
 | run | default output | purpose |
 | --- | --- | --- |
-| P1024 full search | `results/optimus_gpu_suite/search_p1024_chunk8` | Matched quality and systems baseline. |
-| P4096 full search | `results/optimus_gpu_suite/search_p4096_chunk8` | Best-of-N and scaling evidence. |
+| P1024 full search | `results/optimus_gpu_suite/search_p1024_chunk32` | Matched quality and systems baseline. |
+| P4096 full search | `results/optimus_gpu_suite/search_p4096_chunk32` | Best-of-N and scaling evidence. |
 | P1024 halving | `results/optimus_gpu_suite/halving_p1024_stage8_surv64` | Staged-search savings and regret. |
 | Adapter throughput benches | `results/optimus_gpu_suite/bench_a*_p64` | Candidate/sec, prompts/sec, tokens/sec, adapter-scaling data. |
 | Systems report | `results/report/optimus_systems` | Backend/method-aware plot inputs and PNGs for candidate/sec, adapter throughput, token throughput, best-of-N, quality scaling, and staging tradeoffs. |
@@ -47,15 +47,20 @@ Important overrides:
 ```bash
 OUT_ROOT=results/optimus_gpu_suite \
 POPULATIONS="1024 4096" \
+MODEL=Qwen/Qwen3-4B \
 PROMPTS=64 \
 HOLDOUT_PROMPTS=256 \
 PROMOTE=64 \
-CHUNK_ADAPTERS=8 \
-MAX_LORAS=8 \
+CHUNK_ADAPTERS=32 \
+MAX_LORAS=32 \
 MAX_CPU_LORAS=8192 \
-TENSOR_PARALLEL_SIZE=8 \
+TENSOR_PARALLEL_SIZE=1 \
 scripts/run_optimus_gpu_suite.sh
 ```
+
+For Qwen3-4B, prefer data-parallel independent jobs or LightEval
+`--data-parallel-size` when using a multi-GPU node; tensor parallelism is mainly
+for larger models that do not fit or run efficiently on one GPU.
 
 ## Acceptance Gates
 

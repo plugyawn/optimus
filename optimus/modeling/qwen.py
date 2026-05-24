@@ -20,9 +20,10 @@ def normalize_qwen_text_config(config):
 
 def validate_qwen_lora_config(config, *, model_name: str = "model") -> None:
     model_type = str(getattr(config, "model_type", ""))
-    if not (model_type.startswith("qwen2") or model_type == "qwen3_vl_text"):
+    if not (model_type.startswith("qwen2") or model_type == "qwen3" or model_type == "qwen3_vl_text"):
         raise ValueError(
-            f"{model_name} has model_type={model_type!r}; direct LoRA materialization is validated for Qwen2/Qwen3-VL text."
+            f"{model_name} has model_type={model_type!r}; direct LoRA materialization is validated for "
+            "Qwen2, dense Qwen3 text, and Qwen3-VL text."
         )
 
 

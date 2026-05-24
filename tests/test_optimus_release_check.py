@@ -16,7 +16,7 @@ def valid_bench_summary(adapters: int) -> dict:
     return {
         "kind": "vllm_lora_bench",
         "method": "lora",
-        "model": "Qwen/Qwen2.5-3B-Instruct",
+        "model": "Qwen/Qwen3-4B",
         "family": "isotropic",
         "adapters": adapters,
         "prompts": 64,
@@ -25,7 +25,7 @@ def valid_bench_summary(adapters: int) -> dict:
         "seed": 2468,
         "targets": ["q_proj", "v_proj"],
         "max_new_tokens": 32,
-        "tensor_parallel_size": 8,
+        "tensor_parallel_size": 1,
         "adapter_build_s": 1.0,
         "load_s": 1.0,
         "lora_tokens_per_sec": None,
@@ -38,7 +38,7 @@ def valid_search_summary(population: int) -> dict:
     return {
         "kind": "vllm_lora_search",
         "method": "lora",
-        "model": "Qwen/Qwen2.5-3B-Instruct",
+        "model": "Qwen/Qwen3-4B",
         "family": "isotropic",
         "population": population,
         "rank": 8,
@@ -49,9 +49,9 @@ def valid_search_summary(population: int) -> dict:
         "holdout_prompts": 256,
         "promote": 64,
         "max_new_tokens": 32,
-        "tensor_parallel_size": 8,
-        "chunk_adapters": 8,
-        "max_loras": 8,
+        "tensor_parallel_size": 1,
+        "chunk_adapters": 32,
+        "max_loras": 32,
         "max_cpu_loras": 8192,
         "antithetic": True,
         "base_holdout_exact": 0.1,
@@ -103,7 +103,7 @@ include = {package_include}
     for name in ["adapter_rows.jsonl", "per_prompt.jsonl"]:
         (gpu / "bench_a8_p64" / name).write_text(json.dumps({"candidate": CANDIDATE, "exact_mean": 0.2, "mode": "mixed"}) + "\n")
     for population in [1024, 4096]:
-        run = gpu / f"search_p{population}_chunk8"
+        run = gpu / f"search_p{population}_chunk32"
         run.mkdir()
         (run / "summary.json").write_text(json.dumps(valid_search_summary(population)) + "\n")
         (run / "candidate_summary.jsonl").write_text(
@@ -128,8 +128,8 @@ include = {package_include}
         else:
             (systems / name).write_text("placeholder\n")
     (systems / "bench.csv").write_text("suite,run,adapters,mixed_tokens_per_sec\noptimus_gpu_suite,bench_a8_p64,8,10\n")
-    (systems / "full_search.csv").write_text("suite,run,population,candidate_sec\noptimus_gpu_suite,search_p1024_chunk8,1024,1\n")
-    (systems / "best_of_n.csv").write_text("suite,run,n,best_screen_exact\noptimus_gpu_suite,search_p1024_chunk8,1,0.2\n")
+    (systems / "full_search.csv").write_text("suite,run,population,candidate_sec\noptimus_gpu_suite,search_p1024_chunk32,1024,1\n")
+    (systems / "best_of_n.csv").write_text("suite,run,n,best_screen_exact\noptimus_gpu_suite,search_p1024_chunk32,1,0.2\n")
     (systems / "quality_scaling.csv").write_text(
         "screen_selected_holdout_exact,screen_selected_holdout_delta_vs_base,promoted_holdout_oracle_exact,promoted_holdout_oracle_delta_vs_base\n"
         "0.1,0.01,0.2,0.11\n"

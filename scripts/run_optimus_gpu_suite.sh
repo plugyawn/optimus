@@ -2,7 +2,7 @@
 set -euo pipefail
 
 DATA=${DATA:-data/countdown_generated_1200_seed20260507.json}
-MODEL=${MODEL:-Qwen/Qwen2.5-3B-Instruct}
+MODEL=${MODEL:-Qwen/Qwen3-4B}
 OUT_ROOT=${OUT_ROOT:-results/optimus_gpu_suite}
 POPULATIONS=${POPULATIONS:-"1024 4096"}
 PROMPTS=${PROMPTS:-64}
@@ -13,10 +13,10 @@ SIGMA=${SIGMA:-0.0075}
 SEED=${SEED:-2468}
 TARGETS=${TARGETS:-q_proj,v_proj}
 MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-32}
-CHUNK_ADAPTERS=${CHUNK_ADAPTERS:-8}
-MAX_LORAS=${MAX_LORAS:-8}
+CHUNK_ADAPTERS=${CHUNK_ADAPTERS:-32}
+MAX_LORAS=${MAX_LORAS:-32}
 MAX_CPU_LORAS=${MAX_CPU_LORAS:-8192}
-TENSOR_PARALLEL_SIZE=${TENSOR_PARALLEL_SIZE:-8}
+TENSOR_PARALLEL_SIZE=${TENSOR_PARALLEL_SIZE:-1}
 SYSTEMS_OUT=${SYSTEMS_OUT:-results/report/optimus_systems}
 BENCH_ADAPTERS=${BENCH_ADAPTERS:-8,16,32}
 RUN_HALVING=${RUN_HALVING:-1}
@@ -24,13 +24,33 @@ RUN_HALVING=${RUN_HALVING:-1}
 export PYTHONUNBUFFERED=1
 export VLLM_USAGE_STATS_ENABLED=${VLLM_USAGE_STATS_ENABLED:-0}
 export VLLM_LOGGING_LEVEL=${VLLM_LOGGING_LEVEL:-ERROR}
+export VLLM_WORKER_MULTIPROC_METHOD=${VLLM_WORKER_MULTIPROC_METHOD:-spawn}
 export XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp/optimus-xdg-config}
+if [[ -n "${OPTIMUS_VLLM_ATTENTION_BACKEND:-}" ]]; then
+  export VLLM_ATTENTION_BACKEND="$OPTIMUS_VLLM_ATTENTION_BACKEND"
+fi
 mkdir -p "$OUT_ROOT" "$SYSTEMS_OUT" "$XDG_CONFIG_HOME"
 
 halving_arg=()
 if [[ "$RUN_HALVING" != "1" ]]; then
   halving_arg=(--skip-halving)
 fi
+
+vllm_runtime_args=()
+case "${ENABLE_PREFIX_CACHING:-}" in
+  1|true|TRUE|yes|YES) vllm_runtime_args+=(--enable-prefix-caching) ;;
+  0|false|FALSE|no|NO) vllm_runtime_args+=(--no-enable-prefix-caching) ;;
+esac
+case "${ENABLE_CHUNKED_PREFILL:-}" in
+  1|true|TRUE|yes|YES) vllm_runtime_args+=(--enable-chunked-prefill) ;;
+  0|false|FALSE|no|NO) vllm_runtime_args+=(--no-enable-chunked-prefill) ;;
+esac
+if [[ -n "${KV_CACHE_DTYPE:-}" ]]; then
+  vllm_runtime_args+=(--kv-cache-dtype "$KV_CACHE_DTYPE")
+fi
+for item in ${VLLM_KWARGS:-}; do
+  vllm_runtime_args+=(--vllm-kwarg "$item")
+done
 
 optimus run-plan \
   --root "$OUT_ROOT" \
@@ -51,6 +71,7 @@ optimus run-plan \
   --max-cpu-loras "$MAX_CPU_LORAS" \
   --tensor-parallel-size "$TENSOR_PARALLEL_SIZE" \
   --bench-adapters "$BENCH_ADAPTERS" \
+  "${vllm_runtime_args[@]}" \
   "${halving_arg[@]}" \
   --out "$OUT_ROOT/plan.json"
 
@@ -73,6 +94,7 @@ optimus run-suite \
   --max-cpu-loras "$MAX_CPU_LORAS" \
   --tensor-parallel-size "$TENSOR_PARALLEL_SIZE" \
   --bench-adapters "$BENCH_ADAPTERS" \
+  "${vllm_runtime_args[@]}" \
   "${halving_arg[@]}" \
   --execution-log "$OUT_ROOT/execution.json"
 

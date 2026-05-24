@@ -9,14 +9,15 @@ discipline.
 
 ```bash
 set -a; . /Users/progyan/rando/env.local; set +a
-PRIME_DISABLE_VERSION_CHECK=1 prime pods list
+PRIME_DISABLE_VERSION_CHECK=1 prime --plain pods list
 ```
 
 2. Check availability:
 
 ```bash
-PRIME_DISABLE_VERSION_CHECK=1 prime availability list --gpu-type A100_40GB --gpu-count 8 --output json
-PRIME_DISABLE_VERSION_CHECK=1 prime availability list --gpu-type GH200_96GB --gpu-count 1 --output json
+PRIME_DISABLE_VERSION_CHECK=1 prime --plain availability list --gpu-type H100_80GB --gpu-count 8 --output json
+PRIME_DISABLE_VERSION_CHECK=1 prime --plain availability list --gpu-type B200_180GB --gpu-count 8 --output json
+PRIME_DISABLE_VERSION_CHECK=1 prime --plain availability list --gpu-type A100_80GB --gpu-count 8 --output json
 ```
 
 3. Record the chosen resource in `.opencode/prime-gpu-ledger.md` before running
@@ -34,26 +35,28 @@ TENSOR_PARALLEL_SIZE=1 \
 scripts/prime_sync_and_run.sh
 ```
 
-Then run the GPU suite workload on 8xA100:
+Then run the GPU suite workload. For Qwen3-4B, keep tensor parallelism at 1
+and use independent jobs or LightEval data parallelism for multi-GPU throughput:
 
 ```bash
 MODE=gpu-suite \
 SSH_TARGET=root@POD_HOST \
 REMOTE_ROOT=optimus \
-TENSOR_PARALLEL_SIZE=8 \
+TENSOR_PARALLEL_SIZE=1 \
 POPULATIONS="1024 4096" \
 scripts/prime_sync_and_run.sh
 ```
 
-If 8xA100 provisioning is stale or cannot reach SSH, a 4x fallback can still
-run the P1024/P4096 suite with tensor parallel size 4:
+Run LightEval across materialized population checkpoints with data parallelism:
 
 ```bash
-MODE=gpu-suite \
+MODE=lighteval-sweep \
 SSH_TARGET=root@POD_HOST \
 REMOTE_ROOT=optimus \
-TENSOR_PARALLEL_SIZE=4 \
-POPULATIONS="1024 4096" \
+TENSOR_PARALLEL_SIZE=1 \
+DATA_PARALLEL_SIZE=8 \
+MODEL_TEMPLATE='results/materialized/p{population}' \
+POPULATIONS="128 256 512 1024 4096" \
 scripts/prime_sync_and_run.sh
 ```
 

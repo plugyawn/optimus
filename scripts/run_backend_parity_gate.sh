@@ -2,7 +2,7 @@
 set -euo pipefail
 
 DATA=${DATA:-data/countdown_generated_1200_seed20260507.json}
-MODEL=${MODEL:-Qwen/Qwen2.5-3B-Instruct}
+MODEL=${MODEL:-Qwen/Qwen3-4B}
 OUT_ROOT=${OUT_ROOT:-results/backend_parity_gate}
 FAMILY=${FAMILY:-factor_gaussian_lora}
 POPULATION=${POPULATION:-64}
@@ -22,7 +22,11 @@ ADAPTER_SAMPLE=${ADAPTER_SAMPLE:-16}
 
 export PYTHONUNBUFFERED=1
 export VLLM_USAGE_STATS_ENABLED=${VLLM_USAGE_STATS_ENABLED:-0}
+export VLLM_WORKER_MULTIPROC_METHOD=${VLLM_WORKER_MULTIPROC_METHOD:-spawn}
 export XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-/tmp/optimus-xdg-config}
+if [[ -n "${OPTIMUS_VLLM_ATTENTION_BACKEND:-}" ]]; then
+  export VLLM_ATTENTION_BACKEND="$OPTIMUS_VLLM_ATTENTION_BACKEND"
+fi
 mkdir -p "$OUT_ROOT" "$XDG_CONFIG_HOME"
 
 if [[ ! -f "$DATA" ]]; then

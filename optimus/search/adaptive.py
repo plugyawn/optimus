@@ -10,6 +10,7 @@ from pathlib import Path
 import torch
 
 from optimus.core.perturbations import PerturbationSpec as Candidate, parse_perturbation_key, perturbation_panel
+from optimus.defaults import DEFAULT_MODEL, DEFAULT_TARGETS
 from optimus.modeling.noise import lora_noise_tensors
 from optimus.search.ensemble import anzo_anchor_prompts
 from optimus.search.peft import evaluate_candidate, make_backend, reset_outputs, tag_rows, write_jsonl
@@ -313,14 +314,14 @@ def run_search(args):
 
 def add_common_args(sp):
     sp.add_argument("--out", required=True)
-    sp.add_argument("--model", default="Qwen/Qwen2.5-3B-Instruct")
+    sp.add_argument("--model", default=DEFAULT_MODEL)
     sp.add_argument("--data", default=None)
     sp.add_argument("--prompts", type=int, default=32)
     sp.add_argument("--holdout-prompts", type=int, default=32)
     sp.add_argument("--seed", type=int, default=1234)
     sp.add_argument("--rank", type=int, default=8)
     sp.add_argument("--sigma", type=float, default=0.02)
-    sp.add_argument("--targets", default="q_proj,v_proj")
+    sp.add_argument("--targets", default=DEFAULT_TARGETS)
     sp.add_argument("--max-new-tokens", type=int, default=32)
     sp.add_argument("--batch-size", type=int, default=16)
     sp.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")

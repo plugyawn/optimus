@@ -31,6 +31,7 @@ def test_cli_exposes_professional_run_commands():
     assert resolve_command("validate-run") == "optimus.evaluation.validation"
     assert resolve_command("release-check") == "optimus.evaluation.release"
     assert resolve_command("lighteval") == "optimus.commands.lighteval"
+    assert resolve_command("lighteval-sweep") == "optimus.commands.lighteval_sweep"
     assert resolve_command("peft-search") == "optimus.commands.peft_search"
     assert resolve_command("perturbation-panel") == "optimus.commands.perturbation_panel"
     assert resolve_command("run-suite") == "optimus.runs.gpu_suite_runner"
@@ -67,7 +68,7 @@ def test_no_generic_experiment_command_module_is_packaged():
 def test_pyproject_declares_serving_and_dev_extras():
     pyproject = tomllib.loads(Path("pyproject.toml").read_text())
     extras = pyproject["project"]["optional-dependencies"]
-    assert "vllm" in extras["serving"]
+    assert any(dep.startswith("vllm") for dep in extras["serving"])
     assert any(dep.startswith("lighteval") for dep in extras["eval"])
     assert "pytest" in extras["dev"]
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
@@ -297,6 +298,7 @@ def test_evaluation_namespace_import_is_lightweight():
     )
 
     assert "lighteval_command" in result.stdout
+    assert "lighteval_sweep" in result.stdout
     assert "backend_parity_main" in result.stdout
     assert result.stderr == ""
 

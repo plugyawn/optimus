@@ -30,20 +30,35 @@ Plan a LightEval run without importing or executing LightEval:
 ```bash
 optimus lighteval \
   --backend vllm \
-  --model Qwen/Qwen2.5-3B-Instruct \
-  --tensor-parallel-size 4 \
+  --model Qwen/Qwen3-4B \
+  --data-parallel-size 8 \
+  --max-model-length 4096 \
   --tasks ifeval \
-  --out results/lighteval/ifeval_qwen25_3b \
-  --plan-out results/lighteval/ifeval_qwen25_3b/plan.json
+  --out results/lighteval/ifeval_qwen3_4b \
+  --plan-out results/lighteval/ifeval_qwen3_4b/plan.json
 ```
 
 Execute the same run by adding `--run`.
 
+Plan a population-labelled sweep for selected/materialized checkpoints:
+
+```bash
+optimus lighteval-sweep \
+  --backend vllm \
+  --tasks ifeval \
+  --model-template results/materialized/p{population} \
+  --populations 128,256,512,1024,4096 \
+  --data-parallel-size 8 \
+  --max-model-length 4096 \
+  --out-root results/lighteval/population_sweep \
+  --plan-out results/lighteval/population_sweep/plan.json
+```
+
 Use LightEval for final confirmation of an externally materialized model path,
 for example a base model, merged adapter checkpoint, or other final model
-artifact. It is not the full P1024/P4096 candidate-screening loop and the
-current Optimus command does not bind `candidate_summary.jsonl` rows directly to
-LightEval jobs.
+artifact. It is not the full P1024/P4096 candidate-screening loop; the sweep
+command expects the caller to provide model/path templates for already
+materialized selected states.
 
 ## Required Evidence
 

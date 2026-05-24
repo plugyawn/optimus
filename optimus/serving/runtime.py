@@ -41,7 +41,15 @@ def runtime_environment() -> dict:
             "transformers": package_version("transformers"),
             "peft": package_version("peft"),
             "vllm": package_version("vllm"),
+            "lighteval": package_version("lighteval"),
+            "flashinfer-python": package_version("flashinfer-python"),
+            "flash-attn": package_version("flash-attn"),
+            "triton": package_version("triton"),
             "safetensors": package_version("safetensors"),
+        },
+        "vllm_env": {
+            "VLLM_ATTENTION_BACKEND": os.environ.get("VLLM_ATTENTION_BACKEND"),
+            "VLLM_WORKER_MULTIPROC_METHOD": os.environ.get("VLLM_WORKER_MULTIPROC_METHOD"),
         },
     }
     try:
@@ -76,6 +84,47 @@ def runtime_environment() -> dict:
 
 def configure_vllm_logging() -> None:
     os.environ.setdefault("VLLM_LOGGING_LEVEL", "ERROR")
+
+
+def parse_backend_value(text: str):
+    lowered = text.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    if lowered in {"none", "null"}:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return text
+
+
+def parse_backend_kwargs(items: Iterable[str]) -> dict:
+    kwargs = {}
+    for item in items:
+        if "=" not in item:
+            raise ValueError(f"backend kwarg {item!r} must use KEY=VALUE syntax.")
+        key, value = item.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError(f"backend kwarg {item!r} has an empty key.")
+        kwargs[key] = parse_backend_value(value)
+    return kwargs
+
+
+def optional_vllm_kwargs(args) -> dict:
+    kwargs = {}
+    if getattr(args, "max_num_batched_tokens", 0):
+        kwargs["max_num_batched_tokens"] = args.max_num_batched_tokens
+    if getattr(args, "enable_prefix_caching", None) is not None:
+        kwargs["enable_prefix_caching"] = args.enable_prefix_caching
+    if getattr(args, "enable_chunked_prefill", None) is not None:
+        kwargs["enable_chunked_prefill"] = args.enable_chunked_prefill
+    if getattr(args, "kv_cache_dtype", ""):
+        kwargs["kv_cache_dtype"] = args.kv_cache_dtype
+    kwargs.update(parse_backend_kwargs(getattr(args, "vllm_kwarg", []) or []))
+    return kwargs
 
 
 def import_vllm_lora_request():

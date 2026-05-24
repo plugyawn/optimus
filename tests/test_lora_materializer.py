@@ -10,6 +10,7 @@ from safetensors.torch import load_file
 from optimus.core.perturbations import PerturbationSpec as Candidate
 from optimus.core.perturbations import canonical_module_name
 from optimus.modeling import qwen_lora_shapes, save_seed_adapter
+from optimus.modeling.qwen import validate_qwen_lora_config
 from optimus.modeling.dense import dense_noise_tensor
 from optimus.modeling.geometry import best_rank_projection, lora_update
 from optimus.modeling.noise import (
@@ -54,7 +55,7 @@ class LoraMaterializerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             save_seed_adapter(
                 Path(tmp),
-                model="Qwen/Qwen2.5-3B-Instruct",
+                model="Qwen/Qwen3-4B",
                 candidate=candidate,
                 rank=rank,
                 targets=["q_proj"],
@@ -66,6 +67,21 @@ class LoraMaterializerTests(unittest.TestCase):
         prefix = f"base_model.model.{module}"
         self.assertTrue(torch.equal(tensors[f"{prefix}.lora_A.weight"], expected_a))
         self.assertTrue(torch.equal(tensors[f"{prefix}.lora_B.weight"], expected_b))
+
+    def test_qwen3_text_config_is_validated_for_direct_lora(self):
+        config = types.SimpleNamespace(
+            model_type="qwen3",
+            hidden_size=16,
+            intermediate_size=32,
+            num_hidden_layers=1,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=4,
+        )
+
+        validate_qwen_lora_config(config, model_name="Qwen/Qwen3-4B")
+
+        self.assertIn(("model.layers.0.self_attn.v_proj", 16, 8), qwen_lora_shapes(config, ["v_proj"]))
 
     def test_qwen3_vl_materialization_uses_language_model_prefix(self):
         candidate = Candidate("isotropic", seed=123, sigma=0.0075, sign=-1)

@@ -19,15 +19,15 @@ def _summary_for_kind(kind: str, **identity):
     base = {
         "kind": f"vllm_lora_{kind}",
         "method": "lora",
-        "model": "Qwen/Qwen2.5-3B-Instruct",
+        "model": "Qwen/Qwen3-4B",
         "family": "isotropic",
         "rank": 8,
         "sigma": 0.0075,
         "seed": 2468,
         "targets": ["q_proj", "v_proj"],
         "max_new_tokens": 32,
-        "tensor_parallel_size": 8,
-        "max_loras": 8,
+        "tensor_parallel_size": 1,
+        "max_loras": 32,
         "max_cpu_loras": 8192,
         **identity,
     }
@@ -47,7 +47,7 @@ def _summary_for_kind(kind: str, **identity):
             "screen_prompts": identity.get("screen_prompts", 64),
             "holdout_prompts": identity.get("holdout_prompts", 256),
             "promote": identity.get("promote", 64),
-            "chunk_adapters": identity.get("chunk_adapters", 8),
+            "chunk_adapters": identity.get("chunk_adapters", 32),
             "antithetic": identity.get("antithetic", True),
             "base_holdout_exact": 0.1,
             "candidate_sec": 1.0,
@@ -66,7 +66,7 @@ def _summary_for_kind(kind: str, **identity):
             "screen_prompts": identity.get("screen_prompts", 64),
             "holdout_prompts": identity.get("holdout_prompts", 256),
             "promote": identity.get("promote", 64),
-            "chunk_adapters": identity.get("chunk_adapters", 8),
+            "chunk_adapters": identity.get("chunk_adapters", 32),
             "antithetic": identity.get("antithetic", True),
             "stage_prompts": identity.get("stage_prompts", 8),
             "survivors": identity.get("survivors", 64),
@@ -93,9 +93,9 @@ def write_contract_outputs(contract) -> None:
     if contract.name == "systems_report":
         csv_rows = {
             "bench.csv": "suite,run,adapters,mixed_tokens_per_sec\noptimus_gpu_suite,bench_a8_p64,8,10\n",
-            "full_search.csv": "suite,run,population,candidate_sec\noptimus_gpu_suite,search_p1024_chunk8,1024,1\n",
-            "best_of_n.csv": "suite,run,n,best_screen_exact\noptimus_gpu_suite,search_p1024_chunk8,1,0.2\n",
-            "quality_scaling.csv": "suite,run,screen_selected_holdout_exact,screen_selected_holdout_delta_vs_base,promoted_holdout_oracle_exact,promoted_holdout_oracle_delta_vs_base\noptimus_gpu_suite,search_p1024_chunk8,0.2,0.1,0.3,0.2\n",
+            "full_search.csv": "suite,run,population,candidate_sec\noptimus_gpu_suite,search_p1024_chunk32,1024,1\n",
+            "best_of_n.csv": "suite,run,n,best_screen_exact\noptimus_gpu_suite,search_p1024_chunk32,1,0.2\n",
+            "quality_scaling.csv": "suite,run,screen_selected_holdout_exact,screen_selected_holdout_delta_vs_base,promoted_holdout_oracle_exact,promoted_holdout_oracle_delta_vs_base\noptimus_gpu_suite,search_p1024_chunk32,0.2,0.1,0.3,0.2\n",
             "parity.csv": "suite,run,trusted_name,candidate_name,n_common,pass,pass_protocol,pass_base_rows,pass_adapter_tensors,pass_output_diff\nbackend_parity_gate,gate,peft,vllm,1,true,true,true,true,true\n",
             "halving.csv": "suite,run,stage_prompts,survivors,prompt_eval_savings\noptimus_gpu_suite,halving_p1024_stage8_surv64,8,64,0.5\n",
         }
@@ -109,7 +109,7 @@ def write_contract_outputs(contract) -> None:
         return
     if "summary.json" in contract.required_files:
         kind = "bench" if contract.name.startswith("bench") else "halving" if contract.name.startswith("halving") else "search"
-        reference = contract.root.parent / "search_p1024_chunk8"
+        reference = contract.root.parent / "search_p1024_chunk32"
         if kind == "halving":
             reference.mkdir(parents=True, exist_ok=True)
         summary = _summary_for_kind(kind, full_search_reference=str(reference))
@@ -148,8 +148,8 @@ def test_gpu_suite_specs_include_p1024_and_p4096_searches(tmp_path: Path):
     specs = gpu_suite_specs(config)
     names = {spec.name for spec in specs}
 
-    assert "search_p1024_chunk8" in names
-    assert "search_p4096_chunk8" in names
+    assert "search_p1024_chunk32" in names
+    assert "search_p4096_chunk32" in names
     assert "halving_p1024_stage8_surv64" in names
     assert "systems_report" in names
 
@@ -158,14 +158,14 @@ def test_plan_payload_serializes_commands(tmp_path: Path):
     config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems")
 
     payload = plan_payload(config)
-    search = next(run for run in payload["runs"] if run["name"] == "search_p4096_chunk8")
+    search = next(run for run in payload["runs"] if run["name"] == "search_p4096_chunk32")
 
     assert search["kind"] == "search"
     assert search["command"][:2] == ["optimus", "vllm-search"]
     assert "--population" in search["command"]
     assert "4096" in search["command"]
     assert "--tensor-parallel-size" in search["command"]
-    assert "8" in search["command"]
+    assert "1" in search["command"]
 
 
 def test_plan_payload_respects_full_config_surface(tmp_path: Path):
@@ -203,12 +203,12 @@ def test_halving_plan_uses_full_search_reference_for_regret_metrics(tmp_path: Pa
     halving = next(run for run in plan_payload(config)["runs"] if run["kind"] == "halving")
 
     assert "--full-search-reference" in halving["command"]
-    assert str(tmp_path / "runs" / "search_p1024_chunk8") in halving["command"]
+    assert str(tmp_path / "runs" / "search_p1024_chunk32") in halving["command"]
 
 
 def test_run_contract_checks_missing_and_present_files(tmp_path: Path):
     config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems")
-    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p1024_chunk8")
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p1024_chunk32")
 
     initial = check_run(contract)
     assert not initial.passed
@@ -257,7 +257,7 @@ def test_run_contract_checks_every_jsonl_row_and_halving_reference(tmp_path: Pat
 
 def test_failure_summary_is_not_a_completion_marker(tmp_path: Path):
     config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems", populations=(16,))
-    spec = next(item for item in gpu_suite_specs(config) if item.name == "search_p16_chunk8")
+    spec = next(item for item in gpu_suite_specs(config) if item.name == "search_p16_chunk32")
     spec.output_path.mkdir(parents=True)
     (spec.output_path / "summary.json").write_text('{"kind": "vllm_lora_search_failure"}\n')
 
@@ -280,7 +280,7 @@ def test_execute_specs_dry_run_and_skip_existing(tmp_path: Path):
     by_name = {row["name"]: row for row in rows}
 
     assert by_name[first.name]["status"] == "skipped"
-    assert by_name["search_p16_chunk8"]["status"] == "dry_run"
+    assert by_name["search_p16_chunk32"]["status"] == "dry_run"
     assert by_name["systems_report"]["status"] == "dry_run"
 
 
@@ -318,7 +318,7 @@ def test_run_suite_dry_run_cli_writes_execution_log(tmp_path: Path):
 
     assert '"dry_run": true' in result.stdout
     assert log.exists()
-    assert "search_p16_chunk8" in log.read_text()
+    assert "search_p16_chunk32" in log.read_text()
 
 
 def test_validate_run_cli_respects_plan_shape(tmp_path: Path):

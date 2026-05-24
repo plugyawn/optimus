@@ -46,7 +46,7 @@ serving extras for LightEval's vLLM backend.
 | `optimus.search` | Backend-neutral zeroth-order study helpers, trusted Transformers search, selector scoring, and replay helpers. |
 | `optimus.serving` | vLLM LoRA adapter-swapping search, halving, benchmark execution, prompt/token contracts, and output scoring. |
 | `optimus.runs` | GPU workload specs, stable point identities, resumable execution logs, and plan serialization. |
-| `optimus.evaluation` | Backend parity gates, LightEval command planning, run validation, systems reports, and release checks. |
+| `optimus.evaluation` | Backend parity gates, LightEval command/sweep planning, run validation, systems reports, and release checks. |
 
 ## Perturbation Contract
 
@@ -96,6 +96,7 @@ optimus run-suite ...
 optimus validate-run ...
 optimus systems-report ...
 optimus lighteval ...
+optimus lighteval-sweep ...
 ```
 
 The repository root intentionally excludes old experiment namespaces, tracked

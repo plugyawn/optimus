@@ -32,6 +32,7 @@ for old manifest parsing and are not part of the public package exports.
 | `optimus make-countdown-data` | Generate deterministic Countdown evaluation data. |
 | `optimus backend-parity-gate` | Gate vLLM selector trust against trusted outputs and adapter tensor checks. |
 | `optimus lighteval` | Plan or run a LightEval job for standard or custom-task confirmation. |
+| `optimus lighteval-sweep` | Plan or run LightEval across population-labelled materialized model artifacts. |
 | `optimus systems-report` | Build backend/method-aware plot inputs and throughput/quality PNGs from result directories. |
 | `optimus run-plan` | Serialize the normalized P1024/P4096 GPU-suite plan. |
 | `optimus run-suite` | Execute the normalized GPU-suite plan and write an execution log with stable point identities. |
