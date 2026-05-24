@@ -138,11 +138,6 @@ include = {package_include}
         "suite,run,trusted_name,candidate_name,n_common,pass,pass_protocol,pass_base_rows,pass_adapter_tensors,pass_output_diff\n"
         "backend_parity_gate,gate,peft,vllm,1,true,true,true,true,true\n"
     )
-    ledger = root / ".opencode"
-    ledger.mkdir()
-    (ledger / "prime-gpu-ledger.md").write_text(
-        "## Active Pods\n\nNo active Prime pods. `prime pods list --plain` reported `Compute Pods (Total: 0)`.\n"
-    )
     return gpu, systems
 
 

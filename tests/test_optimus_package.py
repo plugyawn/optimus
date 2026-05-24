@@ -323,3 +323,4 @@ def test_repo_root_has_no_old_project_namespace_or_tracked_results():
     assert not any(path.startswith("results/") for path in tracked)
     assert not any(path.startswith("docs/reports/") for path in tracked)
     assert not any(path.startswith("data/") for path in tracked)
+    assert not any(path.startswith(".opencode/") for path in tracked)

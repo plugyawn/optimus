@@ -4,6 +4,7 @@ __pycache__/
 build/
 dist/
 .venv/
+.opencode/
 data/
 docs/reports/
 results/

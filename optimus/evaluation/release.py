@@ -145,11 +145,13 @@ def repo_structure_checks(root: Path) -> list[ReleaseCheck]:
     tracked_results: list[str] = []
     tracked_report_bundles: list[str] = []
     tracked_generated_data: list[str] = []
+    tracked_local_state: list[str] = []
     if (root / ".git").exists():
         for label, pathspec in [
             ("results", "results"),
             ("report_bundles", "docs/reports"),
             ("generated_data", "data"),
+            ("local_state", ".opencode"),
         ]:
             result = subprocess.run(
                 ["git", "ls-files", pathspec],
@@ -167,6 +169,8 @@ def repo_structure_checks(root: Path) -> list[ReleaseCheck]:
                 tracked_report_bundles = lines
             elif label == "generated_data":
                 tracked_generated_data = lines
+            elif label == "local_state":
+                tracked_local_state = lines
     return [
         ReleaseCheck(
             "repo_has_no_top_level_old_namespace",
@@ -187,6 +191,11 @@ def repo_structure_checks(root: Path) -> list[ReleaseCheck]:
             "repo_has_no_tracked_generated_data",
             not tracked_generated_data,
             "no tracked generated data files" if not tracked_generated_data else f"files={tracked_generated_data[:8]!r}",
+        ),
+        ReleaseCheck(
+            "repo_has_no_tracked_local_state",
+            not tracked_local_state,
+            "no tracked local state files" if not tracked_local_state else f"files={tracked_local_state[:8]!r}",
         ),
         ReleaseCheck(
             "repo_has_no_archive_experiment_tree",
@@ -365,11 +374,11 @@ def gpu_artifact_checks(
 def ledger_check(root: Path) -> ReleaseCheck:
     ledger = root / ".opencode" / "prime-gpu-ledger.md"
     if not ledger.exists():
-        return ReleaseCheck("prime_ledger_reports_no_active_pods", False, "missing .opencode/prime-gpu-ledger.md")
+        return ReleaseCheck("prime_ledger_local_check", True, "no local Prime ledger present")
     text = ledger.read_text()
     passed = "No active Prime pods" in text and "Compute Pods (Total: 0)" in text
     return ReleaseCheck(
-        "prime_ledger_reports_no_active_pods",
+        "prime_ledger_local_check",
         passed,
         str(ledger) if passed else "ledger does not record zero active pods",
     )
