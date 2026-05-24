@@ -60,13 +60,14 @@ def qwen_lora_shapes(config, targets: list[str]) -> list[tuple[str, int, int]]:
     heads = int(config.num_attention_heads)
     kv_heads = int(getattr(config, "num_key_value_heads", heads))
     head_dim = int(getattr(config, "head_dim", hidden // heads))
+    q_out = heads * head_dim
     kv_out = kv_heads * head_dim
 
     dims = {
-        "q_proj": ("self_attn", hidden, hidden),
+        "q_proj": ("self_attn", hidden, q_out),
         "k_proj": ("self_attn", hidden, kv_out),
         "v_proj": ("self_attn", hidden, kv_out),
-        "o_proj": ("self_attn", hidden, hidden),
+        "o_proj": ("self_attn", q_out, hidden),
         "gate_proj": ("mlp", hidden, intermediate),
         "up_proj": ("mlp", hidden, intermediate),
         "down_proj": ("mlp", intermediate, hidden),

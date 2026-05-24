@@ -82,6 +82,29 @@ class LoraMaterializerTests(unittest.TestCase):
         validate_qwen_lora_config(config, model_name="Qwen/Qwen3-4B")
 
         self.assertIn(("model.layers.0.self_attn.v_proj", 16, 8), qwen_lora_shapes(config, ["v_proj"]))
+        self.assertIn(("model.layers.0.self_attn.q_proj", 16, 16), qwen_lora_shapes(config, ["q_proj"]))
+        self.assertIn(("model.layers.0.self_attn.o_proj", 16, 16), qwen_lora_shapes(config, ["o_proj"]))
+
+    def test_qwen3_projection_shapes_follow_explicit_head_dim(self):
+        config = types.SimpleNamespace(
+            model_type="qwen3",
+            hidden_size=2560,
+            intermediate_size=9728,
+            num_hidden_layers=1,
+            num_attention_heads=32,
+            num_key_value_heads=8,
+            head_dim=128,
+        )
+
+        self.assertEqual(
+            qwen_lora_shapes(config, ["q_proj", "k_proj", "v_proj", "o_proj"]),
+            [
+                ("model.layers.0.self_attn.q_proj", 2560, 4096),
+                ("model.layers.0.self_attn.k_proj", 2560, 1024),
+                ("model.layers.0.self_attn.v_proj", 2560, 1024),
+                ("model.layers.0.self_attn.o_proj", 4096, 2560),
+            ],
+        )
 
     def test_qwen3_vl_materialization_uses_language_model_prefix(self):
         candidate = Candidate("isotropic", seed=123, sigma=0.0075, sign=-1)
