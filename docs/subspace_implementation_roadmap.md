@@ -55,15 +55,18 @@ Current saved state, 2026-05-25:
   subspace runs, removing public legacy subspace alias normalization, and adding
   shard metadata to the public `SubspaceCandidate` schema. Phase 1 still
   requires independent re-review before runtime basis capture starts.
-- The latest pre-implementation checkpoint is commit `aadc7a4`
-  (`Close subspace review contract gaps`). This roadmap update records the
-  remaining review queue only; it does not authorize runtime implementation.
+- The latest pre-implementation enforcement checkpoint is commit `90f920d`
+  (`Seal subspace public contracts`). It turns the previous review queue into
+  executable validation/release gates for artifact provenance, scientific-gate
+  metadata, duplicate candidate/score rejection, strict systems numerics,
+  subspace public-surface guards, source-of-truth doc scans, and per-entry
+  Prime ledger cleanup.
 
-## Next Pre-Implementation Review Queue
+## Phase 0 Enforcement Queue
 
-Before Phase 1 starts, resolve and re-review the remaining Phase 0 contract
-gaps. These are roadmap blockers, not permission to start basis capture, vLLM
-hooks, lazy kernels, or optimized kernels.
+Before Phase 1 starts, keep the following Phase 0 gates green and re-review
+them independently. These are implementation-substrate gates, not permission to
+start basis capture, vLLM hooks, lazy kernels, or optimized kernels.
 
 1. Artifact provenance:
    - `subspace_state_summary.json`, `top_k_ensemble.json`,
@@ -123,6 +126,13 @@ hooks, lazy kernels, or optimized kernels.
 
 This is the saved plan for the next implementation pass. Execute in order, and
 commit after each coherent slice.
+
+Current closure status:
+
+- Steps 1-6 below are enforced by code and tests as of `90f920d`.
+- Step 7 remains the active gate for declaring Phase 0 satisfactory: independent
+  reviewers must confirm the design doc and roadmap are complete and that the
+  implementation substrate has not drifted back toward adapter-era shortcuts.
 
 1. Public surface reconciliation:
    - add final subspace options to `optimus search --help` and
