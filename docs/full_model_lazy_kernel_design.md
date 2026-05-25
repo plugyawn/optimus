@@ -329,7 +329,7 @@ The candidate random field is a pure deterministic function:
 
 ```text
 G_abs_t,c[j,a] =
-  GaussianHash(direction_seed, target_id, j, a, rng_version, salt)
+  GaussianHash(rng_version, direction_seed, target_id, j, a, salt)
 G_t,c[j,a] = sign * G_abs_t,c[j,a]
 ```
 
@@ -339,15 +339,18 @@ semantics must come from candidate identity and indices, not from stored tensors
 or mutable RNG state. Antithetic candidates share `G_abs` exactly and differ
 only by the outer sign.
 
-`gaussian_hash_v1` is specified as follows. Encode
-`direction_seed`, canonical `target_id`, row index `j`, basis index `a`, and
-`salt` as UTF-8 fields separated by NUL bytes. Hash the payload with SHA-256,
-interpret the first two uint64 little-endian words as open-interval uniforms by
-adding `0.5` and dividing by `2**64`, and use a Box-Muller transform to produce
-one fp64 standard normal. Apply sign in fp64, then cast to the requested runtime
-dtype at the kernel boundary. Implementations may replace this with a
-counter-based RNG only after golden-vector tests prove bitwise equality for the
-published `gaussian_hash_v1` values or after the `rng_version` is changed.
+`gaussian_hash_v1` is specified as follows. Canonicalize `target_id` as the
+fully qualified post-alias module path from `TargetModule.target_id`, using `/`
+only as a separator inside model ids and `.` inside module paths, with no
+leading/trailing whitespace. Encode `rng_version`, `direction_seed`, canonical
+`target_id`, row index `j`, basis index `a`, and `salt` as UTF-8 fields separated
+by NUL bytes in exactly that order. Hash the payload with SHA-256, interpret the
+first two uint64 little-endian words as open-interval uniforms by adding `0.5`
+and dividing by `2**64`, and use a Box-Muller transform to produce one fp64
+standard normal. Apply sign in fp64, then cast to the requested runtime dtype at
+the kernel boundary. Implementations may replace this with a counter-based RNG
+only after golden-vector tests prove bitwise equality for the published
+`gaussian_hash_v1` values or after the `rng_version` is changed.
 
 Allowed implementations:
 
@@ -417,14 +420,35 @@ It contains:
 ```json
 {
   "ensemble_kind": "lazy_top_k",
+  "schema_version": "top_k_ensemble_v1",
   "aggregation": "majority-vote | mean-logprob | score-sum | custom",
+  "tie_break_policy": "lowest_candidate_id",
+  "selection_rule": "screen_top_k_fixed_config",
   "K": 16,
-  "candidate_ids": [],
+  "candidates": [
+    {
+      "candidate_id": "seed12345:+:rho0.01",
+      "direction_seed": 12345,
+      "sign": "+",
+      "basis_hash": "...",
+      "target_set_hash": "...",
+      "scale_mode": "relative_output_rms",
+      "rho_or_sigma_w": 0.01,
+      "budget_policy": "per_block_equal",
+      "budget_hash": "...",
+      "rng_version": "gaussian_hash_v1",
+      "runtime_dtype": "bf16"
+    }
+  ],
   "basis_hash": "...",
   "scale_mode": "relative_output_rms",
   "rho_or_sigma_w": 0.01,
   "target_set_hash": "...",
-  "runtime_config_hash": "..."
+  "scorer_version": "...",
+  "prompt_ids_hash": "...",
+  "basis_collection_config_hash": "...",
+  "runtime_config_hash": "...",
+  "decode_config_hash": "..."
 }
 ```
 
@@ -502,15 +526,26 @@ kappa_t(Q) = ||grad_W_t J Q_s(t).T||_F^2 / ||grad_W_t J||_F^2
 Activation energy capture measures approximation fidelity. Gradient capture
 measures objective relevance. They are not the same.
 
-The primary scientific gate is top-K ensemble holdout score at the predeclared
-K, rank, radius grid, task panel, and seed panel. Proceed to optimized kernels
-only if activation-SVD has a paired bootstrap 95% confidence interval lower
-bound above zero versus both random-orthonormal and shuffled-SVD controls on the
-primary metric, or if a predeclared engineering review accepts a statistically
-indistinguishable tie because activation-SVD has lower drift or higher captured
-energy at equal quality. Secondary metrics are reported for diagnosis only:
-improvement density, best single-candidate holdout score, diversity-adjusted
-ensemble gain, and screen-to-holdout drop.
+The primary scientific gate is top-K ensemble holdout score at one locked
+configuration: one K, one rank, one radius, one target preset, one task panel,
+one seed panel, one scorer, and one aggregation rule. That configuration must be
+declared before production-gate holdout scores are read. If a rank/radius/K grid
+is explored, it is a calibration or validation search; either choose the locked
+configuration on a separate validation split before the gate, or apply the same
+screen-only selection rule to every basis family and use a predeclared
+multiple-comparison correction such as Holm-Bonferroni over all tested
+configuration contrasts.
+
+Proceed to optimized kernels for a scientific win only if activation-SVD has a
+paired bootstrap 95% confidence interval lower bound above zero versus both
+random-orthonormal and shuffled-SVD controls on the locked primary metric. A
+statistically indistinguishable tie may authorize an engineering proceed, but it
+must be labeled `engineering_proceed_no_scientific_win` and requires one
+predeclared operational advantage at equal quality: at least 25% lower
+logit-KL/drift, at least 20% lower lazy overhead, or at least 10 percentage
+points higher captured activation energy. Secondary metrics are reported for
+diagnosis only: improvement density, best single-candidate holdout score,
+diversity-adjusted ensemble gain, and screen-to-holdout drop.
 
 If holdout is used to choose rank, radius, K, target preset, or basis family,
 that split becomes validation, not final test evidence. Final claims then need a
@@ -791,8 +826,11 @@ confirmation.
 
 Mathematical tests:
 
-- Projection covariance: empirical covariance of `G Q X` matches
-  `X Q.T Q X.T`.
+- Projection covariance: with activation rows `X` shaped `[tokens, d]`, basis
+  `Q` shaped `[r, d]`, and Gaussian field `G` shaped `[m, r]`, form
+  `Y = X Q.T G.T` shaped `[tokens, m]`. For each output coordinate, empirical
+  covariance across calibration tokens must match `sigma_w^2 X Q.T Q X.T`
+  within tolerance.
 - Full-rank equivalence: if `Q` spans the input dimension, lazy perturbation
   matches dense Gaussian effect law.
 - Projected-dense rank law: under `projected-dense`, measured perturbation RMS

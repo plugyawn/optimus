@@ -4,6 +4,98 @@ This roadmap is the execution checklist for
 `docs/full_model_lazy_kernel_design.md`. Do not start optimized kernel work
 until the early correctness and basis-quality gates pass.
 
+Current saved state, 2026-05-25:
+
+- This roadmap is planning-only. It authorizes documentation, test planning,
+  and compatibility audits, but not lazy-kernel implementation work.
+- The next implementation pass must start by removing legacy public surface from
+  the runnable suite and validation gates. It must not start with vLLM hooks,
+  basis capture, or optimized kernels.
+- `optimus search` and `optimus bench` are the final public command families.
+  Any runnable plan, launcher, release gate, or validation contract that still
+  depends on `peft-search`, `vllm-search`, `vllm-bench`, `vllm-halving`,
+  adapter hot-path flags, or old LoRA-shaped artifacts is a Phase 0 blocker.
+- The public method name is `subspace`. The backend selector is `--backend`.
+  Public API and artifacts must not use `activation_subspace`,
+  `lazy-subspace`, `engine`, `family_state`, or LoRA adapter terminology for
+  the lazy-kernel path.
+
+## Phase 0: Stop-The-Line Legacy Surface Cleanup
+
+Goal: make the public repo prove the new subspace contract before adding more
+runtime code.
+
+This phase is complete only when the runnable commands, generated plans,
+launchers, tests, release checks, and validation contracts all point at the
+same final API. Passing tests that still validate old LoRA adapter workflows do
+not count as subspace readiness.
+
+Deliverables:
+
+- Update `optimus run-plan` and `optimus run-suite` so generated specs use:
+  - `optimus search --backend vllm --method lora` only for explicit legacy LoRA
+    baselines;
+  - `optimus search --backend vllm --method subspace` only as a fail-closed
+    planned route until Phase 5 lands;
+  - `optimus bench --backend vllm --method lora` for legacy adapter throughput
+    baselines;
+  - no removed top-level commands in generated JSON or shell scripts.
+- Add `run-plan` fields for the final subspace surface:
+  - `--backend`;
+  - `--method`;
+  - `--basis-rank`;
+  - `--scale-mode`;
+  - `--rho-grid`;
+  - `--sigma-w-grid`;
+  - `--budget-policy`;
+  - `--basis-kind`;
+  - `--basis-prompts`;
+  - `--target-preset`;
+  - `--top-k-grid`.
+- Remove or disable staged-search emission until a final public staged-search
+  route exists. Do not generate `optimus vllm-halving`.
+- Update `scripts/run_optimus_gpu_suite.sh`, `scripts/README.md`, remote smoke
+  scripts, and Prime runbooks so supported launchers do not pass subspace work
+  through `--rank`, `--sigma`, `--chunk-adapters`, `--max-loras`, or old
+  top-level command names.
+- Make `perturbation-panel --method subspace` use the new subspace scale names
+  or fail closed. It must not expose subspace through old `--rank` and `--sigma`
+  semantics.
+- Update release checks so they scan:
+  - public docs;
+  - `optimus/cli.py`;
+  - run-plan generated JSON;
+  - supported shell launchers;
+  - validation contracts;
+  - public commands that can emit artifacts.
+- Update validation contracts so subspace runs require the subspace artifact
+  shape, not LoRA adapter artifacts.
+- Update old evidence docs that still describe P1024/P4096 results as
+  `candidate_summary.jsonl`, adapter rows, or per-prompt LoRA artifacts. Keep
+  those as legacy baselines only when explicitly labeled.
+
+Acceptance gate:
+
+- `optimus --help`, `optimus search --help`, `optimus bench --help`,
+  `optimus run-plan --help`, and supported script docs expose only the final
+  public surface for new subspace work.
+- `optimus run-plan --method subspace --backend vllm ...` succeeds as a
+  planning command and emits final command names, or fails closed with a
+  roadmap-specific message. It must never emit removed commands.
+- `optimus run-plan` default LoRA baseline plans use final `search`/`bench`
+  routes, not removed wrappers.
+- Validation has separate contracts for:
+  - legacy LoRA adapter baselines;
+  - subspace reference runs;
+  - subspace vLLM runs;
+  - systems reports.
+- Release checks fail if any supported launcher, generated plan, public docs, or
+  validation gate promotes removed wrappers or LoRA-shaped subspace artifacts.
+- Narrow tests prove old wrappers are unknown, generated plans contain no
+  removed command names, and subspace validation requires
+  `subspace_state.pt`, `candidate_scores.jsonl`, `top_k_ensemble.json`,
+  `validation_report.json`, and `systems_report.json`.
+
 ## Phase 0A: Public API Router
 
 Goal: expose the final public command shape before adding more runtime code.
@@ -24,6 +116,7 @@ Acceptance gate:
 - Public docs and CLI help expose only the final commands.
 - Old wrappers are absent from `optimus --help` and fail as unknown commands.
 - Release check includes the design doc and roadmap as required public docs.
+- Run-plan and run-suite do not emit removed wrappers.
 
 ## Phase 0B: Public Names And Legacy Quarantine
 
@@ -46,6 +139,8 @@ Deliverables:
   `LoRARequest`, `save_seed_adapter`, adapter loading, or LoRA factor helpers.
 - Delete or move old experiment scripts into ignored local paths if they are not
   needed for current tests.
+- Move old LoRA-only validation and systems-report assumptions behind explicit
+  legacy-baseline names. They must not be the default proof path for subspace.
 
 Acceptance gate:
 
@@ -55,6 +150,57 @@ Acceptance gate:
   names remain.
 - Any remaining legacy parser is private, covered by compatibility tests, and
   cannot be reached by new subspace runs.
+
+## Phase 0C: Executable Artifact Contracts
+
+Goal: make schemas test-enforceable before implementation starts.
+
+Deliverables:
+
+- Add explicit run-contract families for subspace:
+  - `subspace_reference_search`;
+  - `subspace_vllm_search`;
+  - `subspace_lazy_ensemble`;
+  - `subspace_systems_report`.
+- Validate required files:
+  - `subspace_state.pt`;
+  - `subspace_state_summary.json`;
+  - `candidates.jsonl`;
+  - `candidate_scores.jsonl`;
+  - `top_k_ensemble.json`;
+  - `summary.json`;
+  - `validation_report.json`;
+  - `systems_report.json`.
+- Validate replay-critical fields in JSON artifacts:
+  - `schema_version`;
+  - `backend`;
+  - `method`;
+  - `basis_hash`;
+  - `target_set_hash`;
+  - `scale_mode`;
+  - `rho_grid` or `sigma_w_grid`;
+  - `budget_policy`;
+  - `rng_version`;
+  - `candidate_routing`;
+  - `prefix_cache_policy`;
+  - scorer version;
+  - prompt/sample-set hashes;
+  - decode config hash.
+- Validate `top_k_ensemble.json` contains full candidate identities, not only
+  candidate ids.
+- Add `gaussian_hash_v1` golden-vector tests before any random-field backend is
+  accepted.
+
+Acceptance gate:
+
+- A synthetic subspace run fixture can pass validation with only the documented
+  artifacts and required fields.
+- A LoRA adapter run fixture cannot pass as a subspace run.
+- Missing `top_k_ensemble.json`, missing full candidate identities, missing
+  `rng_version`, missing scorer/sample hashes, or missing systems metrics fail
+  validation.
+- Golden-vector RNG tests cover process restart, candidate permutation,
+  candidate batch-size changes, antithetic signs, and row-order independence.
 
 ## Phase 1: Core Subspace Data Model
 
@@ -82,6 +228,8 @@ Deliverables:
   - down uses `down_in`.
 - Implement deterministic stateless Gaussian random-field generation with
   process-, batch-, and scheduler-independent replay.
+- Publish `gaussian_hash_v1` test vectors and keep the exact byte payload
+  stable unless `rng_version` changes.
 - Define candidate shard metadata in the schema now:
   - shard id;
   - shard population range;
@@ -95,6 +243,8 @@ Acceptance gate:
 
 - Unit tests show candidate random fields replay across process restarts,
   candidate batch sizes, and candidate permutations.
+- Golden-vector tests prove `gaussian_hash_v1` is stable across Python
+  versions, worker counts, row order, and candidate-block composition.
 - Unit tests show target modules that share an activation site do not duplicate
   basis tensors.
 
@@ -243,9 +393,21 @@ Deliverables:
   custom-op registration points.
 - Explicit `row_candidate_id` routing into perturbed target modules.
 - Request metadata propagation via the selected vLLM custom-arguments path.
+- Concrete row-routing descriptor propagated from request metadata to the model
+  runner:
+  - `request_id`;
+  - `sequence_id`;
+  - prefill/decode phase;
+  - flattened token row start/count;
+  - position ids or equivalent row-position mapping;
+  - `candidate_id`;
+  - candidate slot within the current candidate block;
+  - basis/runtime config hash.
 - Prefix cache policy:
-  - default `disabled-for-search`;
-  - no candidate-different KV-cache sharing.
+  - v1 supports only `disabled-for-search`;
+  - no candidate-different KV-cache sharing;
+  - candidate-keyed prefix caching is a later PR and must not be enabled until
+    vLLM cache-key integration has explicit tests.
 - Single-target proof-of-life, then read-site sharing, then
   `transformer-linears`.
 - Throughput metrics:
@@ -278,13 +440,22 @@ production substrate before investing in custom kernels.
 
 Acceptance gate:
 
-- Primary metric is predeclared as top-K ensemble holdout score at fixed K,
-  rank grid, radius grid, task panel, seed panel, and scorer config.
+- Primary metric is predeclared as top-K ensemble holdout score at one locked
+  configuration: fixed K, rank, radius, target preset, task panel, seed panel,
+  scorer config, and aggregation rule.
+- Rank/radius/K grids are calibration or validation searches. If a grid is used
+  in the gate, the selection rule must be screen-only and identical across basis
+  families, or the analysis must apply the predeclared multiple-comparison
+  correction from the design doc.
 - Activation-SVD must beat random-orthonormal and shuffled-SVD controls with a
-  paired bootstrap 95% CI lower bound above zero on the primary metric.
+  paired bootstrap 95% CI lower bound above zero on the locked primary metric.
 - A statistically indistinguishable tie can proceed only if a predeclared
-  engineering review accepts materially lower drift or materially better
-  throughput at equal quality.
+  engineering review accepts the label
+  `engineering_proceed_no_scientific_win` and shows at least one operational
+  advantage at equal quality:
+  - at least 25% lower logit-KL/drift;
+  - at least 20% lower lazy overhead;
+  - at least 10 percentage points higher captured activation energy.
 - All secondary metrics, logit-KL/drift diagnostics, and screen-to-holdout drops
   are reported but do not replace the primary gate.
 - Holdout-tuned rank/radius/K/target choices are labeled validation and require
@@ -412,18 +583,23 @@ export, candidate shard metadata, or top-K ensemble artifacts.
 
 Preferred implementation order:
 
-1. Public `search`/`bench` router and old-wrapper removal.
+0. Fix generated run specs, supported launchers, release checks, and validation
+   contracts so they no longer bless the old LoRA adapter suite as the subspace
+   path.
+1. Public `search`/`bench` router and old-wrapper removal, including run-plan
+   and run-suite.
 2. Public-name guards in tests and release checks.
-3. `optimus.subspace` schema and artifact writers.
-4. Target preset registry and activation-site specs.
-5. Deterministic `gaussian_hash_v1` with golden vectors.
-6. Basis capture and control bases.
-7. Scale resolver and budget policies.
-8. Reference evaluator with top-K artifacts.
-9. Evaluation harness contract and sample-level details.
-10. vLLM one-target wrapper with fail-closed compatibility guard.
-11. vLLM routing/cache adversarial tests.
-12. Full target presets over vLLM.
-13. Production scientific gate.
-14. Materialized export and distillation artifacts.
-15. Optimized kernel only after the scientific and p128 speed gates pass.
+3. Subspace artifact contract fixtures and validation tests.
+4. `optimus.subspace` schema and artifact writers.
+5. Target preset registry and activation-site specs.
+6. Deterministic `gaussian_hash_v1` with golden vectors.
+7. Basis capture and control bases.
+8. Scale resolver and budget policies.
+9. Reference evaluator with top-K artifacts.
+10. Evaluation harness contract and sample-level details.
+11. vLLM one-target wrapper with fail-closed compatibility guard.
+12. vLLM routing/cache adversarial tests.
+13. Full target presets over vLLM.
+14. Production scientific gate.
+15. Materialized export and distillation artifacts.
+16. Optimized kernel only after the scientific and p128 speed gates pass.
