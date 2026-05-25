@@ -72,7 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subspace.add_argument("--top-k-grid", help="Comma-separated lazy ensemble K values.")
     subspace.add_argument("--candidate-batch-size", help="Candidate block size or 'auto'.")
-    subspace.add_argument("--kernel", choices=["torch", "triton", "custom-op"], help="Lazy delta kernel backend.")
+    subspace.add_argument("--kernel", choices=["torch", "triton", "flashinfer", "custom-op"], help="Lazy delta kernel backend.")
     subspace.add_argument(
         "--prefix-cache-policy",
         choices=["disabled-for-search"],

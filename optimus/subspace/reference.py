@@ -544,7 +544,8 @@ def candidate_score(
     input_dim: int,
     seed: int,
 ) -> tuple[float, int, float, float]:
-    activations = deterministic_activations(examples, dim=input_dim, seed=seed + 17)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    activations = deterministic_activations(examples, dim=input_dim, seed=seed + 17).to(device)
     basis_by_site = {site.site_id: state.basis_tensors[site.basis_tensor_key] for site in state.activation_sites}
     scale_by_target = {scale.target_id: scale.beta_t_by_radius[f"{candidate.rho_or_sigma_w:g}"] for scale in scales}
     total = 0.0
@@ -552,18 +553,27 @@ def candidate_score(
     delta_time = 0.0
     output_tokens = len(examples)
     for target in state.targets:
-        basis = basis_by_site[target.module.activation_site_id]
+        basis = basis_by_site[target.module.activation_site_id].to(device)
+        objective = target.objective.to(device)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
         qx_start = time.perf_counter()
         z = activations @ basis.T if basis.numel() else activations.new_zeros((activations.shape[0], 0))
+        if device.type == "cuda":
+            torch.cuda.synchronize()
         qx_time += time.perf_counter() - qx_start
+        if device.type == "cuda":
+            torch.cuda.synchronize()
         delta_start = time.perf_counter()
         field = CandidateRandomField(
             direction_seed=candidate.direction_seed,
             sign=candidate.sign,
             target_id=target.module.target_id,
-        ).tensor(target.module.output_dim, int(basis.shape[0]))
+        ).tensor(target.module.output_dim, int(basis.shape[0])).to(device)
         delta = scale_by_target[target.module.target_id] * (z @ field.T)
-        utility = (delta @ target.objective).mean()
+        utility = (delta @ objective).mean()
+        if device.type == "cuda":
+            torch.cuda.synchronize()
         total += float(utility.item())
         delta_time += time.perf_counter() - delta_start
     score = max(0.0, min(1.0, 0.5 + 0.05 * total))
@@ -729,6 +739,14 @@ def run_reference_search(args: Any, *, backend: str) -> dict[str, Any]:
     locked_radius = radius_grid[0]
     locked_k = min(top_k_grid[0], population)
     basis_kind: BasisKind = args.basis_kind or "activation-svd"
+    kernel = args.kernel or "torch"
+    kernel_detail: dict[str, Any] = {"requested_kernel": kernel}
+    if kernel == "flashinfer":
+        try:
+            import flashinfer  # type: ignore
+        except Exception as exc:
+            raise RuntimeError("requested --kernel flashinfer, but flashinfer-python is not importable") from exc
+        kernel_detail["flashinfer_version"] = getattr(flashinfer, "__version__", "unknown")
     if backend == "vllm" and (args.prefix_cache_policy or "disabled-for-search") != "disabled-for-search":
         raise ValueError("subspace vLLM search requires --prefix-cache-policy disabled-for-search")
     screen = load_examples(args.data, prompts, int(args.seed or 0))
@@ -843,7 +861,7 @@ def run_reference_search(args: Any, *, backend: str) -> dict[str, Any]:
     runtime_config_hash = config_hash(
         {
             "backend": backend,
-            "kernel": args.kernel or "torch",
+            "kernel": kernel,
             "basis_hash": state.basis_hash,
             "target_set_hash": state.target_set_hash,
             "scale_mode": scale_mode,
@@ -980,7 +998,7 @@ def run_reference_search(args: Any, *, backend: str) -> dict[str, Any]:
         "population": population,
         "target_preset": target_preset,
         "basis_rank": basis_rank,
-        "kernel": args.kernel or "torch",
+        "kernel": kernel,
         "candidate_batch_size": min(population, 16) if (args.candidate_batch_size or "auto") == "auto" else int(args.candidate_batch_size),
         "candidate_shard_id": "single",
         "gpu_model": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu-reference",
@@ -1033,7 +1051,8 @@ def run_reference_search(args: Any, *, backend: str) -> dict[str, Any]:
         "sample_set_hash": sample_set_hash,
         "prompt_scoring_config_hash": prompt_scoring_config_hash,
         "decode_config_hash": decode_config_hash,
-        "kernel": args.kernel or "torch",
+            "kernel": kernel,
+            "kernel_detail": kernel_detail,
         "resolved_target_scales": [asdict(scale) for scale in scales],
         "candidates_per_sec": systems_report["candidates_per_sec"],
         "prompts_per_sec": systems_report["prompts_per_sec"],
