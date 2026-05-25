@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from math import isfinite
 from pathlib import Path
 
-from optimus.runs.gpu_suite import GpuSuiteConfig, gpu_suite_specs, parse_int_tuple
+from optimus.runs.gpu_suite import GpuSuiteConfig, add_config_args, config_from_args, gpu_suite_specs, parse_int_tuple
 
 
 SUBSPACE_REQUIRED_FILES = (
@@ -1649,12 +1649,7 @@ def summary_payload(checks: list[RunCheck]) -> dict:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Validate an Optimus GPU run directory.")
-    parser.add_argument("--root", type=Path, default=Path("results/optimus_gpu_suite"))
-    parser.add_argument("--systems-out", type=Path, default=Path("results/report/optimus_systems"))
-    parser.add_argument("--backend", choices=["vllm"], default="vllm")
-    parser.add_argument("--method", choices=["lora", "subspace"], default="lora")
-    parser.add_argument("--populations", default="1024,4096")
-    parser.add_argument("--bench-adapters", default="8,16,32")
+    add_config_args(parser, include_out=False)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--strict", action="store_true")
     return parser
@@ -1662,15 +1657,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    config = GpuSuiteConfig(
-        output_root=args.root,
-        systems_output_root=args.systems_out,
-        backend=args.backend,
-        method=args.method,
-        populations=parse_int_tuple(args.populations),
-        bench_adapters=parse_int_tuple(args.bench_adapters),
-        run_halving=False,
-    )
+    config = config_from_args(args)
     try:
         contracts = gpu_suite_contracts(config)
     except RuntimeError as exc:

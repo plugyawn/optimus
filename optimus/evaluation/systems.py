@@ -211,10 +211,14 @@ def selected_subspace_system_report(reports: list[dict]) -> dict:
         return {}
     selectable = [row for row in reports if row.get("benchmark_kind") == "subspace"] or reports
     selected = min(selectable, key=lambda row: as_float(row.get("candidates_per_sec"), float("inf")))
+    source_report = Path(str(selected.get("source_report", ""))).resolve()
+    source_run_dir = Path(str(selected.get("source_run_dir", ""))).resolve()
     return selected | {
+        "source_report": str(source_report),
+        "source_run_dir": str(source_run_dir),
         "systems_selection_policy": "slowest_candidates_per_sec_conservative_gate",
         "all_reports_count": len(reports),
-        "all_report_sources": [row.get("source_report") for row in reports],
+        "all_report_sources": [str(Path(str(row.get("source_report", ""))).resolve()) for row in reports],
     }
 
 
