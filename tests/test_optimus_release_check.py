@@ -265,6 +265,7 @@ def test_release_check_rejects_legacy_package_level_exports(tmp_path: Path):
     serving = tmp_path / "optimus" / "serving"
     serving.mkdir()
     (serving / "__init__.py").write_text("__all__ = ['AdapterSpec', 'score_rows', 'make_sampling_params']\n")
+    (serving / "vllm.py").write_text("def run_vllm_search(): pass\n")
     search = tmp_path / "optimus" / "search"
     search.mkdir()
     (search / "__init__.py").write_text("__all__ = ['run_peft_search']\n")
@@ -286,6 +287,7 @@ def test_release_check_rejects_legacy_package_level_exports(tmp_path: Path):
     assert "AdapterSpec" in by_name["public_package_surface_excludes_legacy_subspace_internals"].detail
     assert "run_peft_search" in by_name["public_package_surface_excludes_legacy_subspace_internals"].detail
     assert "halving.py" in by_name["public_package_surface_excludes_legacy_subspace_internals"].detail
+    assert "vllm.py" in by_name["public_package_surface_excludes_legacy_subspace_internals"].detail
 
 
 def _write_subspace_systems_out(root: Path, *, timing: bool = True, numeric_as_string: bool = False) -> Path:
@@ -294,9 +296,9 @@ def _write_subspace_systems_out(root: Path, *, timing: bool = True, numeric_as_s
     source_run = root / "run"
     source_run.mkdir()
     source_report = source_run / "systems_report.json"
-    source_report.write_text("{}\n")
+    source_report.write_text(json.dumps({"schema_version": "subspace_systems_report_v1"}) + "\n")
     if timing:
-        (source_run / "timing_trace.jsonl").write_text(json.dumps({"elapsed_s": 0.1}) + "\n")
+        (source_run / "timing_trace.jsonl").write_text(json.dumps({"elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
     payload = {
         "schema_version": "subspace_systems_report_v1",
         "created_at": "2026-05-25T00:00:00Z",
@@ -326,8 +328,8 @@ def _write_subspace_systems_out(root: Path, *, timing: bool = True, numeric_as_s
         "gpu_memory_allocated_bytes": 1024,
         "gpu_memory_reserved_bytes": 2048,
         "base_model_time_s": 1.0,
-        "qx_time_s": 0.1,
-        "lazy_delta_time_s": 0.2,
+        "qx_time_s": 0.05,
+        "lazy_delta_time_s": 0.1,
         "scoring_time_s": 0.3,
         "setup_time_s": 0.4,
         "candidates_per_sec": 1.0,
@@ -350,8 +352,11 @@ def _write_subspace_systems_out(root: Path, *, timing: bool = True, numeric_as_s
     (systems / "report.md").write_text("# Report\n")
     (systems / "systems_report.json").write_text(json.dumps(payload) + "\n")
     (systems / "subspace_systems.csv").write_text(
-        "source_run_dir,candidate_batch_size,population,target_preset,basis_rank,kernel,candidates_per_sec,top_k_ensemble_cost_multiplier,screen_score,holdout_score,screen_to_holdout_drop,diversity_metrics,random_q_control,shuffled_q_control,antithetic_odd_even\n"
-        "run,4,128,transformer-linears,128,torch,1.0,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "source_run_dir,candidate_batch_size,population,target_preset,basis_rank,kernel,candidates_per_sec,prompts_per_sec,output_tokens_per_sec,lazy_overhead_pct,base_model_time_s,qx_time_s,lazy_delta_time_s,top_k_ensemble_cost_multiplier,screen_score,holdout_score,screen_to_holdout_drop,diversity_metrics,random_q_control,shuffled_q_control,antithetic_odd_even\n"
+        "run,4,128,qv,128,torch,2.2,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "run,4,128,attn-qkvo,128,torch,2.0,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "run,4,128,mlp,128,torch,1.8,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "run,4,128,transformer-linears,128,torch,1.2,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
     )
     return systems
 
@@ -374,6 +379,32 @@ def test_subspace_release_check_rejects_string_numeric_systems_fields(tmp_path: 
 
     assert not by_name["subspace_systems_report_fields_present"].passed
     assert "gpu_count" in by_name["subspace_systems_report_fields_present"].detail
+
+
+def test_subspace_release_check_rejects_invalid_source_report(tmp_path: Path):
+    systems = _write_subspace_systems_out(tmp_path)
+    ((tmp_path / "run") / "systems_report.json").write_text("{}\n")
+
+    checks = systems_report_checks(systems, method="subspace")
+    by_name = {check.name: check for check in checks}
+
+    assert not by_name["subspace_systems_report_fields_present"].passed
+    assert "source_report_schema" in by_name["subspace_systems_report_fields_present"].detail
+
+
+def test_subspace_release_check_rejects_incomplete_p128_speed_gate(tmp_path: Path):
+    systems = _write_subspace_systems_out(tmp_path)
+    (systems / "subspace_systems.csv").write_text(
+        "source_run_dir,candidate_batch_size,population,target_preset,basis_rank,kernel,candidates_per_sec,prompts_per_sec,output_tokens_per_sec,lazy_overhead_pct,base_model_time_s,qx_time_s,lazy_delta_time_s,top_k_ensemble_cost_multiplier,screen_score,holdout_score,screen_to_holdout_drop,diversity_metrics,random_q_control,shuffled_q_control,antithetic_odd_even\n"
+        "run,4,128,transformer-linears,128,torch,1.0,2.0,3.0,10.0,1.0,0.2,0.2,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+    )
+
+    checks = systems_report_checks(systems, method="subspace")
+    by_name = {check.name: check for check in checks}
+
+    assert not by_name["subspace_p128_speed_gate_enforced"].passed
+    assert "missing target presets" in by_name["subspace_p128_speed_gate_enforced"].detail
+    assert "qx_plus_lazy_delta_overhead" in by_name["subspace_p128_speed_gate_enforced"].detail
 
 
 def test_release_check_accepts_verified_prime_zero_ledger(tmp_path: Path):

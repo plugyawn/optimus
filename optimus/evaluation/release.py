@@ -83,6 +83,13 @@ def as_int(value, default: int = 0) -> int:
         return default
 
 
+def as_float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def pyproject_checks(root: Path) -> list[ReleaseCheck]:
     path = root / "pyproject.toml"
     if not path.exists():
@@ -224,6 +231,20 @@ def _module_all(path: Path) -> list[str]:
     return []
 
 
+def _timing_evidence_has_sync_marker(path: Path) -> bool:
+    try:
+        with path.open() as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if isinstance(row, dict) and row.get("cuda_synchronized") is True:
+                    return True
+    except (OSError, json.JSONDecodeError):
+        return False
+    return False
+
+
 def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
     checks: list[ReleaseCheck] = []
     legacy_tokens = {"peft-search", "vllm-search", "vllm-halving", "vllm-bench"}
@@ -341,6 +362,8 @@ def package_code_checks(root: Path) -> list[ReleaseCheck]:
         surface_leaks.append(f"optimus/search/__init__.py:{name}")
     if (package_root / "serving" / "halving.py").exists():
         surface_leaks.append("optimus/serving/halving.py:removed_staged_driver")
+    if (package_root / "serving" / "vllm.py").exists():
+        surface_leaks.append("optimus/serving/vllm.py:removed_adapter_facade")
     return [
         ReleaseCheck("optimus_package_source_present", True, str(package_root)),
         ReleaseCheck(
@@ -545,6 +568,8 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
                     evidence_path = source_run_dir / evidence_path
                 if not evidence_path.exists():
                     missing_timing_evidence.append(str(evidence))
+                elif not _timing_evidence_has_sync_marker(evidence_path):
+                    missing_timing_evidence.append(f"{evidence}:no_cuda_synchronized_marker")
         missing_sources: list[str] = []
         source_report = payload.get("source_report")
         if isinstance(source_report, str) and source_report:
@@ -553,6 +578,14 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
                 source_report_path = systems_out / source_report_path
             if not source_report_path.exists():
                 missing_sources.append(f"source_report={source_report!r}")
+            else:
+                try:
+                    source_payload = json.loads(source_report_path.read_text())
+                except json.JSONDecodeError:
+                    missing_sources.append(f"source_report_invalid_json={source_report!r}")
+                else:
+                    if not isinstance(source_payload, dict) or source_payload.get("schema_version") != "subspace_systems_report_v1":
+                        missing_sources.append(f"source_report_schema={source_report!r}")
         source_run_dir = payload.get("source_run_dir")
         if isinstance(source_run_dir, str) and source_run_dir:
             source_run_path = Path(source_run_dir)
@@ -614,6 +647,42 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
                     "subspace_systems_csv_has_comparison_axes",
                     bool(rows) and not missing_columns,
                     "subspace comparison axes present" if rows and not missing_columns else f"rows={len(rows)} missing={missing_columns!r}",
+                )
+            )
+            p128_rows = [row for row in rows if as_int(row.get("population")) == 128]
+            p128_failures: list[str] = []
+            for index, row in enumerate(p128_rows, start=1):
+                base_time = as_float(row.get("base_model_time_s"), 0.0)
+                qx_time = as_float(row.get("qx_time_s"), -1.0)
+                delta_time = as_float(row.get("lazy_delta_time_s"), -1.0)
+                if base_time <= 0.0 or qx_time < 0.0 or delta_time < 0.0:
+                    p128_failures.append(f"row {index}: missing base/qx/lazy timing")
+                    continue
+                overhead = (qx_time + delta_time) / base_time
+                if overhead > 0.25:
+                    p128_failures.append(f"row {index}: qx_plus_lazy_delta_overhead={overhead:.3f}")
+            target_presets = {row.get("target_preset") for row in p128_rows}
+            required_presets = {"qv", "attn-qkvo", "mlp", "transformer-linears"}
+            missing_presets = sorted(required_presets - target_presets)
+            grouped: dict[tuple[str, str], list[dict]] = {}
+            for row in p128_rows:
+                grouped.setdefault((str(row.get("basis_rank")), str(row.get("kernel"))), []).append(row)
+            for (basis_rank, kernel), group in grouped.items():
+                transformer = [row for row in group if row.get("target_preset") == "transformer-linears"]
+                siblings = [row for row in group if row.get("target_preset") in {"qv", "attn-qkvo", "mlp"}]
+                if not transformer or not siblings:
+                    continue
+                transformer_cps = max(as_float(row.get("candidates_per_sec"), 0.0) for row in transformer)
+                sibling_cps = max(as_float(row.get("candidates_per_sec"), 0.0) for row in siblings)
+                if transformer_cps <= 0.0 or sibling_cps / transformer_cps > 2.0:
+                    p128_failures.append(f"rank={basis_rank} kernel={kernel}: transformer-linears more than 2x slower")
+            if missing_presets:
+                p128_failures.append(f"missing target presets {missing_presets!r}")
+            checks.append(
+                ReleaseCheck(
+                    "subspace_p128_speed_gate_enforced",
+                    bool(p128_rows) and not p128_failures,
+                    "p128 speed gate present" if p128_rows and not p128_failures else f"rows={len(p128_rows)} failures={p128_failures!r}",
                 )
             )
         return checks

@@ -138,7 +138,10 @@ The generated evidence is not enough by itself. A final claim requires:
 6. For subspace, the p128 speed gate must pass before p1024/p4096 scaling runs:
    the systems report must include per-run `subspace_systems.csv` rows for the
    compared target presets and must not reduce the claim to the fastest sibling
-   run.
+   run. The gate requires synchronized timing evidence, `Qx + lazy_delta` at
+   or below 25% of hot base-model time, and `transformer-linears` no more than
+   2x slower than the matched target-band rows unless the run is explicitly
+   labeled as a profiling failure.
 7. Systems outputs from `optimus systems-report`: LoRA/dense plots for backend
    throughput, token throughput, best-of-N, and quality scaling; subspace
    runtime summaries in `systems_report.json` and `subspace_systems.csv`.

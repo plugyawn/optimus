@@ -45,8 +45,8 @@ def _subspace_systems_payload() -> dict:
         "gpu_memory_allocated_bytes": 1024,
         "gpu_memory_reserved_bytes": 2048,
         "base_model_time_s": 1.0,
-        "qx_time_s": 0.1,
-        "lazy_delta_time_s": 0.2,
+        "qx_time_s": 0.05,
+        "lazy_delta_time_s": 0.1,
         "scoring_time_s": 0.3,
         "setup_time_s": 0.4,
         "candidates_per_sec": 1.0,
@@ -214,7 +214,7 @@ def test_systems_report_writes_subspace_systems_json_from_measured_runs(tmp_path
         json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128}) + "\n"
     )
     (run / "systems_report.json").write_text(json.dumps(_subspace_systems_payload()) + "\n")
-    (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1}) + "\n")
+    (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
 
     out = tmp_path / "report"
     assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 0
@@ -243,7 +243,7 @@ def test_systems_report_selects_conservative_slowest_subspace_row(tmp_path: Path
         payload["candidates_per_sec"] = candidate_sec
         payload["target_preset"] = target_preset
         (run / "systems_report.json").write_text(json.dumps(payload) + "\n")
-        (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1}) + "\n")
+        (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
 
     out = tmp_path / "report"
     assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 0
@@ -267,13 +267,48 @@ def test_systems_report_rejects_bad_subspace_system_types(tmp_path: Path):
     payload["candidates_per_sec"] = "1.0"
     payload["top_k_ensemble_cost_multiplier"] = "huge"
     (run / "systems_report.json").write_text(json.dumps(payload) + "\n")
-    (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1}) + "\n")
+    (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
 
     out = tmp_path / "report"
     assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 1
 
     report = (out / "report.md").read_text()
     assert "nonnumeric fields" in report
+
+
+def test_systems_report_rejects_unsynchronized_timing_evidence(tmp_path: Path):
+    run = tmp_path / "optimus_gpu_suite" / "search_p128_subspace_r128"
+    run.mkdir(parents=True)
+    (run / "summary.json").write_text(
+        json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128}) + "\n"
+    )
+    (run / "systems_report.json").write_text(json.dumps(_subspace_systems_payload()) + "\n")
+    (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1}) + "\n")
+
+    out = tmp_path / "report"
+    assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 1
+
+    report = (out / "report.md").read_text()
+    assert "no_cuda_synchronized_marker" in report
+
+
+def test_systems_report_rejects_p128_lazy_overhead_regression(tmp_path: Path):
+    run = tmp_path / "optimus_gpu_suite" / "search_p128_subspace_r128"
+    run.mkdir(parents=True)
+    (run / "summary.json").write_text(
+        json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128}) + "\n"
+    )
+    payload = _subspace_systems_payload()
+    payload["qx_time_s"] = 0.2
+    payload["lazy_delta_time_s"] = 0.2
+    (run / "systems_report.json").write_text(json.dumps(payload) + "\n")
+    (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
+
+    out = tmp_path / "report"
+    assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 1
+
+    report = (out / "report.md").read_text()
+    assert "p128 qx_plus_lazy_delta_overhead" in report
 
 
 def test_systems_report_fails_closed_for_subspace_without_measured_report(tmp_path: Path):

@@ -248,6 +248,12 @@ This is the work to do before any Phase 1 runtime code begins.
      names become part of the subspace public surface.
 3. Finish executable artifact gates:
    - require nonempty candidate ids in all candidate-bearing artifacts;
+   - recompute replay hashes for `subspace_state.pt` and
+     `candidate_scores.jsonl` instead of trusting copied hash strings;
+   - require `subspace_state.pt` to be loadable and to contain the
+     `basis_tensors` referenced by `subspace_state_summary.json`;
+   - require validation evidence paths to be section-specific JSON evidence,
+     not self-links back to `summary.json` or `validation_report.json`;
    - require exact schema ids, provenance, numeric JSON types, timing evidence,
      source paths, and axis fields for subspace systems reports;
    - require enum validation for basis kind, centering, token source, and split;
@@ -287,6 +293,9 @@ Do not start Phase 1 until every item below is true:
   as subspace artifacts.
 - Systems reporting requires measured timing evidence and preserves target
   preset, rank, population, kernel, and conservative throughput evidence.
+- p128 speed evidence includes synchronized timing markers, enforces the
+  `Qx + lazy_delta <= 25%` hot-model overhead threshold, and preserves
+  `qv`, `attn-qkvo`, `mlp`, and `transformer-linears` target-band comparisons.
 - Scientific gate logic distinguishes smoke non-inferiority, production
   positive acceptance, and explicitly labeled engineering proceed.
 - Five independent review axes have passed after the final Phase 0 changes.

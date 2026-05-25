@@ -44,6 +44,9 @@ experiment-lab repository.
   post-hoc promoted-candidate evidence.
 - Fast-backend selector claims require a passing parity row in
   `parity.csv`; a header-only parity file is not release evidence.
+- Subspace systems claims require the p128 speed gate in
+  `subspace_systems.csv`: synchronized timing evidence, target-preset axes, and
+  the documented lazy-overhead/target-band thresholds.
 
 ## Systems Gates
 

@@ -2,9 +2,9 @@
 
 Optimus is a research library for zeroth-order post-training of large language
 models. It gives perturbations stable identities, applies them as dense weight
-patches, LoRA adapters, or lazy subspace updates, runs
-high-throughput GPU screens, and keeps the systems and validation records
-needed to decide whether a candidate actually transfers.
+patches or LoRA adapters today, defines the planned lazy subspace-update
+backend, runs high-throughput GPU screens, and keeps the systems and validation
+records needed to decide whether a candidate actually transfers.
 
 The supported public interface is the `optimus` package and CLI.
 
@@ -74,7 +74,7 @@ optimus/
   tasks/       benchmark data models, prompt builders, and scorers
   modeling/    dense patches, low-rank geometry, and materialization helpers
   subspace/    subspace basis state, candidate noise, and reference math
-  backends/    vLLM and Transformers backend integrations
+  backends/    backend and method names plus compatibility boundaries
   runs/        reusable workload specifications for GPU validation suites
   search/      zeroth-order studies, selection, and trusted HF execution
   serving/     vLLM adapter-swapping and throughput-oriented execution

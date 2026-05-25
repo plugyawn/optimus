@@ -770,6 +770,7 @@ by hash.
       "requested_rank": 128,
       "effective_rank": 128,
       "basis_tensor_key": "...",
+      "basis_tensor_sha256": "...",
       "singular_values": "...",
       "captured_energy": 0.91,
       "prefill_captured_energy": 0.91,
@@ -793,9 +794,11 @@ by hash.
 ```
 
 `subspace_state.pt` is the tensor payload. Until the Phase 1 writer/reader
-lands, validators check that the payload exists and that the summary records
-the tensor keys and hashes needed to replay it; they do not treat the binary
-payload as a JSON schema.
+lands, validators require a loadable payload with schema
+`subspace_state_payload_v1`, a `basis_tensors` map keyed by each
+`basis_tensor_key`, and per-basis tensor hashes matching
+`basis_tensor_sha256`. They also recompute the file digest and compare it to
+`summary.json.subspace_state_hash`.
 
 `summary.json` required scale and budget fields:
 
@@ -870,10 +873,13 @@ diagnostics, random/shuffled controls, throughput gates, and a
 `scientific_gate_contract`. Each section has `status`, `evidence_paths`, and a
 machine-readable failure list. A completed run passes validation only when every
 required section has `status: "pass"`, nonempty evidence paths that exist in the
-run directory, and an empty failure list. The scientific gate section also
-records `locked_config_hash`, `selection_rule_hash`, `primary_metric`,
-`multiple_comparison_correction`, and a numeric confidence interval so a
-gate result is not merely self-attested prose.
+run directory, and an empty failure list. Evidence paths must point to
+section-specific JSON evidence, not back to `summary.json` or
+`validation_report.json`. The scientific gate section also records
+`locked_config_hash`, `selection_rule_hash`, `primary_metric`,
+`multiple_comparison_correction`, locked K/rank/radius/target/aggregation
+fields, `selection_split`, `holdout_tuned`, `screen_holdout_overlap`, and a
+numeric confidence interval so a gate result is not merely self-attested prose.
 
 `systems_report.json` records warmup policy, CUDA synchronization policy,
 candidate batch size, candidate shard id, GPU model, GPU count, memory

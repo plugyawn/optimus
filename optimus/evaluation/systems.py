@@ -35,6 +35,20 @@ def is_json_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def timing_evidence_has_sync_marker(path: Path) -> bool:
+    try:
+        with path.open() as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if isinstance(row, dict) and row.get("cuda_synchronized") is True:
+                    return True
+    except (OSError, json.JSONDecodeError):
+        return False
+    return False
+
+
 def read_summary(path: Path) -> dict:
     row = json.loads(path.read_text())
     row["summary_path"] = str(path)
@@ -146,9 +160,22 @@ def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], li
             resolved = evidence_path if evidence_path.is_absolute() else path.parent / evidence_path
             if not resolved.exists():
                 missing_evidence.append(str(evidence))
+            elif not timing_evidence_has_sync_marker(resolved):
+                missing_evidence.append(f"{evidence}:no_cuda_synchronized_marker")
         if missing_evidence:
             invalid.append(f"{path}: missing timing evidence {', '.join(missing_evidence)}")
             continue
+        if payload.get("population") == 128:
+            base_time = as_float(payload.get("base_model_time_s"), 0.0)
+            qx_time = as_float(payload.get("qx_time_s"), -1.0)
+            delta_time = as_float(payload.get("lazy_delta_time_s"), -1.0)
+            if base_time <= 0.0 or qx_time < 0.0 or delta_time < 0.0:
+                invalid.append(f"{path}: p128 speed gate missing base/qx/lazy timing")
+                continue
+            overhead = (qx_time + delta_time) / base_time
+            if overhead > 0.25:
+                invalid.append(f"{path}: p128 qx_plus_lazy_delta_overhead {overhead:.3f} > 0.25")
+                continue
         if payload.get("prefix_cache_policy") != "disabled-for-search":
             invalid.append(f"{path}: invalid prefix_cache_policy {payload.get('prefix_cache_policy')!r}")
             continue

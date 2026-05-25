@@ -416,19 +416,6 @@ print(json.dumps([gaussian_hash_v1(**item) for item in reversed(cases)]))
     assert forward == list(reversed(reversed_values))
 
 
-def test_vllm_adapter_module_is_explicit_legacy_baseline_import():
-    result = subprocess.run(
-        [sys.executable, "-c", "from optimus.serving.vllm import AdapterSpec, perturbation_panel; print(AdapterSpec.__name__, perturbation_panel.__name__)"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    assert "AdapterSpec" in result.stdout
-    assert "perturbation_panel" in result.stdout
-    assert result.stderr == ""
-
-
 def test_serving_runtime_helpers_import_from_public_namespace():
     result = subprocess.run(
         [sys.executable, "-c", "from optimus.serving import backend_contract, make_vllm_prompt_inputs, score_rows; print(backend_contract.__module__, make_vllm_prompt_inputs.__module__, score_rows.__module__)"],

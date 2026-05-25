@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 from pathlib import Path
 
 import subprocess
 import sys
+
+import torch
 
 from optimus.evaluation.validation import check_run, gpu_suite_contracts, summary_payload
 from optimus.runs.gpu_suite import GpuSuiteConfig, execute_specs, gpu_suite_specs, parse_int_tuple, plan_payload, spec_is_complete
@@ -12,6 +16,22 @@ from optimus.runs.gpu_suite import GpuSuiteConfig, execute_specs, gpu_suite_spec
 
 CANDIDATE = "lora:isotropic:seed1:s0.0075:sign1:r8:tq_proj,v_proj"
 PNG_1X1 = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfeA\xba\xa3\x8b\x00\x00\x00\x00IEND\xaeB`\x82"
+
+
+def _sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _torch_tensor_sha256(tensor: torch.Tensor) -> str:
+    buffer = io.BytesIO()
+    torch.save(tensor.detach().cpu().contiguous(), buffer)
+    return _sha256_bytes(buffer.getvalue())
+
+
+def _torch_save_bytes(payload: dict) -> bytes:
+    buffer = io.BytesIO()
+    torch.save(payload, buffer)
+    return buffer.getvalue()
 
 
 def _summary_for_kind(kind: str, **identity):
@@ -102,9 +122,9 @@ def write_contract_outputs(contract) -> None:
         }
         source_run = contract.root / "source_run"
         source_run.mkdir(parents=True, exist_ok=True)
-        (source_run / "timing_trace.jsonl").write_text(json.dumps({"event": "suite_timed_region", "elapsed_s": 0.1}) + "\n")
+        (source_run / "timing_trace.jsonl").write_text(json.dumps({"event": "suite_timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
         source_report = source_run / "systems_report.json"
-        source_report.write_text("{}\n")
+        source_report.write_text(json.dumps({"schema_version": "subspace_systems_report_v1"}) + "\n")
         for rel in contract.required_files:
             path = contract.root / rel
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -142,8 +162,8 @@ def write_contract_outputs(contract) -> None:
                             "gpu_memory_allocated_bytes": 1024,
                             "gpu_memory_reserved_bytes": 2048,
                             "base_model_time_s": 1.0,
-                            "qx_time_s": 0.1,
-                            "lazy_delta_time_s": 0.2,
+                            "qx_time_s": 0.05,
+                            "lazy_delta_time_s": 0.1,
                             "scoring_time_s": 0.3,
                             "setup_time_s": 0.4,
                             "candidates_per_sec": 1.0,
@@ -228,6 +248,35 @@ def write_subspace_contract_outputs(contract) -> None:
         "device_id": "cuda:0",
         "prompt_scoring_config_hash": "promptscore123",
     }
+    basis_tensor = torch.eye(8, 16)
+    subspace_state_bytes = _torch_save_bytes(
+        {
+            "schema_version": "subspace_state_payload_v1",
+            "basis_tensors": {"basis/layer_0.attn_in": basis_tensor},
+        }
+    )
+    candidate_scores_text = "".join(
+        json.dumps(
+            {
+                "candidate_id": f"seed{idx}:+:rho0.01",
+                "split": "screen",
+                "selection_stage": "screen",
+                "selection_rule_hash": "select123",
+                "promoted_by_candidate_id": None,
+                "scorer_name": "countdown",
+                "scorer_version": "countdown_v1",
+                "aggregate_metrics": {"exact": 0.1},
+                "sample_count": 8,
+                "prompt_ids_hash": "prompts123",
+                "sample_set_hash": "samples123",
+                "decode_config_hash": "decode123",
+                "elapsed_s": 0.01,
+                "output_tokens": 16,
+            }
+        )
+        + "\n"
+        for idx in range(1, 17)
+    )
     summary = {
         "schema_version": "subspace_run_summary_v1",
         "kind": "subspace_vllm_search",
@@ -246,12 +295,13 @@ def write_subspace_contract_outputs(contract) -> None:
         "prompt_contract_hash": "promptcontract123",
         "screen_split_hash": "screen123",
         "holdout_split_hash": "holdout123",
+        "screen_holdout_overlap": 0,
         "population": 16,
         "basis_hash": "basis123",
         "target_set_hash": "target123",
         "basis_collection_config_hash": "basisconfig123",
-        "subspace_state_hash": "statehash123",
-        "candidate_scores_hash": "scorehash123",
+        "subspace_state_hash": _sha256_bytes(subspace_state_bytes),
+        "candidate_scores_hash": _sha256_bytes(candidate_scores_text.encode("utf-8")),
         "scale_mode": "relative-output-rms",
         "rho_grid": [0.01],
         "sigma_w_grid": None,
@@ -288,23 +338,24 @@ def write_subspace_contract_outputs(contract) -> None:
         "holdout_split_hash": summary["holdout_split_hash"],
         "decode_config_hash": summary["decode_config_hash"],
     }
+    validation_sections = [
+        "math_tests",
+        "rng_replay_tests",
+        "routing_cache_tests",
+        "selector_quality",
+        "holdout_quality",
+        "ensemble_quality",
+        "drift_diagnostics",
+        "random_shuffled_controls",
+        "throughput_gates",
+        "scientific_gate_contract",
+    ]
     validation_report = {
         "schema_version": "validation_report_v1",
         **artifact_provenance,
         **{
-            key: {"status": "pass", "evidence_paths": ["summary.json"], "failures": []}
-            for key in [
-                "math_tests",
-                "rng_replay_tests",
-                "routing_cache_tests",
-                "selector_quality",
-                "holdout_quality",
-                "ensemble_quality",
-                "drift_diagnostics",
-                "random_shuffled_controls",
-                "throughput_gates",
-                "scientific_gate_contract",
-            ]
+            key: {"status": "pass", "evidence_paths": [f"evidence/{key}.json"], "failures": []}
+            for key in validation_sections
         },
     }
     json_files = {
@@ -346,6 +397,7 @@ def write_subspace_contract_outputs(contract) -> None:
                     "requested_rank": 8,
                     "effective_rank": 8,
                     "basis_tensor_key": "basis/layer_0.attn_in",
+                    "basis_tensor_sha256": _torch_tensor_sha256(basis_tensor),
                     "singular_values": [1.0, 0.5],
                     "captured_energy": 0.9,
                     "prefill_captured_energy": 0.9,
@@ -377,12 +429,12 @@ def write_subspace_contract_outputs(contract) -> None:
             "candidates": [candidate],
             "basis_hash": "basis123",
             "basis_collection_config_hash": "basisconfig123",
-            "subspace_state_hash": "statehash123",
+            "subspace_state_hash": summary["subspace_state_hash"],
             "scale_mode": "relative-output-rms",
             "rho_or_sigma_w": 0.01,
             "budget_policy": "per-block-equal",
             "target_set_hash": "target123",
-            "candidate_scores_hash": "scorehash123",
+            "candidate_scores_hash": summary["candidate_scores_hash"],
             "rng_version": "gaussian_hash_v1",
             "scorer_version": "countdown_v1",
             "prompt_ids_hash": "prompts123",
@@ -408,8 +460,8 @@ def write_subspace_contract_outputs(contract) -> None:
             "gpu_memory_allocated_bytes": 1024,
             "gpu_memory_reserved_bytes": 2048,
             "base_model_time_s": 1.0,
-            "qx_time_s": 0.1,
-            "lazy_delta_time_s": 0.2,
+            "qx_time_s": 0.05,
+            "lazy_delta_time_s": 0.1,
             "scoring_time_s": 0.3,
             "setup_time_s": 0.4,
             "candidates_per_sec": 1.0,
@@ -430,10 +482,19 @@ def write_subspace_contract_outputs(contract) -> None:
     }
     json_files["validation_report.json"]["scientific_gate_contract"].update(
         {
-            "locked_config_hash": "locked123",
+            "locked_config_hash": "runtime123",
             "selection_rule_hash": "select123",
             "primary_metric": "top_k_holdout_exact",
             "multiple_comparison_correction": "none_predeclared_single_config",
+            "locked_K": 1,
+            "locked_basis_rank": 128,
+            "locked_radius": 0.01,
+            "locked_target_preset": "transformer-linears",
+            "locked_scale_mode": "relative-output-rms",
+            "locked_aggregation": "majority-vote",
+            "selection_split": "screen",
+            "holdout_tuned": False,
+            "screen_holdout_overlap": 0,
             "gate_stage": "production",
             "basis_kind": "activation-svd",
             "control_basis_kinds": ["random-orthonormal", "shuffled-activation-svd"],
@@ -447,39 +508,20 @@ def write_subspace_contract_outputs(contract) -> None:
         path = contract.root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         if rel == "subspace_state.pt":
-            path.write_bytes(b"subspace-state")
+            path.write_bytes(subspace_state_bytes)
         elif rel == "candidates.jsonl":
             path.write_text("".join(json.dumps(candidate | {"candidate_id": f"seed{idx}:+:rho0.01", "direction_seed": idx}) + "\n" for idx in range(1, 17)))
         elif rel == "candidate_scores.jsonl":
-            path.write_text(
-                "".join(
-                    json.dumps(
-                        {
-                            "candidate_id": f"seed{idx}:+:rho0.01",
-                            "split": "screen",
-                            "selection_stage": "screen",
-                            "selection_rule_hash": "select123",
-                            "promoted_by_candidate_id": None,
-                            "scorer_name": "countdown",
-                            "scorer_version": "countdown_v1",
-                            "aggregate_metrics": {"exact": 0.1},
-                            "sample_count": 8,
-                            "prompt_ids_hash": "prompts123",
-                            "sample_set_hash": "samples123",
-                            "decode_config_hash": "decode123",
-                            "elapsed_s": 0.01,
-                            "output_tokens": 16,
-                        }
-                    )
-                    + "\n"
-                    for idx in range(1, 17)
-                )
-            )
+            path.write_text(candidate_scores_text)
         elif rel in json_files:
             path.write_text(json.dumps(json_files[rel]) + "\n")
         else:
             path.write_text("placeholder\n")
-    (contract.root / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1}) + "\n")
+    evidence_dir = contract.root / "evidence"
+    evidence_dir.mkdir(exist_ok=True)
+    for section in validation_sections:
+        (evidence_dir / f"{section}.json").write_text(json.dumps({"section": section, "status": "pass"}) + "\n")
+    (contract.root / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
 
 
 def test_gpu_suite_specs_include_p1024_and_p4096_searches(tmp_path: Path):
@@ -881,6 +923,93 @@ def test_subspace_contract_rejects_bad_schema_versions(tmp_path: Path):
     assert any("summary.schema_version" in item for item in result.invalid)
     assert any("top_k_ensemble.json.schema_version" in item for item in result.invalid)
     assert any("validation_report.json.schema_version" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_state_and_score_hash_drift(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    (contract.root / "subspace_state.pt").write_bytes(b"not-a-loadable-state")
+    (contract.root / "candidate_scores.jsonl").write_text((contract.root / "candidate_scores.jsonl").read_text() + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("subspace_state_hash" in item for item in result.invalid)
+    assert any("subspace_state.pt: cannot load payload" in item for item in result.invalid)
+    assert any("candidate_scores_hash" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_self_attesting_validation_evidence(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    report["math_tests"]["evidence_paths"] = ["summary.json"]
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("math_tests.evidence_paths: self-attesting" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_holdout_overlap_claims(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    summary = json.loads((contract.root / "summary.json").read_text())
+    summary["screen_holdout_overlap"] = 1
+    (contract.root / "summary.json").write_text(json.dumps(summary) + "\n")
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    report["scientific_gate_contract"]["screen_holdout_overlap"] = 1
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("summary.screen_holdout_overlap" in item for item in result.invalid)
+    assert any("scientific_gate_contract.screen_holdout_overlap" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_scientific_gate_not_tied_to_artifacts(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    report["scientific_gate_contract"]["locked_config_hash"] = "wrong"
+    report["scientific_gate_contract"]["selection_rule_hash"] = "unknown"
+    report["scientific_gate_contract"]["locked_K"] = 2
+    report["scientific_gate_contract"]["holdout_tuned"] = True
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("selection_rule_hash: not present" in item for item in result.invalid)
+    assert any("locked_config_hash" in item for item in result.invalid)
+    assert any("locked_K" in item for item in result.invalid)
+    assert any("holdout_tuned" in item for item in result.invalid)
 
 
 def test_subspace_contract_rejects_holdout_scores_without_selector_provenance(tmp_path: Path):

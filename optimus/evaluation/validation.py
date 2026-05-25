@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
+import io
 import json
 from dataclasses import asdict, dataclass
 from math import isfinite
@@ -38,6 +40,7 @@ SUBSPACE_REQUIRED_SUMMARY = (
     "prompt_contract_hash",
     "screen_split_hash",
     "holdout_split_hash",
+    "screen_holdout_overlap",
     "population",
     "basis_hash",
     "target_set_hash",
@@ -225,6 +228,7 @@ SUBSPACE_ACTIVATION_SITE_FIELDS = (
     "requested_rank",
     "effective_rank",
     "basis_tensor_key",
+    "basis_tensor_sha256",
     "singular_values",
     "captured_energy",
     "prefill_captured_energy",
@@ -423,6 +427,83 @@ def _evidence_path_exists(root: Path, value: str) -> bool:
     return path.exists() if path.is_absolute() else (root / path).exists()
 
 
+def _sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _torch_tensor_sha256(tensor: object) -> str:
+    import torch
+
+    if not isinstance(tensor, torch.Tensor):
+        raise TypeError("not a torch tensor")
+    buffer = io.BytesIO()
+    torch.save(tensor.detach().cpu().contiguous(), buffer)
+    return hashlib.sha256(buffer.getvalue()).hexdigest()
+
+
+def _check_subspace_state_payload(invalid: list[str], root: Path, summary: dict, state_summary: dict) -> None:
+    path = root / "subspace_state.pt"
+    if not path.exists():
+        return
+    try:
+        import torch
+
+        try:
+            payload = torch.load(path, map_location="cpu", weights_only=True)
+        except TypeError:
+            payload = torch.load(path, map_location="cpu")
+    except Exception as exc:  # pragma: no cover - exact torch exception varies.
+        invalid.append(f"subspace_state.pt: cannot load payload: {exc}")
+        return
+    if not isinstance(payload, dict):
+        invalid.append("subspace_state.pt: payload is not a dict")
+        return
+    if payload.get("schema_version") != "subspace_state_payload_v1":
+        invalid.append(f"subspace_state.pt.schema_version: expected 'subspace_state_payload_v1', got {payload.get('schema_version')!r}")
+    tensors = payload.get("basis_tensors")
+    if not isinstance(tensors, dict) or not tensors:
+        invalid.append("subspace_state.pt.basis_tensors: empty")
+        return
+    for index, site in enumerate(state_summary.get("activation_sites") or [], start=1):
+        if not isinstance(site, dict):
+            continue
+        key = site.get("basis_tensor_key")
+        expected_tensor_hash = site.get("basis_tensor_sha256")
+        if not isinstance(key, str) or not key:
+            continue
+        if key not in tensors:
+            invalid.append(f"subspace_state.pt.basis_tensors: missing {key!r}")
+            continue
+        if not isinstance(expected_tensor_hash, str) or not expected_tensor_hash:
+            invalid.append(f"subspace_state_summary.json.activation_sites[{index}].basis_tensor_sha256: empty")
+            continue
+        try:
+            observed_tensor_hash = _torch_tensor_sha256(tensors[key])
+        except Exception as exc:  # pragma: no cover - exact tensor exception varies.
+            invalid.append(f"subspace_state.pt.basis_tensors[{key!r}]: cannot hash tensor: {exc}")
+            continue
+        if observed_tensor_hash != expected_tensor_hash:
+            invalid.append(f"subspace_state.pt.basis_tensors[{key!r}]: sha256 mismatch")
+
+
+def _timing_evidence_has_sync_marker(path: Path) -> bool:
+    try:
+        with path.open() as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if isinstance(row, dict) and row.get("cuda_synchronized") is True:
+                    return True
+    except (OSError, json.JSONDecodeError):
+        return False
+    return False
+
+
 def _check_subspace_state_summary(invalid: list[str], rel: str, payload: dict) -> None:
     if payload.get("basis_kind") not in {"activation-svd", "random-orthonormal", "shuffled-activation-svd"}:
         invalid.append(f"{rel}.basis_kind: invalid")
@@ -513,9 +594,29 @@ def _check_subspace_systems(invalid: list[str], rel: str, payload: dict, root: P
                 evidence_path = source_base / evidence_path
             if not evidence_path.exists():
                 invalid.append(f"{rel}.timing_evidence_paths: missing {evidence!r}")
+            elif not _timing_evidence_has_sync_marker(evidence_path):
+                invalid.append(f"{rel}.timing_evidence_paths: no cuda_synchronized marker in {evidence!r}")
+    if payload.get("population") == 128:
+        base_time = payload.get("base_model_time_s")
+        qx_time = payload.get("qx_time_s")
+        delta_time = payload.get("lazy_delta_time_s")
+        if all(_is_json_number(value) for value in (base_time, qx_time, delta_time)) and float(base_time) > 0:
+            overhead = (float(qx_time) + float(delta_time)) / float(base_time)
+            if overhead > 0.25:
+                invalid.append(f"{rel}.p128_speed_gate: qx_plus_lazy_delta_overhead {overhead:.3f} > 0.25")
+        else:
+            invalid.append(f"{rel}.p128_speed_gate: missing timed base/qx/lazy fields")
 
 
-def _check_scientific_gate_contract(invalid: list[str], rel: str, section: dict) -> None:
+def _check_scientific_gate_contract(
+    invalid: list[str],
+    rel: str,
+    section: dict,
+    *,
+    summary: dict,
+    top_k: dict | None,
+    selection_rule_hashes: set[str],
+) -> None:
     for field in (
         "gate_stage",
         "locked_config_hash",
@@ -525,9 +626,46 @@ def _check_scientific_gate_contract(invalid: list[str], rel: str, section: dict)
         "basis_kind",
         "comparison",
         "gate_type",
+        "locked_target_preset",
+        "locked_scale_mode",
+        "locked_aggregation",
+        "selection_split",
     ):
         if not isinstance(section.get(field), str) or not section.get(field):
             invalid.append(f"{rel}.scientific_gate_contract.{field}: empty")
+    for field in ("locked_K", "locked_basis_rank"):
+        if not _is_positive_int(section.get(field)):
+            invalid.append(f"{rel}.scientific_gate_contract.{field}: not positive integer")
+    if not _is_finite_number(section.get("locked_radius")):
+        invalid.append(f"{rel}.scientific_gate_contract.locked_radius: not finite")
+    if section.get("selection_split") != "screen":
+        invalid.append(f"{rel}.scientific_gate_contract.selection_split: expected 'screen'")
+    if section.get("holdout_tuned") is not False:
+        invalid.append(f"{rel}.scientific_gate_contract.holdout_tuned: expected false")
+    if section.get("screen_holdout_overlap") != 0:
+        invalid.append(f"{rel}.scientific_gate_contract.screen_holdout_overlap: expected 0")
+    if section.get("selection_rule_hash") not in selection_rule_hashes:
+        invalid.append(f"{rel}.scientific_gate_contract.selection_rule_hash: not present in candidate_scores")
+    if top_k is not None:
+        if section.get("locked_config_hash") != top_k.get("runtime_config_hash"):
+            invalid.append(f"{rel}.scientific_gate_contract.locked_config_hash: does not match top_k runtime_config_hash")
+        if section.get("locked_K") != top_k.get("K"):
+            invalid.append(f"{rel}.scientific_gate_contract.locked_K: does not match top_k K")
+        if section.get("locked_radius") != top_k.get("rho_or_sigma_w"):
+            invalid.append(f"{rel}.scientific_gate_contract.locked_radius: does not match top_k rho_or_sigma_w")
+        if section.get("locked_scale_mode") != top_k.get("scale_mode"):
+            invalid.append(f"{rel}.scientific_gate_contract.locked_scale_mode: does not match top_k scale_mode")
+        if section.get("locked_aggregation") != top_k.get("aggregation"):
+            invalid.append(f"{rel}.scientific_gate_contract.locked_aggregation: does not match top_k aggregation")
+        candidates = top_k.get("candidates")
+        if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict):
+            first = candidates[0]
+            if section.get("locked_basis_rank") != first.get("basis_rank"):
+                invalid.append(f"{rel}.scientific_gate_contract.locked_basis_rank: does not match top_k candidate basis_rank")
+            if section.get("locked_target_preset") != first.get("target_preset"):
+                invalid.append(f"{rel}.scientific_gate_contract.locked_target_preset: does not match top_k candidate target_preset")
+    if section.get("screen_holdout_overlap") != summary.get("screen_holdout_overlap"):
+        invalid.append(f"{rel}.scientific_gate_contract.screen_holdout_overlap: does not match summary")
     if section.get("gate_stage") not in {"reference_smoke", "production"}:
         invalid.append(f"{rel}.scientific_gate_contract.gate_stage: invalid {section.get('gate_stage')!r}")
     if section.get("basis_kind") != "activation-svd":
@@ -539,6 +677,8 @@ def _check_scientific_gate_contract(invalid: list[str], rel: str, section: dict)
         invalid.append(f"{rel}.scientific_gate_contract.control_basis_kinds: must include exactly random-orthonormal and shuffled-activation-svd")
     if section.get("gate_type") not in {"non-inferiority", "paired-bootstrap-positive", "engineering-proceed-no-scientific-win"}:
         invalid.append(f"{rel}.scientific_gate_contract.gate_type: invalid {section.get('gate_type')!r}")
+    if section.get("comparison") != "activation_svd_minus_best_control":
+        invalid.append(f"{rel}.scientific_gate_contract.comparison: expected activation_svd_minus_best_control")
     if not _is_json_number(section.get("epsilon")) or float(section.get("epsilon", -1.0)) < 0:
         invalid.append(f"{rel}.scientific_gate_contract.epsilon: not nonnegative JSON number")
     ci = section.get("confidence_interval")
@@ -626,6 +766,8 @@ def check_run(contract: RunContract) -> RunCheck:
             invalid.append("summary.command: empty")
         if not isinstance(summary.get("environment"), dict) or not summary.get("environment"):
             invalid.append("summary.environment: empty")
+        if summary.get("screen_holdout_overlap") != 0:
+            invalid.append("summary.screen_holdout_overlap: expected 0")
         scale_mode = summary.get("scale_mode")
         if scale_mode not in SUBSPACE_SCALE_MODES:
             invalid.append("summary.scale_mode: invalid")
@@ -644,6 +786,9 @@ def check_run(contract: RunContract) -> RunCheck:
     subspace_seen_candidate_ids: set[str] = set()
     subspace_scored_candidate_ids: set[str] = set()
     subspace_score_keys: set[tuple[object, ...]] = set()
+    subspace_selection_rule_hashes: set[str] = set()
+    subspace_state_summary_payload: dict | None = None
+    subspace_top_k_payload: dict | None = None
     for rel in contract.required_jsonl_nonempty:
         path = contract.root / rel
         if not path.exists():
@@ -677,6 +822,8 @@ def check_run(contract: RunContract) -> RunCheck:
                         candidate_id = row.get("candidate_id")
                         if isinstance(candidate_id, str) and candidate_id:
                             subspace_scored_candidate_ids.add(candidate_id)
+                        if isinstance(row.get("selection_rule_hash"), str) and row.get("selection_rule_hash"):
+                            subspace_selection_rule_hashes.add(row["selection_rule_hash"])
                         score_key = (
                             row.get("candidate_id"),
                             row.get("split"),
@@ -731,8 +878,10 @@ def check_run(contract: RunContract) -> RunCheck:
             if observed != expected:
                 invalid.append(f"{rel}.{field}: expected {expected!r}, got {observed!r}")
         if is_subspace_contract and rel == "subspace_state_summary.json":
+            subspace_state_summary_payload = payload
             _check_subspace_state_summary(invalid, rel, payload)
         if rel == "top_k_ensemble.json" and "candidates" in fields:
+            subspace_top_k_payload = payload
             _check_identity_consistency(invalid=invalid, prefix=rel, payload=payload, summary=summary)
             for field in ("subspace_state_hash", "candidate_scores_hash"):
                 expected = summary.get(field)
@@ -786,15 +935,47 @@ def check_run(contract: RunContract) -> RunCheck:
                     for evidence in evidence_paths:
                         if not isinstance(evidence, str) or not evidence or not _evidence_path_exists(contract.root, evidence):
                             invalid.append(f"{rel}.{section}.evidence_paths: missing {evidence!r}")
+                            continue
+                        evidence_path = Path(evidence)
+                        if not evidence_path.is_absolute():
+                            evidence_path = contract.root / evidence_path
+                        if evidence_path.name in {"summary.json", "validation_report.json"}:
+                            invalid.append(f"{rel}.{section}.evidence_paths: self-attesting {evidence!r}")
+                            continue
+                        try:
+                            evidence_payload = json.loads(evidence_path.read_text())
+                        except json.JSONDecodeError:
+                            invalid.append(f"{rel}.{section}.evidence_paths: evidence is not JSON {evidence!r}")
+                            continue
+                        if not isinstance(evidence_payload, dict) or evidence_payload.get("section") != section or evidence_payload.get("status") != "pass":
+                            invalid.append(f"{rel}.{section}.evidence_paths: evidence does not prove section pass {evidence!r}")
                 failures = value.get("failures")
                 if not isinstance(failures, list):
                     invalid.append(f"{rel}.{section}.failures: not list")
                 elif failures:
                     invalid.append(f"{rel}.{section}.failures: nonempty")
                 if section == "scientific_gate_contract":
-                    _check_scientific_gate_contract(invalid, rel, value)
+                    _check_scientific_gate_contract(
+                        invalid,
+                        rel,
+                        value,
+                        summary=summary,
+                        top_k=subspace_top_k_payload,
+                        selection_rule_hashes=subspace_selection_rule_hashes,
+                    )
         if is_subspace_artifact_contract and rel == "systems_report.json":
             _check_subspace_systems(invalid, rel, payload, contract.root, suite_report=is_subspace_systems_contract)
+    if is_subspace_contract:
+        if subspace_state_summary_payload is not None:
+            _check_subspace_state_payload(invalid, contract.root, summary, subspace_state_summary_payload)
+        state_path = contract.root / "subspace_state.pt"
+        if state_path.exists() and isinstance(summary.get("subspace_state_hash"), str) and summary.get("subspace_state_hash"):
+            if _sha256_path(state_path) != summary["subspace_state_hash"]:
+                invalid.append("summary.subspace_state_hash: does not match subspace_state.pt sha256")
+        scores_path = contract.root / "candidate_scores.jsonl"
+        if scores_path.exists() and isinstance(summary.get("candidate_scores_hash"), str) and summary.get("candidate_scores_hash"):
+            if _sha256_path(scores_path) != summary["candidate_scores_hash"]:
+                invalid.append("summary.candidate_scores_hash: does not match candidate_scores.jsonl sha256")
     for rel in contract.required_csv_nonempty:
         path = contract.root / rel
         if not path.exists():
