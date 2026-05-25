@@ -112,12 +112,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     ns = build_parser().parse_args(args)
     passthrough = _without_route_args(args)
 
+    if ns.method == "subspace" and not ns.out:
+        raise SystemExit("optimus search --method subspace requires --out so the hardened artifact bundle has a run root")
+
     if ns.backend == "transformers":
         if ns.method == "subspace":
-            raise SystemExit(
-                "optimus search --backend transformers --method subspace is reserved for the "
-                "Phase 3 reference evaluator and is not implemented yet."
-            )
+            from optimus.subspace.reference import run_reference_search
+
+            run_reference_search(ns, backend="transformers")
+            return 0
         from optimus.search.peft import main as transformers_main
 
         return int(
@@ -138,11 +141,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return int(vllm_lora_main(passthrough) or 0)
 
     if ns.backend == "vllm" and ns.method == "subspace":
-        raise SystemExit(
-            "optimus search --backend vllm --method subspace is the planned production "
-            "path, but the vLLM subspace backend is not implemented yet. See "
-            "docs/subspace_implementation_roadmap.md Phase 5."
-        )
+        from optimus.backends.vllm_subspace import run_eager_smoke
+
+        run_eager_smoke(ns)
+        return 0
 
     raise SystemExit(f"unsupported search route: backend={ns.backend!r}, method={ns.method!r}")
 

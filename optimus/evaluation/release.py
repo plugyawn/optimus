@@ -288,7 +288,6 @@ def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
     leaked: list[str] = []
     missing_final: list[str] = []
     config_leaks: list[str] = []
-    planned_missing: list[str] = []
     adapter_config_keys = {"rank", "sigma", "targets", "chunk_adapters", "max_loras", "max_cpu_loras", "keep_adapters", "bench_adapters"}
     for label, payload in plans.items():
         if label == "subspace":
@@ -303,8 +302,6 @@ def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
                 missing_final.append(f"{label}:{run['name']}:{command[:2]!r}")
             if run["kind"] == "bench" and command[:2] != ["optimus", "bench"]:
                 missing_final.append(f"{label}:{run['name']}:{command[:2]!r}")
-            if label == "subspace" and run["kind"] == "search" and run.get("planned_fail_closed") is not True:
-                planned_missing.append(f"{label}:{run['name']}")
     script_paths = [
         root / "scripts" / "run_optimus_gpu_suite.sh",
         root / "scripts" / "run_backend_parity_gate.sh",
@@ -335,10 +332,10 @@ def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
     return [
         ReleaseCheck(
             "run_plan_emits_final_public_commands",
-            not leaked and not missing_final and not config_leaks and not planned_missing,
+            not leaked and not missing_final and not config_leaks,
             "search/bench routes only"
-            if not leaked and not missing_final and not config_leaks and not planned_missing
-            else f"legacy={leaked!r} nonfinal={missing_final!r} config_leaks={config_leaks!r} planned_missing={planned_missing!r}",
+            if not leaked and not missing_final and not config_leaks
+            else f"legacy={leaked!r} nonfinal={missing_final!r} config_leaks={config_leaks!r}",
         ),
         ReleaseCheck(
             "supported_launchers_do_not_emit_removed_wrappers",

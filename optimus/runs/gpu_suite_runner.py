@@ -43,11 +43,6 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     reject_subspace_adapter_options(argv, args)
     config = config_from_args(args)
-    if config.method == "subspace" and not args.dry_run:
-        raise SystemExit(
-            "subspace run-suite is planned fail-closed until the Phase 5 vLLM "
-            "backend lands; use run-plan for planned commands only"
-        )
     if args.ensure_data and not args.dry_run:
         ensure_countdown_data(config.data, count=args.data_count, seed=args.data_seed)
     rows = []

@@ -793,7 +793,7 @@ def test_subspace_plan_uses_final_public_surface(tmp_path: Path):
 
     assert search["command"][:6] == ["optimus", "search", "--backend", "vllm", "--method", "subspace"]
     assert search["name"] == "search_p128_subspace_r256"
-    assert search["planned_fail_closed"] is True
+    assert search["planned_fail_closed"] is False
     assert "--basis-rank" in search["command"]
     assert "256" in search["command"]
     assert "--basis-prompts" in search["command"]
@@ -875,14 +875,13 @@ def test_subspace_run_suite_cli_rejects_explicit_lora_only_options(tmp_path: Pat
     assert "--chunk-adapters" in result.stderr
 
 
-def test_subspace_run_suite_fails_closed_before_execution(tmp_path: Path):
+def test_subspace_run_suite_executes_reference_smoke_before_gpu_backend(tmp_path: Path):
     result = subprocess.run(
         [
             sys.executable,
             "-m",
             "optimus.cli",
             "run-suite",
-            "--no-ensure-data",
             "--method",
             "subspace",
             "--root",
@@ -891,13 +890,24 @@ def test_subspace_run_suite_fails_closed_before_execution(tmp_path: Path):
             str(tmp_path / "systems"),
             "--populations",
             "16",
+            "--prompts",
+            "4",
+            "--holdout-prompts",
+            "4",
+            "--basis-prompts",
+            "4",
+            "--top-k-grid",
+            "1",
+            "--rho-grid",
+            "0.01",
+            "--no-ensure-data",
         ],
         capture_output=True,
         text=True,
     )
 
-    assert result.returncode != 0
-    assert "planned fail-closed" in result.stderr
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "runs" / "search_p16_subspace_r128" / "summary.json").exists()
 
 
 def test_subspace_plan_accepts_documented_screen_matching_flags(tmp_path: Path):

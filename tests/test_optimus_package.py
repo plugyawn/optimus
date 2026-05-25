@@ -193,7 +193,7 @@ def test_legacy_search_wrappers_are_not_public_commands():
         assert "unknown Optimus command" in result.stderr
 
 
-def test_subspace_vllm_route_fails_closed_until_backend_lands():
+def test_subspace_vllm_route_requires_artifact_root():
     result = subprocess.run(
         [sys.executable, "-m", "optimus.cli", "search", "--backend", "vllm", "--method", "subspace"],
         capture_output=True,
@@ -201,7 +201,7 @@ def test_subspace_vllm_route_fails_closed_until_backend_lands():
     )
 
     assert result.returncode != 0
-    assert "planned production path" in result.stderr
+    assert "requires --out" in result.stderr
 
 
 def test_search_rejects_hidden_adapter_era_passthrough_for_public_surface():

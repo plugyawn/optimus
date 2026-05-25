@@ -63,6 +63,15 @@ class TargetModule:
 
 
 @dataclass(frozen=True)
+class SubspaceState:
+    basis_hash: str
+    target_set_hash: str
+    basis_collection_config_hash: str
+    activation_sites: tuple[ActivationSite, ...]
+    targets: tuple[TargetModule, ...]
+
+
+@dataclass(frozen=True)
 class SubspaceCandidate:
     candidate_id: str
     direction_seed: int
@@ -144,5 +153,6 @@ __all__ = [
     "ScaleMode",
     "sign_value",
     "SubspaceCandidate",
+    "SubspaceState",
     "TargetModule",
 ]

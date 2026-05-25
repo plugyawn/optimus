@@ -502,7 +502,8 @@ def execute_specs(
             continue
         started_at = time.time()
         try:
-            completed = subprocess.run(spec.command, check=True)
+            command = tuple([sys.executable, "-m", "optimus.cli", *spec.command[1:]]) if spec.command and spec.command[0] == "optimus" else spec.command
+            completed = subprocess.run(command, check=True)
         except subprocess.CalledProcessError as exc:
             rows.append(
                 status_record(
@@ -614,7 +615,7 @@ def plan_payload(config: GpuSuiteConfig) -> dict:
                 "population": spec.population,
                 "output_path": str(spec.output_path),
                 "command": list(spec.command),
-                "planned_fail_closed": spec.method == "subspace" and spec.kind == "search",
+                "planned_fail_closed": False,
             }
             for spec in gpu_suite_specs(config)
         ],
