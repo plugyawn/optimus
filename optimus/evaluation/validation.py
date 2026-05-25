@@ -456,9 +456,17 @@ def _torch_tensor_sha256(tensor: object) -> str:
 
     if not isinstance(tensor, torch.Tensor):
         raise TypeError("not a torch tensor")
-    buffer = io.BytesIO()
-    torch.save(tensor.detach().cpu().contiguous(), buffer)
-    return hashlib.sha256(buffer.getvalue()).hexdigest()
+    tensor = tensor.detach().cpu().contiguous()
+    header = json.dumps(
+        {
+            "schema_version": "tensor_sha256_v2",
+            "dtype": str(tensor.dtype),
+            "shape": list(tensor.shape),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(header + b"\n" + bytes(tensor.untyped_storage())).hexdigest()
 
 
 def _path_under_root(root: Path, value: object) -> Path | None:

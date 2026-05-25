@@ -138,9 +138,15 @@ def sha256_json(payload: Any) -> str:
 
 
 def tensor_sha256(tensor: torch.Tensor) -> str:
-    buffer = io.BytesIO()
-    torch.save(tensor.detach().cpu().contiguous(), buffer)
-    return sha256_bytes(buffer.getvalue())
+    tensor = tensor.detach().cpu().contiguous()
+    header = stable_json_bytes(
+        {
+            "schema_version": "tensor_sha256_v2",
+            "dtype": str(tensor.dtype),
+            "shape": list(tensor.shape),
+        }
+    )
+    return sha256_bytes(header + b"\n" + bytes(tensor.untyped_storage()))
 
 
 def torch_payload_bytes(payload: dict[str, Any]) -> bytes:

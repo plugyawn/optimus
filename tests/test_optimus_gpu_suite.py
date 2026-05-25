@@ -23,9 +23,17 @@ def _sha256_bytes(data: bytes) -> str:
 
 
 def _torch_tensor_sha256(tensor: torch.Tensor) -> str:
-    buffer = io.BytesIO()
-    torch.save(tensor.detach().cpu().contiguous(), buffer)
-    return _sha256_bytes(buffer.getvalue())
+    tensor = tensor.detach().cpu().contiguous()
+    header = json.dumps(
+        {
+            "schema_version": "tensor_sha256_v2",
+            "dtype": str(tensor.dtype),
+            "shape": list(tensor.shape),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return _sha256_bytes(header + b"\n" + bytes(tensor.untyped_storage()))
 
 
 def _torch_save_bytes(payload: dict) -> bytes:
