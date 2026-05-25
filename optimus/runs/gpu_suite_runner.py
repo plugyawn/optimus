@@ -5,7 +5,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from .gpu_suite import add_config_args, config_from_args, execute_specs, gpu_suite_specs
+from .gpu_suite import add_config_args, config_from_args, execute_specs, gpu_suite_specs, reject_subspace_adapter_options
 
 
 def ensure_countdown_data(path: Path, *, count: int, seed: int) -> None:
@@ -41,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    reject_subspace_adapter_options(argv, args)
     config = config_from_args(args)
     if args.ensure_data and not args.dry_run:
         ensure_countdown_data(config.data, count=args.data_count, seed=args.data_seed)

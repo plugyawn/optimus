@@ -190,6 +190,28 @@ def test_subspace_vllm_route_fails_closed_until_backend_lands():
     assert "planned production path" in result.stderr
 
 
+def test_search_rejects_hidden_adapter_era_passthrough_for_public_surface():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "optimus.cli",
+            "search",
+            "--backend",
+            "vllm",
+            "--method",
+            "subspace",
+            "--family-state-file",
+            "old.pt",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "not part of the Optimus public search surface" in result.stderr
+
+
 def test_unsupported_command_is_not_available_through_cli():
     result = subprocess.run(
         [sys.executable, "-m", "optimus.cli", "prompt-robustness", "--help"],

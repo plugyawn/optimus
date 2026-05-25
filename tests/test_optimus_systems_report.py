@@ -18,6 +18,20 @@ from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS
 def _subspace_systems_payload() -> dict:
     payload = {
         "schema_version": "subspace_systems_report_v1",
+        "created_at": "2026-05-25T00:00:00Z",
+        "optimus_version": "0.1.0",
+        "git_commit": "testcommit",
+        "git_dirty": False,
+        "command": ["optimus", "search", "--backend", "vllm", "--method", "subspace"],
+        "environment": {"python": "test"},
+        "model_id_or_path": "Qwen/Qwen3-4B",
+        "model_revision": "testrev",
+        "tokenizer_hash": "tok123",
+        "task_config_hash": "task123",
+        "prompt_contract_hash": "promptcontract123",
+        "screen_split_hash": "screen123",
+        "holdout_split_hash": "holdout123",
+        "decode_config_hash": "decode123",
         "warmup_policy": "one_warmup_batch",
         "cuda_sync_policy": "sync_timed_regions",
         "candidate_batch_size": 4,
@@ -214,8 +228,8 @@ def test_systems_report_rejects_bad_subspace_system_types(tmp_path: Path):
         json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128}) + "\n"
     )
     payload = _subspace_systems_payload()
-    payload["gpu_count"] = "many"
-    payload["candidates_per_sec"] = "fast"
+    payload["gpu_count"] = "1"
+    payload["candidates_per_sec"] = "1.0"
     payload["top_k_ensemble_cost_multiplier"] = "huge"
     (run / "systems_report.json").write_text(json.dumps(payload) + "\n")
 

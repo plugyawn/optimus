@@ -109,6 +109,20 @@ def write_contract_outputs(contract) -> None:
                     json.dumps(
                         {
                             "schema_version": "subspace_systems_report_v1",
+                            "created_at": "2026-05-25T00:00:00Z",
+                            "optimus_version": "0.1.0",
+                            "git_commit": "testcommit",
+                            "git_dirty": False,
+                            "command": ["optimus", "systems-report"],
+                            "environment": {"python": "test"},
+                            "model_id_or_path": "Qwen/Qwen3-4B",
+                            "model_revision": "testrev",
+                            "tokenizer_hash": "tok123",
+                            "task_config_hash": "task123",
+                            "prompt_contract_hash": "promptcontract123",
+                            "screen_split_hash": "screen123",
+                            "holdout_split_hash": "holdout123",
+                            "decode_config_hash": "decode123",
                             "warmup_policy": "one_warmup_batch",
                             "cuda_sync_policy": "sync_timed_regions",
                             "candidate_batch_size": 4,
@@ -245,10 +259,46 @@ def write_subspace_contract_outputs(contract) -> None:
         "output_tokens_per_sec": 3.0,
         "lazy_overhead_pct": 10.0,
     }
+    artifact_provenance = {
+        "created_at": summary["created_at"],
+        "optimus_version": summary["optimus_version"],
+        "git_commit": summary["git_commit"],
+        "git_dirty": summary["git_dirty"],
+        "command": summary["command"],
+        "environment": summary["environment"],
+        "model_id_or_path": summary["model_id_or_path"],
+        "model_revision": summary["model_revision"],
+        "tokenizer_hash": summary["tokenizer_hash"],
+        "task_config_hash": summary["task_config_hash"],
+        "prompt_contract_hash": summary["prompt_contract_hash"],
+        "screen_split_hash": summary["screen_split_hash"],
+        "holdout_split_hash": summary["holdout_split_hash"],
+        "decode_config_hash": summary["decode_config_hash"],
+    }
+    validation_report = {
+        "schema_version": "validation_report_v1",
+        **artifact_provenance,
+        **{
+            key: {"status": "pass", "evidence_paths": ["summary.json"], "failures": []}
+            for key in [
+                "math_tests",
+                "rng_replay_tests",
+                "routing_cache_tests",
+                "selector_quality",
+                "holdout_quality",
+                "ensemble_quality",
+                "drift_diagnostics",
+                "random_shuffled_controls",
+                "throughput_gates",
+                "scientific_gate_contract",
+            ]
+        },
+    }
     json_files = {
         "summary.json": summary,
         "subspace_state_summary.json": {
             "schema_version": "subspace_state_v1",
+            **artifact_provenance,
             "model_id_or_path": "Qwen/Qwen3-4B",
             "model_revision": "testrev",
             "tokenizer_hash": "tok123",
@@ -288,6 +338,7 @@ def write_subspace_contract_outputs(contract) -> None:
         "top_k_ensemble.json": {
             "ensemble_kind": "lazy_top_k",
             "schema_version": "top_k_ensemble_v1",
+            **artifact_provenance,
             "aggregation": "majority-vote",
             "tie_break_policy": "lowest_candidate_id",
             "selection_rule": "screen_top_k_fixed_config",
@@ -309,23 +360,10 @@ def write_subspace_contract_outputs(contract) -> None:
             "runtime_config_hash": "runtime123",
             "decode_config_hash": "decode123",
         },
-        "validation_report.json": {
-            key: {"status": "pass", "evidence_paths": ["summary.json"], "failures": []}
-            for key in [
-                "math_tests",
-                "rng_replay_tests",
-                "routing_cache_tests",
-                "selector_quality",
-                "holdout_quality",
-                "ensemble_quality",
-                "drift_diagnostics",
-                "random_shuffled_controls",
-                "throughput_gates",
-                "scientific_gate_contract",
-            ]
-        },
+        "validation_report.json": validation_report,
         "systems_report.json": {
             "schema_version": "subspace_systems_report_v1",
+            **artifact_provenance,
             "warmup_policy": "one_warmup_batch",
             "cuda_sync_policy": "sync_timed_regions",
             "candidate_batch_size": 4,
@@ -360,6 +398,11 @@ def write_subspace_contract_outputs(contract) -> None:
             "selection_rule_hash": "select123",
             "primary_metric": "top_k_holdout_exact",
             "multiple_comparison_correction": "none_predeclared_single_config",
+            "basis_kind": "activation-svd",
+            "control_basis_kinds": ["random-orthonormal", "shuffled-activation-svd"],
+            "comparison": "activation_svd_minus_best_control",
+            "gate_type": "non-inferiority",
+            "epsilon": 0.0,
             "confidence_interval": {"lower": 0.0, "upper": 0.1},
         }
     )
@@ -509,6 +552,67 @@ def test_subspace_plan_uses_final_public_surface(tmp_path: Path):
     assert not any("vllm-search" in command or "vllm-bench" in command or "vllm-halving" in command for command in commands)
     for adapter_key in ["rank", "sigma", "targets", "chunk_adapters", "max_loras", "max_cpu_loras", "keep_adapters", "bench_adapters"]:
         assert adapter_key not in payload["config"]
+
+
+def test_subspace_run_plan_cli_rejects_explicit_lora_only_options(tmp_path: Path):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "optimus.cli",
+            "run-plan",
+            "--method",
+            "subspace",
+            "--root",
+            str(tmp_path / "runs"),
+            "--systems-out",
+            str(tmp_path / "systems"),
+            "--rank",
+            "8",
+            "--sigma",
+            "0.01",
+            "--targets",
+            "q_proj",
+            "--max-loras",
+            "4",
+            "--bench-adapters",
+            "4",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "does not accept LoRA-only options" in result.stderr
+    assert "--rank" in result.stderr
+    assert "--bench-adapters" in result.stderr
+
+
+def test_subspace_run_suite_cli_rejects_explicit_lora_only_options(tmp_path: Path):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "optimus.cli",
+            "run-suite",
+            "--dry-run",
+            "--no-ensure-data",
+            "--method",
+            "subspace",
+            "--root",
+            str(tmp_path / "runs"),
+            "--systems-out",
+            str(tmp_path / "systems"),
+            "--chunk-adapters",
+            "4",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "does not accept LoRA-only options" in result.stderr
+    assert "--chunk-adapters" in result.stderr
 
 
 def test_subspace_plan_accepts_documented_screen_matching_flags(tmp_path: Path):
@@ -746,6 +850,27 @@ def test_subspace_contract_rejects_candidate_join_inconsistency(tmp_path: Path):
     assert any("top_k_ensemble.json.candidates[1].candidate_id" in item for item in result.invalid)
 
 
+def test_subspace_contract_rejects_exact_duplicate_candidates_and_scores(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    candidate_lines = (contract.root / "candidates.jsonl").read_text().splitlines()
+    (contract.root / "candidates.jsonl").write_text("\n".join([*candidate_lines, candidate_lines[0]]) + "\n")
+    score_lines = (contract.root / "candidate_scores.jsonl").read_text().splitlines()
+    (contract.root / "candidate_scores.jsonl").write_text("\n".join([*score_lines, score_lines[0]]) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("duplicate candidate_id" in item for item in result.invalid)
+    assert any("duplicate score row" in item for item in result.invalid)
+
+
 def test_subspace_contract_rejects_bad_systems_report_types(tmp_path: Path):
     config = GpuSuiteConfig(
         output_root=tmp_path / "runs",
@@ -756,8 +881,8 @@ def test_subspace_contract_rejects_bad_systems_report_types(tmp_path: Path):
     contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
     write_subspace_contract_outputs(contract)
     systems = json.loads((contract.root / "systems_report.json").read_text())
-    systems["gpu_count"] = "many"
-    systems["candidates_per_sec"] = "fast"
+    systems["gpu_count"] = "1"
+    systems["candidates_per_sec"] = "1.0"
     systems["top_k_ensemble_cost_multiplier"] = "huge"
     (contract.root / "systems_report.json").write_text(json.dumps(systems) + "\n")
 

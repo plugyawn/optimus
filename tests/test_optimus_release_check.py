@@ -238,6 +238,28 @@ def test_release_check_requires_all_public_docs(tmp_path: Path):
     assert "public_docs_present" in failed
 
 
+def test_release_check_scans_source_of_truth_docs_for_legacy_public_surface(tmp_path: Path):
+    gpu, systems = write_minimal_release_tree(tmp_path)
+    (tmp_path / "docs" / "full_model_lazy_kernel_design.md").write_text("Use optimus vllm-search as the production route.\n")
+    (tmp_path / "docs" / "subspace_implementation_roadmap.md").write_text("Load family_state.pt before search.\n")
+
+    checks = build_release_checks(
+        root=tmp_path,
+        systems_out=systems,
+        gpu_root=gpu,
+        populations=(1024, 4096),
+        bench_adapters=(8,),
+        run_halving=False,
+        method="lora",
+        remote="https://github.com/plugyawn/optimus.git",
+    )
+    by_name = {check.name: check for check in checks}
+
+    assert not by_name["public_docs_do_not_promote_legacy_subspace_surface"].passed
+    assert "full_model_lazy_kernel_design.md" in by_name["public_docs_do_not_promote_legacy_subspace_surface"].detail
+    assert "subspace_implementation_roadmap.md" in by_name["public_docs_do_not_promote_legacy_subspace_surface"].detail
+
+
 def test_release_check_accepts_verified_prime_zero_ledger(tmp_path: Path):
     gpu, systems = write_minimal_release_tree(tmp_path)
     ledger = tmp_path / ".opencode" / "prime-gpu-ledger.md"
@@ -257,6 +279,34 @@ def test_release_check_accepts_verified_prime_zero_ledger(tmp_path: Path):
     by_name = {check.name: check for check in checks}
 
     assert by_name["prime_ledger_local_check"].passed
+
+
+def test_release_check_rejects_terminated_prime_entry_without_entry_local_zero_verification(tmp_path: Path):
+    gpu, systems = write_minimal_release_tree(tmp_path)
+    ledger = tmp_path / ".opencode" / "prime-gpu-ledger.md"
+    ledger.parent.mkdir()
+    ledger.write_text(
+        "- pod_id: p1\n"
+        "  status: terminated\n"
+        "\n"
+        "- pod_id: p2\n"
+        "  status: terminated; verified prime pods list total 0\n"
+    )
+
+    checks = build_release_checks(
+        root=tmp_path,
+        systems_out=systems,
+        gpu_root=gpu,
+        populations=(1024, 4096),
+        bench_adapters=(8,),
+        run_halving=False,
+        method="lora",
+        remote="https://github.com/plugyawn/optimus.git",
+    )
+    by_name = {check.name: check for check in checks}
+
+    assert not by_name["prime_ledger_local_check"].passed
+    assert "entry 1" in by_name["prime_ledger_local_check"].detail
 
 
 def test_release_check_cli_is_lightweight(tmp_path: Path):

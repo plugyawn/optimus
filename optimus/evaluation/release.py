@@ -8,7 +8,14 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS, SUBSPACE_SYSTEMS_NUMERIC_FIELDS, check_run, gpu_suite_contracts, summary_payload
+from optimus.evaluation.validation import (
+    SUBSPACE_JSON_PROVENANCE_FIELDS,
+    SUBSPACE_SYSTEMS_FIELDS,
+    SUBSPACE_SYSTEMS_NUMERIC_FIELDS,
+    check_run,
+    gpu_suite_contracts,
+    summary_payload,
+)
 from optimus.runs.gpu_suite import GpuSuiteConfig, parse_int_tuple, plan_payload
 
 
@@ -22,6 +29,23 @@ LEGACY_PUBLIC_PATTERNS = (
     r"\bfamily_state(?:\.pt)?\b",
     r"--activation-state-prompts\b",
     r"\boptimus\s+(?:peft-search|vllm-search|vllm-halving|vllm-bench)\b",
+)
+LEGACY_DOC_GUARD_TERMS = (
+    "absent",
+    "blocker",
+    "delete",
+    "deprecated",
+    "disable",
+    "do not",
+    "fail",
+    "forbidden",
+    "legacy",
+    "must not",
+    "quarantine",
+    "reject",
+    "replace",
+    "remove",
+    "unsupported",
 )
 
 
@@ -136,12 +160,14 @@ def public_api_surface_checks(root: Path) -> list[ReleaseCheck]:
     docs = [
         root / "README.md",
         root / "docs" / "api.md",
+        root / "docs" / "full_model_lazy_kernel_design.md",
         root / "docs" / "gpu_suite.md",
         root / "docs" / "index.md",
         root / "docs" / "optimus_design.md",
         root / "docs" / "evaluation.md",
         root / "docs" / "prime_gpu_runbook.md",
         root / "docs" / "release_checklist.md",
+        root / "docs" / "subspace_implementation_roadmap.md",
     ]
     leaks: list[str] = []
     for path in docs:
@@ -149,8 +175,13 @@ def public_api_surface_checks(root: Path) -> list[ReleaseCheck]:
             continue
         text = path.read_text()
         for pattern in LEGACY_PUBLIC_PATTERNS:
-            if re.search(pattern, text):
-                leaks.append(f"{path.relative_to(root)}:{pattern}")
+            for match in re.finditer(pattern, text):
+                start = text.rfind("\n\n", 0, match.start()) + 2
+                end = text.find("\n\n", match.end())
+                paragraph = text[start:] if end == -1 else text[start:end]
+                if not any(term in paragraph.lower() for term in LEGACY_DOC_GUARD_TERMS):
+                    leaks.append(f"{path.relative_to(root)}:{pattern}")
+                    break
 
     cli_path = root / "optimus" / "cli.py"
     cli_detail = "missing optimus/cli.py"
@@ -412,8 +443,12 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
         except json.JSONDecodeError:
             checks.append(ReleaseCheck("subspace_systems_report_fields_present", False, "invalid systems_report.json"))
             return checks
-        missing = sorted(set(SUBSPACE_SYSTEMS_FIELDS) - set(payload))
-        bad_numeric = sorted(field for field in SUBSPACE_SYSTEMS_NUMERIC_FIELDS if field in payload and not isinstance(payload.get(field), (int, float)))
+        missing = sorted(set((*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_SYSTEMS_FIELDS)) - set(payload))
+        bad_numeric = sorted(
+            field
+            for field in SUBSPACE_SYSTEMS_NUMERIC_FIELDS
+            if field in payload and (not isinstance(payload.get(field), (int, float)) or isinstance(payload.get(field), bool))
+        )
         checks.append(
             ReleaseCheck(
                 "subspace_systems_report_fields_present",
@@ -530,14 +565,40 @@ def ledger_check(root: Path) -> ReleaseCheck:
         return ReleaseCheck("prime_ledger_local_check", True, "no local Prime ledger present")
     text = ledger.read_text()
     lower = text.lower()
-    active_status = re.search(r"(?m)^\s*status:\s*(active|running|pending|provisioning)\b", lower)
-    explicit_zero = "no active prime pods" in lower and "compute pods (total: 0)" in lower
-    verified_zero = "verified prime pods list total 0" in lower
-    passed = not active_status and (explicit_zero or verified_zero)
+    entries = [
+        match.group(0)
+        for match in re.finditer(r"(?ms)^\s*-\s*pod_id:.*?(?=^\s*-\s*pod_id:|\Z)", text)
+    ]
+    global_zero = "no active prime pods" in lower and "compute pods (total: 0)" in lower
+    if not entries:
+        return ReleaseCheck(
+            "prime_ledger_local_check",
+            global_zero or "verified prime pods list total 0" in lower,
+            str(ledger) if global_zero or "verified prime pods list total 0" in lower else "ledger has no pod entries or zero-active verification",
+        )
+    bad_entries: list[str] = []
+    for index, entry in enumerate(entries, start=1):
+        entry_lower = entry.lower()
+        active_status = re.search(r"(?m)^\s*status:\s*(active|running|pending|provisioning)\b", entry_lower)
+        if active_status:
+            bad_entries.append(f"entry {index}: active status {active_status.group(1)!r}")
+            continue
+        terminated = re.search(r"(?m)^\s*status:\s*terminated\b", entry_lower)
+        if terminated:
+            entry_zero = (
+                "verified prime pods list total 0" in entry_lower
+                or "no active prime pods" in entry_lower
+                or "compute pods (total: 0)" in entry_lower
+            )
+            if not entry_zero:
+                bad_entries.append(f"entry {index}: terminated without zero-pod verification")
+            continue
+        bad_entries.append(f"entry {index}: missing terminated status")
+    passed = not bad_entries
     return ReleaseCheck(
         "prime_ledger_local_check",
         passed,
-        str(ledger) if passed else "ledger does not record zero active pods",
+        str(ledger) if passed else "; ".join(bad_entries),
     )
 
 

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,6 +12,18 @@ from typing import Any, Callable, Mapping
 
 from optimus.core.experiments import ExperimentKey, status_record
 from optimus.defaults import DEFAULT_MODEL, DEFAULT_SEARCH_POPULATIONS, DEFAULT_TARGETS
+
+
+SUBSPACE_FORBIDDEN_OPTION_NAMES = {
+    "--rank",
+    "--sigma",
+    "--targets",
+    "--chunk-adapters",
+    "--max-loras",
+    "--max-cpu-loras",
+    "--keep-adapters",
+    "--bench-adapters",
+}
 
 
 @dataclass(frozen=True)
@@ -726,6 +739,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def reject_subspace_adapter_options(argv: list[str] | None, args: argparse.Namespace) -> None:
+    raw = list(sys.argv[1:] if argv is None else argv)
+    if getattr(args, "method", None) != "subspace":
+        return
+    provided = {item.split("=", 1)[0] for item in raw if item.startswith("--")}
+    forbidden = sorted(provided & SUBSPACE_FORBIDDEN_OPTION_NAMES)
+    if forbidden:
+        raise SystemExit(f"subspace run-plan/run-suite does not accept LoRA-only options: {', '.join(forbidden)}")
+
+
 def markdown_plan(payload: dict) -> str:
     lines = ["# Optimus GPU Run Plan", "", "| kind | name | output |", "| --- | --- | --- |"]
     for run in payload["runs"]:
@@ -743,6 +766,7 @@ def markdown_plan(payload: dict) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    reject_subspace_adapter_options(argv, args)
     config = config_from_args(args)
     try:
         payload = plan_payload(config)

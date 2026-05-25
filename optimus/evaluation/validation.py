@@ -164,12 +164,25 @@ SUBSPACE_SYSTEMS_FIELDS = (
     "shuffled_q_control",
     "antithetic_odd_even",
 )
-SUBSPACE_STATE_SUMMARY_FIELDS = (
+SUBSPACE_JSON_PROVENANCE_FIELDS = (
     "schema_version",
+    "created_at",
+    "optimus_version",
+    "git_commit",
+    "git_dirty",
+    "command",
+    "environment",
     "model_id_or_path",
     "model_revision",
     "tokenizer_hash",
+    "task_config_hash",
     "prompt_contract_hash",
+    "screen_split_hash",
+    "holdout_split_hash",
+    "decode_config_hash",
+)
+SUBSPACE_STATE_SUMMARY_FIELDS = (
+    *SUBSPACE_JSON_PROVENANCE_FIELDS,
     "basis_hash",
     "target_preset",
     "layers",
@@ -285,6 +298,10 @@ def _is_finite_number(value: object) -> bool:
     return isfinite(numeric)
 
 
+def _is_json_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(float(value))
+
+
 def _is_positive_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
@@ -394,8 +411,8 @@ def _check_subspace_state_summary(invalid: list[str], rel: str, payload: dict) -
 
 def _check_subspace_systems(invalid: list[str], rel: str, payload: dict) -> None:
     for field in SUBSPACE_SYSTEMS_NUMERIC_FIELDS:
-        if field in payload and not _is_finite_number(payload.get(field)):
-            invalid.append(f"{rel}.{field}: not finite")
+        if field in payload and not _is_json_number(payload.get(field)):
+            invalid.append(f"{rel}.{field}: not JSON number")
     for field in ("diversity_metrics", "random_q_control", "shuffled_q_control", "antithetic_odd_even"):
         if field in payload and not isinstance(payload.get(field), dict):
             invalid.append(f"{rel}.{field}: not object")
@@ -404,16 +421,31 @@ def _check_subspace_systems(invalid: list[str], rel: str, payload: dict) -> None
 
 
 def _check_scientific_gate_contract(invalid: list[str], rel: str, section: dict) -> None:
-    for field in ("locked_config_hash", "selection_rule_hash", "primary_metric", "multiple_comparison_correction"):
+    for field in (
+        "locked_config_hash",
+        "selection_rule_hash",
+        "primary_metric",
+        "multiple_comparison_correction",
+        "basis_kind",
+        "comparison",
+        "gate_type",
+    ):
         if not isinstance(section.get(field), str) or not section.get(field):
             invalid.append(f"{rel}.scientific_gate_contract.{field}: empty")
+    if section.get("gate_type") != "non-inferiority":
+        invalid.append(f"{rel}.scientific_gate_contract.gate_type: expected 'non-inferiority', got {section.get('gate_type')!r}")
+    if not _is_json_number(section.get("epsilon")) or float(section.get("epsilon", -1.0)) < 0:
+        invalid.append(f"{rel}.scientific_gate_contract.epsilon: not nonnegative JSON number")
+    controls = section.get("control_basis_kinds")
+    if not isinstance(controls, list) or not controls or not all(isinstance(item, str) and item for item in controls):
+        invalid.append(f"{rel}.scientific_gate_contract.control_basis_kinds: empty")
     ci = section.get("confidence_interval")
     if not isinstance(ci, dict):
         invalid.append(f"{rel}.scientific_gate_contract.confidence_interval: not object")
         return
     for field in ("lower", "upper"):
-        if not _is_finite_number(ci.get(field)):
-            invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.{field}: not finite")
+        if not _is_json_number(ci.get(field)):
+            invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.{field}: not JSON number")
 
 
 def _candidate_identity_projection(row: dict) -> dict:
@@ -485,7 +517,9 @@ def check_run(contract: RunContract) -> RunCheck:
                 invalid.append("summary.sigma_w_grid: contains non-finite value")
     jsonl_counts: dict[str, int] = {}
     subspace_candidates: dict[str, dict] = {}
+    subspace_seen_candidate_ids: set[str] = set()
     subspace_scored_candidate_ids: set[str] = set()
+    subspace_score_keys: set[tuple[object, ...]] = set()
     for rel in contract.required_jsonl_nonempty:
         path = contract.root / rel
         if not path.exists():
@@ -505,10 +539,10 @@ def check_run(contract: RunContract) -> RunCheck:
                         candidate_id = row.get("candidate_id")
                         if isinstance(candidate_id, str) and candidate_id:
                             projected = _candidate_identity_projection(row)
-                            if candidate_id in subspace_candidates and subspace_candidates[candidate_id] != projected:
-                                invalid.append(f"{rel}: row {line_no} duplicate candidate_id with conflicting identity")
-                            else:
-                                subspace_candidates[candidate_id] = projected
+                            if candidate_id in subspace_seen_candidate_ids:
+                                invalid.append(f"{rel}: row {line_no} duplicate candidate_id {candidate_id!r}")
+                            subspace_seen_candidate_ids.add(candidate_id)
+                            subspace_candidates.setdefault(candidate_id, projected)
                     elif rel == "candidates.jsonl":
                         if row.get("scale_mode") not in SUBSPACE_SCALE_MODES:
                             invalid.append(f"{rel}: row {line_no} invalid scale_mode")
@@ -519,6 +553,17 @@ def check_run(contract: RunContract) -> RunCheck:
                         candidate_id = row.get("candidate_id")
                         if isinstance(candidate_id, str) and candidate_id:
                             subspace_scored_candidate_ids.add(candidate_id)
+                        score_key = (
+                            row.get("candidate_id"),
+                            row.get("split"),
+                            row.get("scorer_name"),
+                            row.get("prompt_ids_hash"),
+                            row.get("sample_set_hash"),
+                            row.get("decode_config_hash"),
+                        )
+                        if score_key in subspace_score_keys:
+                            invalid.append(f"{rel}: row {line_no} duplicate score row for {score_key!r}")
+                        subspace_score_keys.add(score_key)
                     elif rel == "candidate_scores.jsonl":
                         if row.get("split") not in {"screen", "holdout", "validation", "test"}:
                             invalid.append(f"{rel}: row {line_no} invalid split")
@@ -595,7 +640,7 @@ def check_run(contract: RunContract) -> RunCheck:
                         if candidate_id not in subspace_scored_candidate_ids:
                             invalid.append(f"{rel}.candidates[{index}].candidate_id: no candidate_scores row")
         if rel == "validation_report.json":
-            required_sections = fields
+            required_sections = SUBSPACE_VALIDATION_SECTIONS if is_subspace_contract else fields
             for section in required_sections:
                 value = payload.get(section)
                 if not isinstance(value, dict) or not value:
@@ -724,9 +769,9 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
                 required_bool_keys = ()
                 required_json_fields = {
                     "subspace_state_summary.json": SUBSPACE_STATE_SUMMARY_FIELDS,
-                    "top_k_ensemble.json": SUBSPACE_TOP_K_FIELDS,
-                    "validation_report.json": SUBSPACE_VALIDATION_SECTIONS,
-                    "systems_report.json": SUBSPACE_SYSTEMS_FIELDS,
+                    "top_k_ensemble.json": (*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_TOP_K_FIELDS),
+                    "validation_report.json": (*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_VALIDATION_SECTIONS),
+                    "systems_report.json": (*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_SYSTEMS_FIELDS),
                 }
                 required_json_nonempty_fields = {
                     "subspace_state_summary.json": ("basis_hash", "activation_sites", "targets"),
@@ -802,7 +847,7 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
     if config.method == "subspace":
         systems_csvs = []
         systems_files = ["report.md", "systems_report.json"]
-        systems_json_fields = {"systems_report.json": SUBSPACE_SYSTEMS_FIELDS}
+        systems_json_fields = {"systems_report.json": (*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_SYSTEMS_FIELDS)}
         systems_expected_json_values = {"systems_report.json": {"prefix_cache_policy": "disabled-for-search"}}
     else:
         systems_csvs = ["bench.csv", "full_search.csv", "best_of_n.csv", "quality_scaling.csv", "parity.csv"]

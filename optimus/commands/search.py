@@ -4,6 +4,17 @@ import argparse
 import sys
 from collections.abc import Sequence
 
+FORBIDDEN_PUBLIC_PASSTHROUGH = {
+    "--activation-state-prompts",
+    "--activation-state-batch-size",
+    "--activation-state-no-anchor-subtract",
+    "--family-state-file",
+    "--stage-prompts",
+    "--survivors",
+    "--batch-sizes",
+    "--prompt-counts",
+}
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -60,8 +71,16 @@ def _without_route_args(argv: Sequence[str]) -> list[str]:
     return out
 
 
+def _reject_forbidden_passthrough(argv: Sequence[str]) -> None:
+    for item in argv:
+        option = item.split("=", 1)[0]
+        if option in FORBIDDEN_PUBLIC_PASSTHROUGH:
+            raise SystemExit(f"{option} is not part of the Optimus public search surface")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
+    _reject_forbidden_passthrough(args)
     ns, _unknown = build_parser().parse_known_args(args)
     passthrough = _without_route_args(args)
 

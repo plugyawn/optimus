@@ -58,6 +58,10 @@ artifact_arg=()
 if [[ "$KEEP_ADAPTERS" == "1" && "$METHOD" == "lora" ]]; then
   artifact_arg=(--keep-adapters)
 fi
+bench_arg=()
+if [[ "$METHOD" == "lora" ]]; then
+  bench_arg=(--bench-adapters "$BENCH_ADAPTERS")
+fi
 prompt_contract_args=(
   --prompt-variants "$PROMPT_VARIANTS"
   --prompt-input "$PROMPT_INPUT"
@@ -142,7 +146,7 @@ optimus run-plan \
   "${prompt_contract_args[@]}" \
   "${method_args[@]}" \
   --tensor-parallel-size "$TENSOR_PARALLEL_SIZE" \
-  --bench-adapters "$BENCH_ADAPTERS" \
+  ${bench_arg[@]+"${bench_arg[@]}"} \
   ${vllm_runtime_args[@]+"${vllm_runtime_args[@]}"} \
   ${artifact_arg[@]+"${artifact_arg[@]}"} \
   --out "$OUT_ROOT/plan.json"
@@ -163,7 +167,7 @@ optimus run-suite \
   "${prompt_contract_args[@]}" \
   "${method_args[@]}" \
   --tensor-parallel-size "$TENSOR_PARALLEL_SIZE" \
-  --bench-adapters "$BENCH_ADAPTERS" \
+  ${bench_arg[@]+"${bench_arg[@]}"} \
   ${vllm_runtime_args[@]+"${vllm_runtime_args[@]}"} \
   ${artifact_arg[@]+"${artifact_arg[@]}"} \
   --execution-log "$OUT_ROOT/execution.json"
@@ -174,6 +178,6 @@ optimus validate-run \
   --backend "$BACKEND" \
   --method "$METHOD" \
   --populations "$(echo "$POPULATIONS" | tr ' ' ',')" \
-  --bench-adapters "$BENCH_ADAPTERS" \
+  ${bench_arg[@]+"${bench_arg[@]}"} \
   --out "$OUT_ROOT/validation.json" \
   --strict

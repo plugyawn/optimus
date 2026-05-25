@@ -5,7 +5,7 @@ import csv
 import json
 from pathlib import Path
 
-from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS, SUBSPACE_SYSTEMS_NUMERIC_FIELDS
+from optimus.evaluation.validation import SUBSPACE_JSON_PROVENANCE_FIELDS, SUBSPACE_SYSTEMS_FIELDS, SUBSPACE_SYSTEMS_NUMERIC_FIELDS
 
 
 def as_float(value, default: float = 0.0) -> float:
@@ -24,6 +24,10 @@ def as_int(value, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def is_json_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def read_summary(path: Path) -> dict:
@@ -112,11 +116,11 @@ def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], li
         except json.JSONDecodeError:
             invalid.append(f"{path}: invalid JSON")
             continue
-        absent = [field for field in SUBSPACE_SYSTEMS_FIELDS if field not in payload]
+        absent = [field for field in (*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_SYSTEMS_FIELDS) if field not in payload]
         if absent:
             invalid.append(f"{path}: missing fields {', '.join(absent)}")
             continue
-        bad_numeric = [field for field in SUBSPACE_SYSTEMS_NUMERIC_FIELDS if not isinstance(payload.get(field), (int, float))]
+        bad_numeric = [field for field in SUBSPACE_SYSTEMS_NUMERIC_FIELDS if not is_json_number(payload.get(field))]
         if bad_numeric:
             invalid.append(f"{path}: nonnumeric fields {', '.join(bad_numeric)}")
             continue
