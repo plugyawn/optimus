@@ -118,7 +118,7 @@ def write_contract_outputs(contract) -> None:
             "quality_scaling.csv": "suite,run,screen_selected_holdout_exact,screen_selected_holdout_delta_vs_base,promoted_holdout_oracle_exact,promoted_holdout_oracle_delta_vs_base\noptimus_gpu_suite,search_p1024_chunk32,0.2,0.1,0.3,0.2\n",
             "parity.csv": "suite,run,trusted_name,candidate_name,n_common,pass,pass_protocol,pass_base_rows,pass_adapter_tensors,pass_output_diff\nbackend_parity_gate,gate,peft,vllm,1,true,true,true,true,true\n",
             "halving.csv": "suite,run,stage_prompts,survivors,prompt_eval_savings\noptimus_gpu_suite,halving_p1024_stage8_surv64,8,64,0.5\n",
-            "subspace_systems.csv": "source_run_dir,gpu_model,population,target_preset,basis_rank,kernel,candidate_batch_size,candidates_per_sec,top_k_ensemble_cost_multiplier\nrun,test-gpu,16,transformer-linears,128,torch,4,1.0,1.0\n",
+            "subspace_systems.csv": "source_run_dir,benchmark_kind,gpu_model,population,target_preset,basis_rank,kernel,candidate_batch_size,candidates_per_sec,top_k_ensemble_cost_multiplier\nrun,subspace,test-gpu,16,transformer-linears,128,torch,4,1.0,1.0\n",
         }
         source_run = contract.root / "source_run"
         source_run.mkdir(parents=True, exist_ok=True)
@@ -151,6 +151,7 @@ def write_contract_outputs(contract) -> None:
                             "decode_config_hash": "decode123",
                             "warmup_policy": "one_warmup_batch",
                             "cuda_sync_policy": "sync_timed_regions",
+                            "benchmark_kind": "subspace",
                             "population": 16,
                             "target_preset": "transformer-linears",
                             "basis_rank": 128,
@@ -450,6 +451,7 @@ def write_subspace_contract_outputs(contract) -> None:
             **artifact_provenance,
             "warmup_policy": "one_warmup_batch",
             "cuda_sync_policy": "sync_timed_regions",
+            "benchmark_kind": "subspace",
             "population": 16,
             "target_preset": "transformer-linears",
             "basis_rank": 128,
@@ -500,12 +502,14 @@ def write_subspace_contract_outputs(contract) -> None:
                     "control_basis_kind": "random-orthonormal",
                     "metric": "top_k_holdout_exact",
                     "artifact_hash": "contrast-random123",
+                    "control_artifact_hash": "control-random123",
                 },
                 {
                     "basis_kind": "activation-svd",
                     "control_basis_kind": "shuffled-activation-svd",
                     "metric": "top_k_holdout_exact",
                     "artifact_hash": "contrast-shuffled123",
+                    "control_artifact_hash": "control-shuffled123",
                 },
             ],
             "locked_K": 1,
@@ -1204,6 +1208,54 @@ def test_subspace_contract_rejects_scientific_gate_not_tied_to_artifacts(tmp_pat
     assert any("compared_control_artifact_hashes" in item for item in result.invalid)
     assert any("tested_contrasts" in item for item in result.invalid)
     assert any("K_grid" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_scientific_gate_grid_drift_without_correction(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    gate = report["scientific_gate_contract"]
+    gate["K_grid"] = [1, 4]
+    gate["basis_rank_grid"] = [64]
+    gate["radius_grid"] = [0.02]
+    gate["multiple_comparison_correction"] = "none_predeclared_single_config"
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("locked_basis_rank: not present in basis_rank_grid" in item for item in result.invalid)
+    assert any("locked_radius: not present in radius_grid" in item for item in result.invalid)
+    assert any("none_predeclared_single_config requires singleton grids" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_scientific_gate_contrast_mismatch(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    contrasts = report["scientific_gate_contract"]["tested_contrasts"]
+    contrasts[0]["metric"] = "screen_only_metric"
+    contrasts[1]["control_artifact_hash"] = "wrong-control-hash"
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("tested_contrasts[1].metric: does not match primary_metric" in item for item in result.invalid)
+    assert any("tested_contrasts[2].control_artifact_hash" in item for item in result.invalid)
+    assert any("missing primary_metric controls ['random-orthonormal']" in item for item in result.invalid)
 
 
 def test_subspace_contract_rejects_holdout_scores_without_selector_provenance(tmp_path: Path):

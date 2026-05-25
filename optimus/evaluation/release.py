@@ -693,28 +693,32 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
                 overhead = (qx_time + delta_time) / base_time
                 if overhead > 0.25:
                     p128_failures.append(f"row {index}: qx_plus_lazy_delta_overhead={overhead:.3f}")
-            target_presets = {row.get("target_preset") for row in p128_rows}
+            subspace_p128_rows = [row for row in p128_rows if row.get("benchmark_kind") == "subspace"]
+            target_presets = {row.get("target_preset") for row in subspace_p128_rows}
             required_presets = {"qv", "attn-qkvo", "mlp", "transformer-linears"}
             missing_presets = sorted(required_presets - target_presets)
             benchmark_kinds = {row.get("benchmark_kind") for row in p128_rows}
             required_benchmarks = {"base_vllm", "lora_baseline", "subspace"}
             missing_benchmarks = sorted(required_benchmarks - benchmark_kinds)
             grouped: dict[tuple[str, str], list[dict]] = {}
-            for row in p128_rows:
-                if row.get("benchmark_kind") != "subspace":
-                    continue
+            for row in subspace_p128_rows:
                 grouped.setdefault((str(row.get("basis_rank")), str(row.get("kernel"))), []).append(row)
+            complete_groups = []
             for (basis_rank, kernel), group in grouped.items():
+                group_presets = {row.get("target_preset") for row in group}
+                if required_presets - group_presets:
+                    continue
+                complete_groups.append((basis_rank, kernel))
                 transformer = [row for row in group if row.get("target_preset") == "transformer-linears"]
                 siblings = [row for row in group if row.get("target_preset") in {"qv", "attn-qkvo", "mlp"}]
-                if not transformer or not siblings:
-                    continue
                 transformer_cps = max(as_float(row.get("candidates_per_sec"), 0.0) for row in transformer)
                 sibling_cps = max(as_float(row.get("candidates_per_sec"), 0.0) for row in siblings)
                 if transformer_cps <= 0.0 or sibling_cps / transformer_cps > 2.0:
                     p128_failures.append(f"rank={basis_rank} kernel={kernel}: transformer-linears more than 2x slower")
             if missing_presets:
                 p128_failures.append(f"missing target presets {missing_presets!r}")
+            if not complete_groups:
+                p128_failures.append("missing matched subspace preset group")
             if missing_benchmarks:
                 p128_failures.append(f"missing benchmark kinds {missing_benchmarks!r}")
             checks.append(

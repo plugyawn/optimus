@@ -120,23 +120,33 @@ def is_subspace_summary(row: dict) -> bool:
 
 
 def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], list[str]]:
+    allowed_benchmark_kinds = {"base_vllm", "lora_baseline", "subspace"}
     reports: list[dict] = []
     missing: list[str] = []
     invalid: list[str] = []
     for row in rows:
-        if not is_subspace_summary(row):
-            continue
         path = Path(row["run_dir"]) / "systems_report.json"
-        if not path.exists():
+        is_subspace = is_subspace_summary(row)
+        if not path.exists() and is_subspace:
             missing.append(str(path))
+            continue
+        if not path.exists():
             continue
         try:
             payload = json.loads(path.read_text())
         except json.JSONDecodeError:
-            invalid.append(f"{path}: invalid JSON")
+            if is_subspace:
+                invalid.append(f"{path}: invalid JSON")
+            continue
+        if not is_subspace and (
+            payload.get("schema_version") != "subspace_systems_report_v1" or payload.get("benchmark_kind") not in allowed_benchmark_kinds
+        ):
             continue
         if payload.get("schema_version") != "subspace_systems_report_v1":
             invalid.append(f"{path}: invalid schema_version {payload.get('schema_version')!r}")
+            continue
+        if payload.get("benchmark_kind") not in allowed_benchmark_kinds:
+            invalid.append(f"{path}: invalid benchmark_kind {payload.get('benchmark_kind')!r}")
             continue
         absent = [
             field
@@ -182,12 +192,13 @@ def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], li
         enriched = payload | {
             "source_report": str(path),
             "source_run_dir": row["run_dir"],
+            "benchmark_kind": payload.get("benchmark_kind"),
             "population": payload.get("population", row.get("population")),
             "target_preset": payload.get("target_preset", row.get("target_preset")),
             "basis_rank": payload.get("basis_rank", row.get("basis_rank")),
             "kernel": payload.get("kernel", row.get("kernel")),
         }
-        missing_axes = [field for field in SUBSPACE_SYSTEMS_AXIS_FIELDS if not enriched.get(field)]
+        missing_axes = [field for field in SUBSPACE_SYSTEMS_AXIS_FIELDS if field not in enriched or enriched.get(field) in {None, ""}]
         if missing_axes:
             invalid.append(f"{path}: missing comparison axes {', '.join(missing_axes)}")
             continue
@@ -198,7 +209,8 @@ def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], li
 def selected_subspace_system_report(reports: list[dict]) -> dict:
     if not reports:
         return {}
-    selected = min(reports, key=lambda row: as_float(row.get("candidates_per_sec"), float("inf")))
+    selectable = [row for row in reports if row.get("benchmark_kind") == "subspace"] or reports
+    selected = min(selectable, key=lambda row: as_float(row.get("candidates_per_sec"), float("inf")))
     return selected | {
         "systems_selection_policy": "slowest_candidates_per_sec_conservative_gate",
         "all_reports_count": len(reports),
@@ -211,6 +223,7 @@ def subspace_system_rows(reports: list[dict]) -> list[dict]:
         [
             {
                 "source_run_dir": row.get("source_run_dir"),
+                "benchmark_kind": row.get("benchmark_kind"),
                 "population": row.get("population"),
                 "target_preset": row.get("target_preset"),
                 "basis_rank": row.get("basis_rank"),
@@ -252,6 +265,7 @@ def append_subspace_systems_report(path: Path, rows: list[dict]) -> None:
                 rows,
                 [
                     "source_run_dir",
+                    "benchmark_kind",
                     "gpu_model",
                     "population",
                     "target_preset",
@@ -930,6 +944,7 @@ def main(argv: list[str] | None = None) -> int:
             subspace_system_rows(subspace_reports),
             [
                 "source_run_dir",
+                "benchmark_kind",
                 "gpu_model",
                 "population",
                 "target_preset",

@@ -465,6 +465,14 @@ Deliverables:
   `radius_grid`, `compared_control_artifact_hashes`, and `tested_contrasts` so
   grid exploration, control artifacts, and multiple-comparison corrections are
   machine-auditable.
+- Validate locked K, locked basis rank, and locked radius are members of their
+  reported grids. `none_predeclared_single_config` is valid only for singleton
+  grids; multi-value grids require an explicit correction or
+  `separate_validation_split` with validation split and artifact hashes.
+- Validate `tested_contrasts` covers both `random-orthonormal` and
+  `shuffled-activation-svd` controls on the locked primary metric, and that
+  each contrast's `control_artifact_hash` matches
+  `compared_control_artifact_hashes`.
 - Validate `top_k_ensemble.json` contains full candidate identities, not only
   candidate ids.
 - Validate every `validation_report.json.evidence_paths` entry points to a
@@ -787,7 +795,8 @@ Run conditions:
 - `subspace_systems.csv` must include p128 rows for `benchmark_kind=base_vllm`,
   `benchmark_kind=lora_baseline`, and `benchmark_kind=subspace`. Subspace rows
   must cover `qv`, `attn-qkvo`, `mlp`, and `transformer-linears` at matched
-  rank/kernel.
+  rank/kernel as one complete `(basis_rank, kernel)` group; mixed-rank or
+  mixed-kernel coverage does not pass.
 - Suite-level systems artifacts must include `source_report`,
   `source_run_dir`, and `timing_evidence_paths` so every aggregate row points
   back to synchronized timing evidence.

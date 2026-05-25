@@ -351,6 +351,7 @@ def _write_subspace_systems_out(root: Path, *, timing: bool = True, numeric_as_s
         "decode_config_hash": "decode123",
         "warmup_policy": "one_warmup_batch",
         "cuda_sync_policy": "sync_timed_regions",
+        "benchmark_kind": "subspace",
         "population": 128,
         "target_preset": "transformer-linears",
         "basis_rank": 128,
@@ -442,6 +443,19 @@ def test_subspace_release_check_rejects_incomplete_p128_speed_gate(tmp_path: Pat
     assert "missing target presets" in by_name["subspace_p128_speed_gate_enforced"].detail
     assert "missing benchmark kinds" in by_name["subspace_p128_speed_gate_enforced"].detail
     assert "qx_plus_lazy_delta_overhead" in by_name["subspace_p128_speed_gate_enforced"].detail
+
+
+def test_subspace_release_check_rejects_unmatched_p128_preset_group(tmp_path: Path):
+    systems = _write_subspace_systems_out(tmp_path)
+    rows = (systems / "subspace_systems.csv").read_text().splitlines()
+    rows = [line.replace("run,subspace,4,128,qv,128,torch", "run,subspace,4,128,qv,64,torch") for line in rows]
+    (systems / "subspace_systems.csv").write_text("\n".join(rows) + "\n")
+
+    checks = systems_report_checks(systems, method="subspace")
+    by_name = {check.name: check for check in checks}
+
+    assert not by_name["subspace_p128_speed_gate_enforced"].passed
+    assert "missing matched subspace preset group" in by_name["subspace_p128_speed_gate_enforced"].detail
 
 
 def test_release_check_accepts_verified_prime_zero_ledger(tmp_path: Path):

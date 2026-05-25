@@ -34,6 +34,7 @@ def _subspace_systems_payload() -> dict:
         "decode_config_hash": "decode123",
         "warmup_policy": "one_warmup_batch",
         "cuda_sync_policy": "sync_timed_regions",
+        "benchmark_kind": "subspace",
         "population": 128,
         "target_preset": "transformer-linears",
         "basis_rank": 128,
@@ -221,11 +222,43 @@ def test_systems_report_writes_subspace_systems_json_from_measured_runs(tmp_path
 
     payload = json.loads((out / "systems_report.json").read_text())
     assert payload["schema_version"] == "subspace_systems_report_v1"
+    assert payload["benchmark_kind"] == "subspace"
     assert payload["prefix_cache_policy"] == "disabled-for-search"
     assert payload["source_run_dir"] == str(run)
     assert "source_run_dir" in (out / "subspace_systems.csv").read_text()
+    assert "benchmark_kind" in (out / "subspace_systems.csv").read_text()
     assert "target_preset" in (out / "subspace_systems.csv").read_text()
     assert "Subspace Systems" in (out / "report.md").read_text()
+
+
+def test_systems_report_includes_subspace_baseline_benchmark_rows(tmp_path: Path):
+    suite = tmp_path / "optimus_gpu_suite"
+    subspace_run = suite / "search_p128_subspace_r128"
+    subspace_run.mkdir(parents=True)
+    (subspace_run / "summary.json").write_text(
+        json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128}) + "\n"
+    )
+    (subspace_run / "systems_report.json").write_text(json.dumps(_subspace_systems_payload()) + "\n")
+    (subspace_run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
+
+    baseline_run = suite / "base_vllm_p128"
+    baseline_run.mkdir()
+    (baseline_run / "summary.json").write_text(json.dumps({"kind": "vllm_base_bench", "population": 128}) + "\n")
+    baseline_payload = _subspace_systems_payload()
+    baseline_payload["benchmark_kind"] = "base_vllm"
+    baseline_payload["target_preset"] = "base"
+    baseline_payload["basis_rank"] = 0
+    baseline_payload["qx_time_s"] = 0.0
+    baseline_payload["lazy_delta_time_s"] = 0.0
+    (baseline_run / "systems_report.json").write_text(json.dumps(baseline_payload) + "\n")
+    (baseline_run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
+
+    out = tmp_path / "report"
+    assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 0
+
+    csv_text = (out / "subspace_systems.csv").read_text()
+    assert "subspace" in csv_text
+    assert "base_vllm" in csv_text
 
 
 def test_systems_report_selects_conservative_slowest_subspace_row(tmp_path: Path):

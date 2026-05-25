@@ -172,6 +172,7 @@ SUBSPACE_SYSTEMS_FIELDS = (
     "timing_evidence_paths",
 )
 SUBSPACE_SYSTEMS_AXIS_FIELDS = (
+    "benchmark_kind",
     "population",
     "target_preset",
     "basis_rank",
@@ -348,6 +349,13 @@ def _is_positive_int(value: object) -> bool:
 
 def _is_nonnegative_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _number_in_grid(value: object, grid: object) -> bool:
+    if not _is_json_number(value) or not isinstance(grid, list):
+        return False
+    target = float(value)
+    return any(_is_json_number(item) and abs(float(item) - target) <= 1e-12 for item in grid)
 
 
 def _json_identity(summary: dict, field: str) -> object:
@@ -612,7 +620,7 @@ def _check_subspace_systems(invalid: list[str], rel: str, payload: dict, root: P
         if field in payload and not _is_json_number(payload.get(field)):
             invalid.append(f"{rel}.{field}: not JSON number")
     for field in SUBSPACE_SYSTEMS_AXIS_FIELDS:
-        if not payload.get(field):
+        if field not in payload or payload.get(field) in {None, ""}:
             invalid.append(f"{rel}.{field}: empty")
     source_base = root
     if suite_report:
@@ -674,6 +682,13 @@ def _check_scientific_gate_contract(
     top_k: dict | None,
     selection_rule_hashes: set[str],
 ) -> None:
+    allowed_corrections = {
+        "none_predeclared_single_config",
+        "holm_bonferroni",
+        "bonferroni",
+        "benjamini_hochberg",
+        "separate_validation_split",
+    }
     for field in (
         "gate_stage",
         "locked_config_hash",
@@ -702,6 +717,31 @@ def _check_scientific_gate_contract(
         invalid.append(f"{rel}.scientific_gate_contract.radius_grid: invalid")
     if not _is_finite_number(section.get("locked_radius")):
         invalid.append(f"{rel}.scientific_gate_contract.locked_radius: not finite")
+    if isinstance(section.get("K_grid"), list) and _is_positive_int(section.get("locked_K")) and section["locked_K"] not in section["K_grid"]:
+        invalid.append(f"{rel}.scientific_gate_contract.locked_K: not present in K_grid")
+    if (
+        isinstance(section.get("basis_rank_grid"), list)
+        and _is_positive_int(section.get("locked_basis_rank"))
+        and section["locked_basis_rank"] not in section["basis_rank_grid"]
+    ):
+        invalid.append(f"{rel}.scientific_gate_contract.locked_basis_rank: not present in basis_rank_grid")
+    if isinstance(radius_grid, list) and _is_finite_number(section.get("locked_radius")) and not _number_in_grid(section["locked_radius"], radius_grid):
+        invalid.append(f"{rel}.scientific_gate_contract.locked_radius: not present in radius_grid")
+    correction = section.get("multiple_comparison_correction")
+    if correction not in allowed_corrections:
+        invalid.append(f"{rel}.scientific_gate_contract.multiple_comparison_correction: invalid {correction!r}")
+    grid_lengths = [
+        len(values)
+        for values in (section.get("K_grid"), section.get("basis_rank_grid"), radius_grid)
+        if isinstance(values, list) and values
+    ]
+    multi_config_grid = any(length > 1 for length in grid_lengths)
+    if multi_config_grid and correction == "none_predeclared_single_config":
+        invalid.append(f"{rel}.scientific_gate_contract.multiple_comparison_correction: none_predeclared_single_config requires singleton grids")
+    if correction == "separate_validation_split":
+        for field in ("validation_selection_split_hash", "validation_selection_artifact_hash"):
+            if not isinstance(section.get(field), str) or not section.get(field):
+                invalid.append(f"{rel}.scientific_gate_contract.{field}: required for separate_validation_split")
     if section.get("selection_split") != "screen":
         invalid.append(f"{rel}.scientific_gate_contract.selection_split: expected 'screen'")
     if section.get("holdout_tuned") is not False:
@@ -750,13 +790,36 @@ def _check_scientific_gate_contract(
     if not isinstance(contrasts, list) or not contrasts:
         invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts: empty")
     else:
+        covered_controls: set[str] = set()
+        primary_metric = section.get("primary_metric")
         for index, contrast in enumerate(contrasts, start=1):
             if not isinstance(contrast, dict):
                 invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}]: not object")
                 continue
-            for field in ("basis_kind", "control_basis_kind", "metric", "artifact_hash"):
+            for field in ("basis_kind", "control_basis_kind", "metric", "artifact_hash", "control_artifact_hash"):
                 if not isinstance(contrast.get(field), str) or not contrast.get(field):
                     invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].{field}: empty")
+            if contrast.get("basis_kind") != "activation-svd":
+                invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].basis_kind: expected activation-svd")
+            control_basis_kind = contrast.get("control_basis_kind")
+            if control_basis_kind not in {"random-orthonormal", "shuffled-activation-svd"}:
+                invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].control_basis_kind: invalid")
+            if contrast.get("metric") != primary_metric:
+                invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].metric: does not match primary_metric")
+            if isinstance(control_artifacts, dict) and isinstance(control_basis_kind, str) and control_basis_kind in control_artifacts:
+                expected_control_hash = control_artifacts.get(control_basis_kind)
+                if contrast.get("control_artifact_hash") != expected_control_hash:
+                    invalid.append(
+                        f"{rel}.scientific_gate_contract.tested_contrasts[{index}].control_artifact_hash: does not match compared_control_artifact_hashes"
+                    )
+            if contrast.get("basis_kind") == "activation-svd" and contrast.get("metric") == primary_metric and control_basis_kind in {
+                "random-orthonormal",
+                "shuffled-activation-svd",
+            }:
+                covered_controls.add(str(control_basis_kind))
+        missing_contrasts = sorted({"random-orthonormal", "shuffled-activation-svd"} - covered_controls)
+        if missing_contrasts:
+            invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts: missing primary_metric controls {missing_contrasts!r}")
     if section.get("gate_type") not in {"non-inferiority", "paired-bootstrap-positive", "engineering-proceed-no-scientific-win"}:
         invalid.append(f"{rel}.scientific_gate_contract.gate_type: invalid {section.get('gate_type')!r}")
     if section.get("comparison") != "activation_svd_minus_best_control":

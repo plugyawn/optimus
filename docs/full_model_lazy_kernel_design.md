@@ -990,10 +990,21 @@ numeric confidence interval so a gate result is not merely self-attested prose.
 It also records `K_grid`, `basis_rank_grid`, `radius_grid`,
 `compared_control_artifact_hashes`, and `tested_contrasts` so the locked
 selection and multiple-comparison correction can be audited after the run.
+The locked K, basis rank, and radius must be members of those grids. A
+`multiple_comparison_correction` value of `none_predeclared_single_config` is
+valid only when all three grids are singleton grids. If any grid contains more
+than one value, the report must either name an explicit correction
+(`holm_bonferroni`, `bonferroni`, or `benjamini_hochberg`) or use
+`separate_validation_split` with `validation_selection_split_hash` and
+`validation_selection_artifact_hash`. Holdout tuning remains invalid in both
+cases.
 `compared_control_artifact_hashes` contains immutable artifacts for the
 `random-orthonormal` and `shuffled-activation-svd` control families.
 `tested_contrasts` lists the exact basis/control/metric/artifact contrasts that
-entered the confidence interval.
+entered the confidence interval. At minimum, it must cover both control
+families on the locked `primary_metric`; each contrast records its own
+`artifact_hash` and the matching `control_artifact_hash` from
+`compared_control_artifact_hashes`.
 
 `drift_diagnostics` has a fixed v1 metric contract. The probe split is an
 immutable unlabeled prompt/token-row set identified by `probe_split_hash`, and
@@ -1035,9 +1046,10 @@ are `source_run_dir`, `benchmark_kind`, `candidate_batch_size`, `population`,
 `shuffled_q_control`, and `antithetic_odd_even`. The p128 speed gate requires
 rows with `benchmark_kind` values `base_vllm`, `lora_baseline`, and `subspace`.
 For `benchmark_kind=subspace`, the p128 rows must cover `qv`, `attn-qkvo`,
-`mlp`, and `transformer-linears`; the `transformer-linears` row must not be
-more than 2x slower than the matched target-band rows at the same rank and
-kernel. Suite reports include `source_report`, `source_run_dir`, and
+`mlp`, and `transformer-linears` as one matched `(basis_rank, kernel)` group;
+the `transformer-linears` row must not be more than 2x slower than the matched
+target-band rows in that same group. Coverage satisfied only by mixing ranks or
+kernels is invalid. Suite reports include `source_report`, `source_run_dir`, and
 `timing_evidence_paths`; timing evidence must contain a synchronized timed
 region marker.
 
