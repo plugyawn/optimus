@@ -358,6 +358,14 @@ def _number_in_grid(value: object, grid: object) -> bool:
     return any(_is_json_number(item) and abs(float(item) - target) <= 1e-12 for item in grid)
 
 
+def _numeric_grids_equal(left: object, right: object) -> bool:
+    if not isinstance(left, list) or not isinstance(right, list) or len(left) != len(right):
+        return False
+    if not all(_is_json_number(item) for item in left + right):
+        return False
+    return sorted(float(item) for item in left) == sorted(float(item) for item in right)
+
+
 def _json_identity(summary: dict, field: str) -> object:
     return summary.get(field)
 
@@ -432,8 +440,7 @@ def _check_subspace_score(invalid: list[str], prefix: str, row: dict, summary: d
 
 
 def _evidence_path_exists(root: Path, value: str) -> bool:
-    path = Path(value)
-    return path.exists() if path.is_absolute() else (root / path).exists()
+    return _path_under_root(root, value) is not None
 
 
 def _sha256_path(path: Path) -> str:
@@ -452,6 +459,45 @@ def _torch_tensor_sha256(tensor: object) -> str:
     buffer = io.BytesIO()
     torch.save(tensor.detach().cpu().contiguous(), buffer)
     return hashlib.sha256(buffer.getvalue()).hexdigest()
+
+
+def _path_under_root(root: Path, value: object) -> Path | None:
+    if not isinstance(value, str) or not value:
+        return None
+    path = Path(value)
+    candidate = path if path.is_absolute() else root / path
+    try:
+        resolved_root = root.resolve()
+        resolved_candidate = candidate.resolve()
+        resolved_candidate.relative_to(resolved_root)
+    except (OSError, ValueError):
+        return None
+    return resolved_candidate if resolved_candidate.exists() else None
+
+
+def _read_hashed_json_artifact(invalid: list[str], rel: str, prefix: str, root: Path, path_value: object, hash_value: object) -> dict | None:
+    if not isinstance(path_value, str) or not path_value:
+        invalid.append(f"{rel}.scientific_gate_contract.{prefix}_path: empty")
+        return None
+    if not isinstance(hash_value, str) or not hash_value:
+        invalid.append(f"{rel}.scientific_gate_contract.{prefix}_hash: empty")
+        return None
+    path = _path_under_root(root, path_value)
+    if path is None:
+        invalid.append(f"{rel}.scientific_gate_contract.{prefix}_path: missing or outside run bundle")
+        return None
+    observed_hash = _sha256_path(path)
+    if observed_hash != hash_value:
+        invalid.append(f"{rel}.scientific_gate_contract.{prefix}_hash: does not match artifact")
+    try:
+        payload = json.loads(path.read_text())
+    except json.JSONDecodeError:
+        invalid.append(f"{rel}.scientific_gate_contract.{prefix}_path: artifact is not JSON")
+        return None
+    if not isinstance(payload, dict):
+        invalid.append(f"{rel}.scientific_gate_contract.{prefix}_path: artifact is not an object")
+        return None
+    return payload
 
 
 def _check_subspace_state_payload(invalid: list[str], root: Path, summary: dict, state_summary: dict) -> None:
@@ -678,6 +724,7 @@ def _check_scientific_gate_contract(
     rel: str,
     section: dict,
     *,
+    root: Path,
     summary: dict,
     top_k: dict | None,
     selection_rule_hashes: set[str],
@@ -742,6 +789,70 @@ def _check_scientific_gate_contract(
         for field in ("validation_selection_split_hash", "validation_selection_artifact_hash"):
             if not isinstance(section.get(field), str) or not section.get(field):
                 invalid.append(f"{rel}.scientific_gate_contract.{field}: required for separate_validation_split")
+        if section.get("validation_selection_split_hash") in {summary.get("screen_split_hash"), summary.get("holdout_split_hash")}:
+            invalid.append(f"{rel}.scientific_gate_contract.validation_selection_split_hash: must differ from screen and holdout split hashes")
+        validation_artifact = _read_hashed_json_artifact(
+            invalid,
+            rel,
+            "validation_selection_artifact",
+            root,
+            section.get("validation_selection_artifact_path"),
+            section.get("validation_selection_artifact_hash"),
+        )
+        if validation_artifact is not None and validation_artifact.get("schema_version") != "validation_selection_artifact_v1":
+            invalid.append(f"{rel}.scientific_gate_contract.validation_selection_artifact_path: invalid schema_version")
+    gate_family_artifact = _read_hashed_json_artifact(
+        invalid,
+        rel,
+        "gate_family_artifact",
+        root,
+        section.get("gate_family_artifact_path"),
+        section.get("gate_family_artifact_hash"),
+    )
+    if gate_family_artifact is not None:
+        if gate_family_artifact.get("schema_version") != "scientific_gate_family_v1":
+            invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact_path: invalid schema_version")
+        for field in ("primary_metric", "multiple_comparison_correction", "selection_rule_hash", "holdout_tuned"):
+            if gate_family_artifact.get(field) != section.get(field):
+                invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.{field}: does not match contract")
+        for field in ("K_grid", "basis_rank_grid", "radius_grid"):
+            if not _numeric_grids_equal(section.get(field), gate_family_artifact.get(field)):
+                invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.{field}: does not match contract")
+        observed_configs = gate_family_artifact.get("observed_configs")
+        if not isinstance(observed_configs, list) or not observed_configs:
+            invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs: empty")
+        else:
+            expected_k_grid = section.get("K_grid") if isinstance(section.get("K_grid"), list) else []
+            expected_rank_grid = section.get("basis_rank_grid") if isinstance(section.get("basis_rank_grid"), list) else []
+            expected_radius_grid = section.get("radius_grid") if isinstance(section.get("radius_grid"), list) else []
+            observed_k = sorted({config.get("K") for config in observed_configs if isinstance(config, dict) and _is_positive_int(config.get("K"))})
+            observed_rank = sorted({config.get("basis_rank") for config in observed_configs if isinstance(config, dict) and _is_positive_int(config.get("basis_rank"))})
+            observed_radius = sorted({float(config.get("radius")) for config in observed_configs if isinstance(config, dict) and _is_json_number(config.get("radius"))})
+            if observed_k != sorted(expected_k_grid):
+                invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs: K_grid mismatch")
+            if observed_rank != sorted(expected_rank_grid):
+                invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs: basis_rank_grid mismatch")
+            if observed_radius != sorted(float(item) for item in expected_radius_grid if _is_json_number(item)):
+                invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs: radius_grid mismatch")
+            observed_basis = {config.get("basis_kind") for config in observed_configs if isinstance(config, dict)}
+            required_basis = {"activation-svd", "random-orthonormal", "shuffled-activation-svd"}
+            if required_basis - observed_basis:
+                invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs: missing basis families {sorted(required_basis - observed_basis)!r}")
+            locked_seen = any(
+                isinstance(config, dict)
+                and config.get("basis_kind") == section.get("basis_kind")
+                and config.get("K") == section.get("locked_K")
+                and config.get("basis_rank") == section.get("locked_basis_rank")
+                and _is_json_number(config.get("radius"))
+                and _is_json_number(section.get("locked_radius"))
+                and abs(float(config.get("radius")) - float(section.get("locked_radius"))) <= 1e-12
+                and config.get("target_preset") == section.get("locked_target_preset")
+                and config.get("scale_mode") == section.get("locked_scale_mode")
+                and config.get("aggregation") == section.get("locked_aggregation")
+                for config in observed_configs
+            )
+            if not locked_seen:
+                invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs: locked config missing")
     if section.get("selection_split") != "screen":
         invalid.append(f"{rel}.scientific_gate_contract.selection_split: expected 'screen'")
     if section.get("holdout_tuned") is not False:
@@ -763,11 +874,20 @@ def _check_scientific_gate_contract(
             invalid.append(f"{rel}.scientific_gate_contract.locked_aggregation: does not match top_k aggregation")
         candidates = top_k.get("candidates")
         if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict):
-            first = candidates[0]
-            if section.get("locked_basis_rank") != first.get("basis_rank"):
-                invalid.append(f"{rel}.scientific_gate_contract.locked_basis_rank: does not match top_k candidate basis_rank")
-            if section.get("locked_target_preset") != first.get("target_preset"):
-                invalid.append(f"{rel}.scientific_gate_contract.locked_target_preset: does not match top_k candidate target_preset")
+            for index, candidate in enumerate(candidates, start=1):
+                if not isinstance(candidate, dict):
+                    continue
+                if section.get("locked_basis_rank") != candidate.get("basis_rank"):
+                    invalid.append(f"{rel}.scientific_gate_contract.locked_basis_rank: does not match top_k candidate[{index}] basis_rank")
+                if section.get("locked_target_preset") != candidate.get("target_preset"):
+                    invalid.append(f"{rel}.scientific_gate_contract.locked_target_preset: does not match top_k candidate[{index}] target_preset")
+                if section.get("locked_scale_mode") != candidate.get("scale_mode"):
+                    invalid.append(f"{rel}.scientific_gate_contract.locked_scale_mode: does not match top_k candidate[{index}] scale_mode")
+                if _is_json_number(section.get("locked_radius")) and _is_json_number(candidate.get("rho_or_sigma_w")):
+                    if abs(float(section["locked_radius"]) - float(candidate["rho_or_sigma_w"])) > 1e-12:
+                        invalid.append(f"{rel}.scientific_gate_contract.locked_radius: does not match top_k candidate[{index}] rho_or_sigma_w")
+                else:
+                    invalid.append(f"{rel}.scientific_gate_contract.locked_radius: does not match top_k candidate[{index}] rho_or_sigma_w")
     if section.get("screen_holdout_overlap") != summary.get("screen_holdout_overlap"):
         invalid.append(f"{rel}.scientific_gate_contract.screen_holdout_overlap: does not match summary")
     if section.get("gate_stage") not in {"reference_smoke", "production"}:
@@ -786,6 +906,28 @@ def _check_scientific_gate_contract(
         for basis_kind in ("random-orthonormal", "shuffled-activation-svd"):
             if not isinstance(control_artifacts.get(basis_kind), str) or not control_artifacts.get(basis_kind):
                 invalid.append(f"{rel}.scientific_gate_contract.compared_control_artifact_hashes.{basis_kind}: empty")
+    control_paths = section.get("compared_control_artifact_paths")
+    if not isinstance(control_paths, dict):
+        invalid.append(f"{rel}.scientific_gate_contract.compared_control_artifact_paths: not object")
+    else:
+        for basis_kind in ("random-orthonormal", "shuffled-activation-svd"):
+            expected_hash = control_artifacts.get(basis_kind) if isinstance(control_artifacts, dict) else None
+            control_payload = _read_hashed_json_artifact(
+                invalid,
+                rel,
+                f"compared_control_artifact_paths.{basis_kind}",
+                root,
+                control_paths.get(basis_kind),
+                expected_hash,
+            )
+            if control_payload is None:
+                continue
+            if control_payload.get("schema_version") != "scientific_gate_control_v1":
+                invalid.append(f"{rel}.scientific_gate_contract.compared_control_artifact_paths.{basis_kind}: invalid schema_version")
+            if control_payload.get("basis_kind") != basis_kind:
+                invalid.append(f"{rel}.scientific_gate_contract.compared_control_artifact_paths.{basis_kind}: basis_kind mismatch")
+            if control_payload.get("metric") != section.get("primary_metric"):
+                invalid.append(f"{rel}.scientific_gate_contract.compared_control_artifact_paths.{basis_kind}: metric mismatch")
     contrasts = section.get("tested_contrasts")
     if not isinstance(contrasts, list) or not contrasts:
         invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts: empty")
@@ -796,7 +938,7 @@ def _check_scientific_gate_contract(
             if not isinstance(contrast, dict):
                 invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}]: not object")
                 continue
-            for field in ("basis_kind", "control_basis_kind", "metric", "artifact_hash", "control_artifact_hash"):
+            for field in ("basis_kind", "control_basis_kind", "metric", "artifact_path", "artifact_hash", "control_artifact_path", "control_artifact_hash"):
                 if not isinstance(contrast.get(field), str) or not contrast.get(field):
                     invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].{field}: empty")
             if contrast.get("basis_kind") != "activation-svd":
@@ -812,6 +954,32 @@ def _check_scientific_gate_contract(
                     invalid.append(
                         f"{rel}.scientific_gate_contract.tested_contrasts[{index}].control_artifact_hash: does not match compared_control_artifact_hashes"
                     )
+                if isinstance(control_paths, dict) and contrast.get("control_artifact_path") != control_paths.get(control_basis_kind):
+                    invalid.append(
+                        f"{rel}.scientific_gate_contract.tested_contrasts[{index}].control_artifact_path: does not match compared_control_artifact_paths"
+                    )
+            contrast_payload = _read_hashed_json_artifact(
+                invalid,
+                rel,
+                f"tested_contrasts[{index}].artifact",
+                root,
+                contrast.get("artifact_path"),
+                contrast.get("artifact_hash"),
+            )
+            if contrast_payload is not None:
+                if contrast_payload.get("schema_version") != "scientific_gate_contrast_v1":
+                    invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].artifact_path: invalid schema_version")
+                for field in ("basis_kind", "control_basis_kind", "metric", "control_artifact_hash"):
+                    if contrast_payload.get(field) != contrast.get(field):
+                        invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].artifact.{field}: does not match contrast")
+            _read_hashed_json_artifact(
+                invalid,
+                rel,
+                f"tested_contrasts[{index}].control_artifact",
+                root,
+                contrast.get("control_artifact_path"),
+                contrast.get("control_artifact_hash"),
+            )
             if contrast.get("basis_kind") == "activation-svd" and contrast.get("metric") == primary_metric and control_basis_kind in {
                 "random-orthonormal",
                 "shuffled-activation-svd",
@@ -834,6 +1002,7 @@ def _check_scientific_gate_contract(
         if not _is_json_number(ci.get(field)):
             invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.{field}: not JSON number")
     lower = ci.get("lower")
+    upper = ci.get("upper")
     if _is_json_number(lower):
         gate_stage = section.get("gate_stage")
         gate_type = section.get("gate_type")
@@ -843,6 +1012,12 @@ def _check_scientific_gate_contract(
         if gate_stage == "production" and gate_type == "paired-bootstrap-positive" and float(lower) <= 0.0:
             invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.lower: production gate requires lower > 0")
         if gate_stage == "production" and gate_type == "engineering-proceed-no-scientific-win":
+            if float(lower) < -epsilon:
+                invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.lower: engineering proceed requires lower >= -epsilon")
+            if float(lower) > 0.0:
+                invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.lower: scientific win must use paired-bootstrap-positive")
+            if _is_json_number(upper) and float(upper) < 0.0:
+                invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.upper: engineering proceed tie interval must include zero")
             exception = section.get("engineering_exception")
             if not isinstance(exception, dict) or not exception.get("accepted_label") == "engineering_proceed_no_scientific_win":
                 invalid.append(f"{rel}.scientific_gate_contract.engineering_exception: missing accepted label")
@@ -1098,12 +1273,10 @@ def check_run(contract: RunContract) -> RunCheck:
                     invalid.append(f"{rel}.{section}.evidence_paths: empty")
                 else:
                     for evidence in evidence_paths:
-                        if not isinstance(evidence, str) or not evidence or not _evidence_path_exists(contract.root, evidence):
-                            invalid.append(f"{rel}.{section}.evidence_paths: missing {evidence!r}")
+                        evidence_path = _path_under_root(contract.root, evidence)
+                        if evidence_path is None:
+                            invalid.append(f"{rel}.{section}.evidence_paths: missing or outside run bundle {evidence!r}")
                             continue
-                        evidence_path = Path(evidence)
-                        if not evidence_path.is_absolute():
-                            evidence_path = contract.root / evidence_path
                         if evidence_path.name in {"summary.json", "validation_report.json"}:
                             invalid.append(f"{rel}.{section}.evidence_paths: self-attesting {evidence!r}")
                             continue
@@ -1123,6 +1296,7 @@ def check_run(contract: RunContract) -> RunCheck:
                         invalid,
                         rel,
                         value,
+                        root=contract.root,
                         summary=summary,
                         top_k=subspace_top_k_payload,
                         selection_rule_hashes=subspace_selection_rule_hashes,

@@ -34,6 +34,14 @@ def _torch_save_bytes(payload: dict) -> bytes:
     return buffer.getvalue()
 
 
+def _json_bytes(payload: dict) -> bytes:
+    return json.dumps(payload, sort_keys=True).encode("utf-8")
+
+
+def _json_sha256(payload: dict) -> str:
+    return _sha256_bytes(_json_bytes(payload))
+
+
 def _summary_for_kind(kind: str, **identity):
     full_search_reference = identity.get("full_search_reference") or identity.get("reference")
     base = {
@@ -483,6 +491,63 @@ def write_subspace_contract_outputs(contract) -> None:
             "timing_evidence_paths": ["timing_trace.jsonl"],
         },
     }
+    gate_family_artifact = {
+        "schema_version": "scientific_gate_family_v1",
+        "primary_metric": "top_k_holdout_exact",
+        "multiple_comparison_correction": "none_predeclared_single_config",
+        "selection_rule_hash": "select123",
+        "holdout_tuned": False,
+        "K_grid": [1],
+        "basis_rank_grid": [128],
+        "radius_grid": [0.01],
+        "observed_configs": [
+            {
+                "basis_kind": basis_kind,
+                "K": 1,
+                "basis_rank": 128,
+                "radius": 0.01,
+                "target_preset": "transformer-linears",
+                "scale_mode": "relative-output-rms",
+                "aggregation": "majority-vote",
+            }
+            for basis_kind in ["activation-svd", "random-orthonormal", "shuffled-activation-svd"]
+        ],
+    }
+    random_control_artifact = {
+        "schema_version": "scientific_gate_control_v1",
+        "basis_kind": "random-orthonormal",
+        "metric": "top_k_holdout_exact",
+        "sample_set_hash": "samples123",
+    }
+    shuffled_control_artifact = {
+        "schema_version": "scientific_gate_control_v1",
+        "basis_kind": "shuffled-activation-svd",
+        "metric": "top_k_holdout_exact",
+        "sample_set_hash": "samples123",
+    }
+    random_control_hash = _json_sha256(random_control_artifact)
+    shuffled_control_hash = _json_sha256(shuffled_control_artifact)
+    random_contrast_artifact = {
+        "schema_version": "scientific_gate_contrast_v1",
+        "basis_kind": "activation-svd",
+        "control_basis_kind": "random-orthonormal",
+        "metric": "top_k_holdout_exact",
+        "control_artifact_hash": random_control_hash,
+    }
+    shuffled_contrast_artifact = {
+        "schema_version": "scientific_gate_contrast_v1",
+        "basis_kind": "activation-svd",
+        "control_basis_kind": "shuffled-activation-svd",
+        "metric": "top_k_holdout_exact",
+        "control_artifact_hash": shuffled_control_hash,
+    }
+    gate_artifacts = {
+        "gate/gate_family.json": gate_family_artifact,
+        "gate/control_random.json": random_control_artifact,
+        "gate/control_shuffled.json": shuffled_control_artifact,
+        "gate/contrast_random.json": random_contrast_artifact,
+        "gate/contrast_shuffled.json": shuffled_contrast_artifact,
+    }
     json_files["validation_report.json"]["scientific_gate_contract"].update(
         {
             "locked_config_hash": "runtime123",
@@ -492,24 +557,34 @@ def write_subspace_contract_outputs(contract) -> None:
             "K_grid": [1],
             "basis_rank_grid": [128],
             "radius_grid": [0.01],
+            "gate_family_artifact_path": "gate/gate_family.json",
+            "gate_family_artifact_hash": _json_sha256(gate_family_artifact),
+            "compared_control_artifact_paths": {
+                "random-orthonormal": "gate/control_random.json",
+                "shuffled-activation-svd": "gate/control_shuffled.json",
+            },
             "compared_control_artifact_hashes": {
-                "random-orthonormal": "control-random123",
-                "shuffled-activation-svd": "control-shuffled123",
+                "random-orthonormal": random_control_hash,
+                "shuffled-activation-svd": shuffled_control_hash,
             },
             "tested_contrasts": [
                 {
                     "basis_kind": "activation-svd",
                     "control_basis_kind": "random-orthonormal",
                     "metric": "top_k_holdout_exact",
-                    "artifact_hash": "contrast-random123",
-                    "control_artifact_hash": "control-random123",
+                    "artifact_path": "gate/contrast_random.json",
+                    "artifact_hash": _json_sha256(random_contrast_artifact),
+                    "control_artifact_path": "gate/control_random.json",
+                    "control_artifact_hash": random_control_hash,
                 },
                 {
                     "basis_kind": "activation-svd",
                     "control_basis_kind": "shuffled-activation-svd",
                     "metric": "top_k_holdout_exact",
-                    "artifact_hash": "contrast-shuffled123",
-                    "control_artifact_hash": "control-shuffled123",
+                    "artifact_path": "gate/contrast_shuffled.json",
+                    "artifact_hash": _json_sha256(shuffled_contrast_artifact),
+                    "control_artifact_path": "gate/control_shuffled.json",
+                    "control_artifact_hash": shuffled_control_hash,
                 },
             ],
             "locked_K": 1,
@@ -543,6 +618,10 @@ def write_subspace_contract_outputs(contract) -> None:
             path.write_text(json.dumps(json_files[rel]) + "\n")
         else:
             path.write_text("placeholder\n")
+    for rel, payload in gate_artifacts.items():
+        path = contract.root / rel
+        path.parent.mkdir(exist_ok=True)
+        path.write_bytes(_json_bytes(payload))
     evidence_dir = contract.root / "evidence"
     evidence_dir.mkdir(exist_ok=True)
     for section in validation_sections:
@@ -1033,6 +1112,39 @@ def test_subspace_contract_rejects_self_attesting_validation_evidence(tmp_path: 
     assert any("math_tests.evidence_paths: self-attesting" in item for item in result.invalid)
 
 
+def test_subspace_contract_rejects_validation_evidence_outside_run_bundle(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    external = tmp_path / "external_evidence.json"
+    external.write_text(
+        json.dumps(
+            {
+                "evidence_schema_version": "validation_evidence_v1",
+                "section": "math_tests",
+                "status": "pass",
+                "generated_at": "2026-05-25T00:00:00Z",
+                "command": ["pytest", "math_tests"],
+                "checks": [{"name": "external", "passed": True}],
+            }
+        )
+        + "\n"
+    )
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    report["math_tests"]["evidence_paths"] = [str(external)]
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("math_tests.evidence_paths: missing or outside run bundle" in item for item in result.invalid)
+
+
 def test_subspace_contract_rejects_hollow_validation_evidence(tmp_path: Path):
     config = GpuSuiteConfig(
         output_root=tmp_path / "runs",
@@ -1174,9 +1286,41 @@ def test_subspace_contract_rejects_weak_engineering_exception(tmp_path: Path):
     result = check_run(contract)
 
     assert not result.passed
+    assert any("engineering proceed requires lower >= -epsilon" in item for item in result.invalid)
     assert any("operational_advantage.delta" in item for item in result.invalid)
     assert any("operational_advantage.probe_split_hash" in item for item in result.invalid)
     assert any("operational_advantage.reference_artifact_hash" in item for item in result.invalid)
+
+
+def test_subspace_contract_accepts_tie_like_engineering_exception(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    gate = report["scientific_gate_contract"]
+    gate["gate_type"] = "engineering-proceed-no-scientific-win"
+    gate["confidence_interval"] = {"lower": 0.0, "upper": 0.02}
+    gate["engineering_exception"] = {
+        "accepted_label": "engineering_proceed_no_scientific_win",
+        "operational_advantage": {
+            "metric": "logit_kl_mean_reduction_pct",
+            "delta": 30.0,
+            "probe_split_hash": "drift-probe123",
+            "reference_artifact_hash": "base-logits123",
+            "aggregation": "mean_token_rows",
+            "direction": "lower_is_better",
+        },
+    }
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert result.passed
 
 
 def test_subspace_contract_rejects_scientific_gate_not_tied_to_artifacts(tmp_path: Path):
@@ -1256,6 +1400,102 @@ def test_subspace_contract_rejects_scientific_gate_contrast_mismatch(tmp_path: P
     assert any("tested_contrasts[1].metric: does not match primary_metric" in item for item in result.invalid)
     assert any("tested_contrasts[2].control_artifact_hash" in item for item in result.invalid)
     assert any("missing primary_metric controls ['random-orthonormal']" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_unbound_scientific_gate_artifacts(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    gate = report["scientific_gate_contract"]
+    gate["gate_family_artifact_hash"] = "wrong-gate-hash"
+    gate["compared_control_artifact_paths"]["random-orthonormal"] = str(tmp_path / "outside_control.json")
+    gate["tested_contrasts"][0]["artifact_path"] = "gate/missing_contrast.json"
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("gate_family_artifact_hash: does not match artifact" in item for item in result.invalid)
+    assert any("compared_control_artifact_paths.random-orthonormal_path: missing or outside run bundle" in item for item in result.invalid)
+    assert any("tested_contrasts[1].artifact_path: missing or outside run bundle" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_validation_split_aliasing_screen(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    validation_artifact = {
+        "schema_version": "validation_selection_artifact_v1",
+        "selection_split_hash": "screen123",
+        "selection_rule_hash": "select123",
+    }
+    validation_path = contract.root / "gate" / "validation_selection.json"
+    validation_path.write_bytes(_json_bytes(validation_artifact))
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    gate = report["scientific_gate_contract"]
+    gate["multiple_comparison_correction"] = "separate_validation_split"
+    gate["validation_selection_split_hash"] = "screen123"
+    gate["validation_selection_artifact_path"] = "gate/validation_selection.json"
+    gate["validation_selection_artifact_hash"] = _json_sha256(validation_artifact)
+    family = json.loads((contract.root / gate["gate_family_artifact_path"]).read_text())
+    family["multiple_comparison_correction"] = "separate_validation_split"
+    (contract.root / gate["gate_family_artifact_path"]).write_bytes(_json_bytes(family))
+    gate["gate_family_artifact_hash"] = _json_sha256(family)
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("validation_selection_split_hash: must differ" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_mixed_config_top_k_candidates(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    candidates = [json.loads(line) for line in (contract.root / "candidates.jsonl").read_text().splitlines()]
+    candidates[1]["basis_rank"] = 512
+    candidates[1]["target_preset"] = "mlp"
+    candidates[1]["rho_or_sigma_w"] = 0.5
+    (contract.root / "candidates.jsonl").write_text("".join(json.dumps(row) + "\n" for row in candidates))
+    top_k = json.loads((contract.root / "top_k_ensemble.json").read_text())
+    top_k["K"] = 2
+    top_k["candidates"] = [top_k["candidates"][0], candidates[1]]
+    (contract.root / "top_k_ensemble.json").write_text(json.dumps(top_k) + "\n")
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    gate = report["scientific_gate_contract"]
+    gate["locked_K"] = 2
+    gate["K_grid"] = [2]
+    family = json.loads((contract.root / gate["gate_family_artifact_path"]).read_text())
+    family["K_grid"] = [2]
+    for config_row in family["observed_configs"]:
+        config_row["K"] = 2
+    (contract.root / gate["gate_family_artifact_path"]).write_bytes(_json_bytes(family))
+    gate["gate_family_artifact_hash"] = _json_sha256(family)
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("locked_basis_rank: does not match top_k candidate[2]" in item for item in result.invalid)
+    assert any("locked_target_preset: does not match top_k candidate[2]" in item for item in result.invalid)
+    assert any("locked_radius: does not match top_k candidate[2]" in item for item in result.invalid)
 
 
 def test_subspace_contract_rejects_holdout_scores_without_selector_provenance(tmp_path: Path):

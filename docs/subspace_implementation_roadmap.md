@@ -462,23 +462,31 @@ Deliverables:
   `lazy_overhead_pct`; strict subspace validation requires
   `screen_holdout_overlap == 0`.
 - Validate `scientific_gate_contract` includes `K_grid`, `basis_rank_grid`,
-  `radius_grid`, `compared_control_artifact_hashes`, and `tested_contrasts` so
-  grid exploration, control artifacts, and multiple-comparison corrections are
-  machine-auditable.
+  `radius_grid`, a hashed run-local gate-family artifact,
+  `compared_control_artifact_paths` / `compared_control_artifact_hashes`, and
+  `tested_contrasts` so grid exploration, control artifacts, and
+  multiple-comparison corrections are machine-auditable.
 - Validate locked K, locked basis rank, and locked radius are members of their
   reported grids. `none_predeclared_single_config` is valid only for singleton
   grids; multi-value grids require an explicit correction or
-  `separate_validation_split` with validation split and artifact hashes.
+  `separate_validation_split` with validation split and artifact hashes. That
+  validation split hash must differ from both screen and holdout hashes.
+- Validate the reported grids match the observed K/rank/radius family in the
+  hashed gate-family artifact, and that the artifact contains activation-SVD,
+  random-orthonormal, and shuffled-activation-SVD basis families.
 - Validate `tested_contrasts` covers both `random-orthonormal` and
   `shuffled-activation-svd` controls on the locked primary metric, and that
-  each contrast's `control_artifact_hash` matches
-  `compared_control_artifact_hashes`.
+  each contrast's run-local artifact hash is verified and its
+  `control_artifact_path` / `control_artifact_hash` matches the compared
+  control artifact maps.
 - Validate `top_k_ensemble.json` contains full candidate identities, not only
-  candidate ids.
+  candidate ids. Every top-K candidate, not just the first, must match the
+  locked basis rank, target preset, scale mode, and radius.
 - Validate every `validation_report.json.evidence_paths` entry points to a
   section-specific `validation_evidence_v1` JSON object with `section`,
   `status`, `generated_at`, `command`, and at least one nonempty `checks`,
-  `metrics`, or `artifacts` payload. Bare pass markers are invalid.
+  `metrics`, or `artifacts` payload. Bare pass markers are invalid, and
+  evidence outside the run bundle is invalid.
 - Validate `drift_diagnostics` evidence includes `probe_split_hash`,
   `reference_artifact_hash`, `candidate_artifact_hash`, `aggregation`,
   `sample_count`, `temperature`, `epsilon`, `logit_kl_mean`, and
@@ -761,6 +769,9 @@ Acceptance gate:
   - `hidden_state_rms_drift_reduction_pct >= 25.0`;
   - `lazy_overhead_reduction_pct >= 20.0`;
   - `captured_energy_gain_pct_points >= 10.0`.
+- The engineering-proceed CI must be tie-like: lower bound `>= -epsilon`, the
+  interval includes zero, and a strictly positive lower bound must use the
+  scientific-win gate instead.
 - Drift diagnostics use the design-doc metric contract: fixed probe split,
   base-model reference artifact, `logit_kl_mean` over token-row logits, and
   `hidden_state_rms_drift` over reported activation sites. Evidence records

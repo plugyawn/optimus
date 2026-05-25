@@ -569,6 +569,9 @@ predeclared operational advantage at equal quality using the metric contract in
 percentage points higher captured activation energy. Secondary metrics are
 reported for diagnosis only: improvement density, best single-candidate holdout
 score, diversity-adjusted ensemble gain, and screen-to-holdout drop.
+The engineering-proceed CI must be tie-like under the predeclared `epsilon`:
+the lower bound is at least `-epsilon`, the interval includes zero, and a
+strictly positive lower bound is reported as a scientific win instead.
 
 If holdout is used to choose rank, radius, K, target preset, or basis family,
 that split becomes validation, not final test evidence. Final claims then need a
@@ -962,7 +965,8 @@ machine-readable failure list. A completed run passes validation only when every
 required section has `status: "pass"`, nonempty evidence paths that exist in the
 run directory, and an empty failure list. Evidence paths must point to
 section-specific JSON evidence, not back to `summary.json` or
-`validation_report.json`.
+`validation_report.json`. Evidence outside the run bundle is invalid, even if
+the path exists on the local filesystem.
 
 Each evidence file must use this minimal schema:
 
@@ -988,23 +992,30 @@ The scientific gate section also records
 fields, `selection_split`, `holdout_tuned`, `screen_holdout_overlap`, and a
 numeric confidence interval so a gate result is not merely self-attested prose.
 It also records `K_grid`, `basis_rank_grid`, `radius_grid`,
-`compared_control_artifact_hashes`, and `tested_contrasts` so the locked
-selection and multiple-comparison correction can be audited after the run.
+`gate_family_artifact_path`, `gate_family_artifact_hash`,
+`compared_control_artifact_paths`, `compared_control_artifact_hashes`, and
+`tested_contrasts` so the locked selection and multiple-comparison correction
+can be audited after the run. All artifact paths are run-local and all hashes
+are verified against the referenced files.
 The locked K, basis rank, and radius must be members of those grids. A
 `multiple_comparison_correction` value of `none_predeclared_single_config` is
 valid only when all three grids are singleton grids. If any grid contains more
 than one value, the report must either name an explicit correction
 (`holm_bonferroni`, `bonferroni`, or `benjamini_hochberg`) or use
 `separate_validation_split` with `validation_selection_split_hash` and
-`validation_selection_artifact_hash`. Holdout tuning remains invalid in both
-cases.
-`compared_control_artifact_hashes` contains immutable artifacts for the
-`random-orthonormal` and `shuffled-activation-svd` control families.
+`validation_selection_artifact_path` / `validation_selection_artifact_hash`.
+That validation split must differ from both the screen and holdout split hashes.
+Holdout tuning remains invalid in all cases. The gate-family artifact lists the
+observed K/rank/radius family and the basis families included in the comparison.
+The validator rejects reported grids that do not match that observed family.
+`compared_control_artifact_paths` and `compared_control_artifact_hashes` bind
+immutable artifacts for the `random-orthonormal` and `shuffled-activation-svd`
+control families.
 `tested_contrasts` lists the exact basis/control/metric/artifact contrasts that
 entered the confidence interval. At minimum, it must cover both control
 families on the locked `primary_metric`; each contrast records its own
-`artifact_hash` and the matching `control_artifact_hash` from
-`compared_control_artifact_hashes`.
+`artifact_path` / `artifact_hash` and the matching `control_artifact_path` /
+`control_artifact_hash` from the control artifact maps.
 
 `drift_diagnostics` has a fixed v1 metric contract. The probe split is an
 immutable unlabeled prompt/token-row set identified by `probe_split_hash`, and
