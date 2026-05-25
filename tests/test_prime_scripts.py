@@ -80,8 +80,12 @@ def test_prime_sync_bundle_does_not_copy_local_agent_state():
 def test_backend_parity_launcher_uses_supported_cli_commands():
     text = Path("scripts/run_backend_parity_gate.sh").read_text()
 
-    assert "optimus peft-search" in text
-    assert "optimus vllm-search" in text
+    assert "optimus search" in text
+    assert "--backend transformers" in text
+    assert "--backend vllm" in text
+    assert "--method lora" in text
+    assert "optimus peft-search" not in text
+    assert "optimus vllm-search" not in text
     assert "optimus backend-parity-gate" in text
     assert "backend-output-diff" not in text
     assert "--allow-missing-output-diff" not in text

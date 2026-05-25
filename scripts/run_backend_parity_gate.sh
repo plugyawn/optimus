@@ -33,7 +33,9 @@ if [[ ! -f "$DATA" ]]; then
   optimus make-countdown-data --out "$DATA" --count 1200 --seed 20260507
 fi
 
-optimus peft-search \
+optimus search \
+  --backend transformers \
+  --method lora \
   --out "$OUT_ROOT/peft" \
   --model "$MODEL" \
   --data "$DATA" \
@@ -51,7 +53,9 @@ optimus peft-search \
   --stop-at-answer \
   --antithetic
 
-optimus vllm-search \
+optimus search \
+  --backend vllm \
+  --method lora \
   --out "$OUT_ROOT/vllm" \
   --model "$MODEL" \
   --data "$DATA" \

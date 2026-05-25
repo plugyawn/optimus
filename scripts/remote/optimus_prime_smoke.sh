@@ -19,7 +19,9 @@ optimus make-countdown-data \
   --count 64 \
   --seed 20260523
 
-optimus vllm-bench \
+optimus bench \
+  --backend vllm \
+  --method lora \
   --out results/prime_smoke/prepare_only \
   --data data/countdown_prime_smoke_64.json \
   --adapters 2 \
@@ -31,7 +33,9 @@ optimus vllm-bench \
   --prepare-only
 
 if [[ "${RUN_VLLM_SMOKE:-1}" == "1" ]]; then
-  optimus vllm-bench \
+  optimus bench \
+    --backend vllm \
+    --method lora \
     --out results/prime_smoke/vllm_bench \
     --data data/countdown_prime_smoke_64.json \
     --adapters 2 \
