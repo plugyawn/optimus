@@ -268,6 +268,7 @@ def test_release_check_rejects_legacy_package_level_exports(tmp_path: Path):
     search = tmp_path / "optimus" / "search"
     search.mkdir()
     (search / "__init__.py").write_text("__all__ = ['run_peft_search']\n")
+    (serving / "halving.py").write_text("def run_halving(): pass\n")
 
     checks = build_release_checks(
         root=tmp_path,
@@ -284,6 +285,7 @@ def test_release_check_rejects_legacy_package_level_exports(tmp_path: Path):
     assert not by_name["public_package_surface_excludes_legacy_subspace_internals"].passed
     assert "AdapterSpec" in by_name["public_package_surface_excludes_legacy_subspace_internals"].detail
     assert "run_peft_search" in by_name["public_package_surface_excludes_legacy_subspace_internals"].detail
+    assert "halving.py" in by_name["public_package_surface_excludes_legacy_subspace_internals"].detail
 
 
 def _write_subspace_systems_out(root: Path, *, timing: bool = True, numeric_as_string: bool = False) -> Path:

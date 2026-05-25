@@ -32,8 +32,10 @@ experiment-lab repository.
 - `optimus systems-report` separates screen-selected heldout transfer from
   promoted holdout-oracle quality.
 - Subspace P1024 and P4096 reports include `subspace_state.pt`,
-  `candidate_scores.jsonl`, `top_k_ensemble.json`, sample-level scorer details,
-  token throughput, candidate/sec, and top-K/best-of-N data.
+  `subspace_state_summary.json`, `candidates.jsonl`,
+  `candidate_scores.jsonl`, `top_k_ensemble.json`, `validation_report.json`,
+  `systems_report.json`, sample-level scorer details, token throughput,
+  candidate/sec, and top-K/best-of-N data.
 - Legacy LoRA baseline reports may include adapter rows and
   `candidate_summary.jsonl`, but those artifacts are not accepted as subspace
   evidence.

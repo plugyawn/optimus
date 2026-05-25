@@ -339,6 +339,8 @@ def package_code_checks(root: Path) -> list[ReleaseCheck]:
     search_exports = set(_module_all(package_root / "search" / "__init__.py"))
     for name in sorted(search_exports & {"run_peft_search"}):
         surface_leaks.append(f"optimus/search/__init__.py:{name}")
+    if (package_root / "serving" / "halving.py").exists():
+        surface_leaks.append("optimus/serving/halving.py:removed_staged_driver")
     return [
         ReleaseCheck("optimus_package_source_present", True, str(package_root)),
         ReleaseCheck(

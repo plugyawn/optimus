@@ -62,8 +62,9 @@ Subspace families build a rank-capped activation basis from a fixed screen split
 and sample per-candidate output noise. The implicit dense update is
 `G @ activation_basis`. The planned vLLM backend applies this effect during
 search without adapter swapping and fails closed until the roadmap acceptance
-gates land. PEFT/vLLM adapter export is available only as a materialization step
-for selected winners, using `subspace_state.pt`.
+gates land. A later materialized-export path may produce PEFT/vLLM-compatible
+single-winner artifacts from `subspace_state.pt`; that export is replay and
+distillation infrastructure, not the search hot path.
 
 ## Report Semantics
 

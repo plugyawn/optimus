@@ -469,19 +469,6 @@ def test_vllm_benchmark_driver_import_is_metadata_lightweight():
     assert "PyTorch" not in result.stderr
 
 
-def test_vllm_halving_driver_import_is_metadata_lightweight():
-    result = subprocess.run(
-        [sys.executable, "-c", "from optimus.serving.halving import run_halving; print(run_halving.__module__)"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    assert "optimus.serving.halving" in result.stdout
-    assert "NumPy" not in result.stderr
-    assert "PyTorch" not in result.stderr
-
-
 def test_runs_namespace_exports_execution_helpers_lightweight():
     result = subprocess.run(
         [sys.executable, "-c", "from optimus.runs import execute_specs, plan_payload; print(execute_specs.__name__, plan_payload.__name__)"],
