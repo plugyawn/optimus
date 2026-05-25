@@ -457,8 +457,9 @@ For fixed-choice/logprob scoring and identical prefill, serving K candidates
 over one prompt has the same computational shape as search over a K-candidate
 block. For open-ended autoregressive generation, candidate continuations can
 diverge; the runtime must keep candidate identity on every generated row and
-cannot assume shared decode trajectories beyond prefixes that are actually
-identical under the candidate-keyed cache policy.
+cannot assume shared decode trajectories. V1 disables prefix caching for
+subspace search and ensemble serving; candidate-keyed cache reuse is a later
+integration problem, not a v1 optimization.
 
 Supported v1 aggregation modes:
 
@@ -584,6 +585,24 @@ row layout only after a routing parity test proves equivalence to explicit row
 metadata. CUDA graph capture is disabled for the eager wrapper; custom-op graph
 capture is a separate acceptance gate.
 
+The v1 row-routing descriptor is explicit and scheduler-order independent. At
+the vLLM request boundary, Optimus attaches candidate metadata to each logical
+request. At the model-runner boundary, Optimus constructs a flattened
+row-routing tensor/table with:
+
+- request id;
+- sequence id;
+- prefill or decode phase;
+- flattened token-row start and count;
+- position ids or equivalent row-position mapping;
+- stable candidate id;
+- candidate slot within the current candidate block;
+- basis/runtime config hash.
+
+Chunked prefill, decode-only steps, ragged prompts, and row-order changes must
+preserve this mapping. Kernel fast paths may reorder rows internally only if the
+pre-reorder and post-reorder descriptors round-trip in routing tests.
+
 For each target module:
 
 1. receive activation rows `x_n`;
@@ -603,11 +622,8 @@ model semantics.
 
 Any candidate-specific perturbation that can affect hidden states contributing
 to cached K/V or prefix state invalidates cache sharing, including q/k/v/o/MLP
-targets when they occur before or inside the cached computation. Therefore:
-
-- candidate-different requests must not share KV-cache entries;
-- candidate identity must be part of prefix-cache validity; or
-- prefix caching must be disabled during search and ensemble serving.
+targets when they occur before or inside the cached computation. V1 therefore
+has exactly one supported policy:
 
 Default v1:
 
@@ -615,10 +631,13 @@ Default v1:
 --prefix-cache-policy disabled-for-search
 ```
 
-A future `candidate-keyed` policy is allowed only if the cache key includes all
-candidate fields that affect computation: base model hash, basis hash,
-candidate id, target set hash, scale mode, radius, budget hash, RNG version, and
-runtime dtype.
+Candidate-different requests must not share KV-cache or prefix-cache entries in
+v1. A future `candidate-keyed` policy is a separate PR and non-goal for v1. It
+must define the exact vLLM cache-key integration, including use of cache salt or
+extra-hash fields where applicable, and must key every computation-affecting
+field: base model hash, basis hash, candidate id, target set hash, scale mode,
+radius, budget hash, RNG version, runtime dtype, target preset, and runtime
+config hash.
 
 V1 exact parity claims require unquantized fp16/bf16 base weights. Quantized
 base search may be allowed experimentally, but must report base weight dtype,
@@ -860,7 +879,7 @@ Routing and cache tests:
 - Row-order scramble fails unless explicit `row_candidate_id` is used.
 - Same prompt under different candidate ids does not share perturbed KV-cache
   state.
-- Prefix caching is either disabled or candidate-keyed.
+- Prefix caching is disabled for v1 subspace search and ensemble serving.
 
 Ensemble tests:
 
@@ -919,8 +938,7 @@ Before accepting an implementation PR:
 - Bases are attached to activation sites, not duplicated per target module.
 - Candidate random fields are pure functions of candidate identity and indices.
 - Every activation row carries explicit candidate id metadata.
-- Prefix caching is disabled or candidate-keyed during search and ensemble
-  serving.
+- Prefix caching is disabled during v1 search and ensemble serving.
 - `projected-dense` and `relative-output-rms` both pass scale tests.
 - Random-Q and shuffled-Q gating controls are present.
 - Top-K lazy ensemble is a first-class artifact and runtime path.
