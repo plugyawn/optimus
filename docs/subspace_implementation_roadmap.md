@@ -487,6 +487,11 @@ Deliverables:
   grids, validate `tested_contrasts` covers every activation-SVD versus control
   contrast implied by the observed gate-family configs, not only the locked
   config.
+- Emit and validate the scientific-gate mini-schemas documented in the design
+  doc: `validation_selection_artifact_v1`, `scientific_gate_family_v1`,
+  `scientific_gate_config_v1`, `scientific_gate_control_v1`, and
+  `scientific_gate_contrast_v1`. Phase 0 treats these schema ids and required
+  fields as public run-artifact contracts, not validator internals.
 - Validate `top_k_ensemble.json` contains full candidate identities, not only
   candidate ids. Every top-K candidate, not just the first, must match the
   locked basis rank, target preset, scale mode, and radius.
@@ -816,6 +821,10 @@ Run conditions:
   must cover `qv`, `attn-qkvo`, `mlp`, and `transformer-linears` at matched
   rank/kernel as one complete `(basis_rank, kernel)` group; mixed-rank or
   mixed-kernel coverage does not pass.
+- `base_vllm`, `lora_baseline`, and `subspace` contributor runs all emit
+  per-run `systems_report.json` files using `subspace_systems_report_v1` with
+  their resolved `benchmark_kind`. V1 has no baseline-native normalization
+  layer; a baseline run that cannot emit this schema fails closed.
 - Suite-level systems artifacts must include `source_report`,
   `source_run_dir`, and `timing_evidence_paths` so every aggregate row points
   back to synchronized timing evidence.

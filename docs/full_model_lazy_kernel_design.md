@@ -1026,6 +1026,22 @@ Holm-Bonferroni, Bonferroni, or Benjamini-Hochberg, `tested_contrasts` must
 cover every activation-SVD versus control-family contrast implied by the
 observed gate-family configs, not only the locked winning config.
 
+Scientific-gate artifact mini-schemas:
+
+| schema | emitted by | required fields |
+| --- | --- | --- |
+| `validation_selection_artifact_v1` | validation-split selector | `schema_version`, `selection_split_hash`, `selection_rule_hash` |
+| `scientific_gate_family_v1` | gate-family scorer/planner | `schema_version`, `primary_metric`, `multiple_comparison_correction`, `selection_rule_hash`, `holdout_tuned`, `K_grid`, `basis_rank_grid`, `radius_grid`, `observed_configs` |
+| `scientific_gate_config_v1` | per-config scorer | `schema_version`, `basis_kind`, `K`, `basis_rank`, `radius`, `target_preset`, `scale_mode`, `aggregation`, `primary_metric`, `selection_rule_hash` |
+| `scientific_gate_control_v1` | control-family scorer | `schema_version`, `basis_kind`, `metric`, `sample_set_hash` |
+| `scientific_gate_contrast_v1` | gate analyzer | `schema_version`, `basis_kind`, `control_basis_kind`, `metric`, `control_artifact_hash`, `K`, `basis_rank`, `radius`, `target_preset`, `scale_mode`, `aggregation` |
+
+`observed_configs` entries in `scientific_gate_family_v1` contain the same
+config identity fields as `scientific_gate_config_v1`, plus `artifact_path` and
+`artifact_hash`. `tested_contrasts` entries contain the same config identity
+fields as `scientific_gate_contrast_v1`, plus `artifact_path`, `artifact_hash`,
+`control_artifact_path`, and `control_artifact_hash`.
+
 `drift_diagnostics` has a fixed v1 metric contract. The probe split is an
 immutable unlabeled prompt/token-row set identified by `probe_split_hash`, and
 the reference output is the unperturbed base model under the same model
@@ -1072,6 +1088,12 @@ target-band rows in that same group. Coverage satisfied only by mixing ranks or
 kernels is invalid. Suite reports include `source_report`, `source_run_dir`, and
 `timing_evidence_paths`; timing evidence must contain a synchronized timed
 region marker.
+
+Every contributor run that feeds this suite-level systems report, including
+`base_vllm` and `lora_baseline`, emits a per-run `systems_report.json` with
+schema `subspace_systems_report_v1` and its resolved `benchmark_kind`. V1 does
+not normalize baseline-native reports into the subspace systems schema; missing
+or differently shaped baseline reports fail closed.
 
 Lazy top-K ensembles are evaluated by Optimus-native sample-level evaluation in
 v1. LightEval is the trusted lane for base models, single-candidate
