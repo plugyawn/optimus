@@ -269,7 +269,8 @@ Do not start Phase 1 until every item below is true:
 - Subspace artifact fixtures pass strict validation; LoRA-shaped artifacts fail
   as subspace artifacts.
 - Systems reporting requires measured timing evidence and preserves target
-  preset, rank, population, kernel, and conservative throughput evidence.
+  preset, rank, population, kernel, benchmark kind, source report/run paths,
+  timing evidence paths, and conservative throughput evidence.
 - Scientific gate logic distinguishes smoke non-inferiority, production
   positive acceptance, and explicitly labeled engineering proceed.
 - Phase 6 p128 speed requirements are documented, but not treated as a
@@ -451,12 +452,20 @@ Deliverables:
   `candidates_per_sec`, `prompts_per_sec`, `output_tokens_per_sec`, and
   `lazy_overhead_pct`; strict subspace validation requires
   `screen_holdout_overlap == 0`.
+- Validate `scientific_gate_contract` includes `K_grid`, `basis_rank_grid`,
+  `radius_grid`, `compared_control_artifact_hashes`, and `tested_contrasts` so
+  grid exploration, control artifacts, and multiple-comparison corrections are
+  machine-auditable.
 - Validate `top_k_ensemble.json` contains full candidate identities, not only
   candidate ids.
 - Validate every `validation_report.json.evidence_paths` entry points to a
   section-specific `validation_evidence_v1` JSON object with `section`,
-  `status`, `generated_at`, and at least one nonempty `checks`, `metrics`, or
-  `artifacts` payload. Bare pass markers are invalid.
+  `status`, `generated_at`, `command`, and at least one nonempty `checks`,
+  `metrics`, or `artifacts` payload. Bare pass markers are invalid.
+- Validate `drift_diagnostics` evidence includes `probe_split_hash`,
+  `reference_artifact_hash`, `candidate_artifact_hash`, `aggregation`,
+  `sample_count`, `temperature`, `epsilon`, `logit_kl_mean`, and
+  `hidden_state_rms_drift`.
 - Add `gaussian_hash_v1` golden-vector tests before any random-field backend is
   accepted.
 
@@ -766,6 +775,13 @@ Run conditions:
 - same scorer;
 - same GPU type;
 - same population where applicable.
+- `subspace_systems.csv` must include p128 rows for `benchmark_kind=base_vllm`,
+  `benchmark_kind=lora_baseline`, and `benchmark_kind=subspace`. Subspace rows
+  must cover `qv`, `attn-qkvo`, `mlp`, and `transformer-linears` at matched
+  rank/kernel.
+- Suite-level systems artifacts must include `source_report`,
+  `source_run_dir`, and `timing_evidence_paths` so every aggregate row points
+  back to synchronized timing evidence.
 
 Decision gates:
 

@@ -657,6 +657,7 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
                 columns = set(reader.fieldnames or [])
             required_columns = {
                 "source_run_dir",
+                "benchmark_kind",
                 "candidate_batch_size",
                 "population",
                 "target_preset",
@@ -695,8 +696,13 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
             target_presets = {row.get("target_preset") for row in p128_rows}
             required_presets = {"qv", "attn-qkvo", "mlp", "transformer-linears"}
             missing_presets = sorted(required_presets - target_presets)
+            benchmark_kinds = {row.get("benchmark_kind") for row in p128_rows}
+            required_benchmarks = {"base_vllm", "lora_baseline", "subspace"}
+            missing_benchmarks = sorted(required_benchmarks - benchmark_kinds)
             grouped: dict[tuple[str, str], list[dict]] = {}
             for row in p128_rows:
+                if row.get("benchmark_kind") != "subspace":
+                    continue
                 grouped.setdefault((str(row.get("basis_rank")), str(row.get("kernel"))), []).append(row)
             for (basis_rank, kernel), group in grouped.items():
                 transformer = [row for row in group if row.get("target_preset") == "transformer-linears"]
@@ -709,6 +715,8 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
                     p128_failures.append(f"rank={basis_rank} kernel={kernel}: transformer-linears more than 2x slower")
             if missing_presets:
                 p128_failures.append(f"missing target presets {missing_presets!r}")
+            if missing_benchmarks:
+                p128_failures.append(f"missing benchmark kinds {missing_benchmarks!r}")
             checks.append(
                 ReleaseCheck(
                     "subspace_p128_speed_gate_enforced",

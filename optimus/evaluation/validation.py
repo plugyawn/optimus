@@ -225,6 +225,7 @@ SUBSPACE_ACTIVATION_SITE_FIELDS = (
     "basis_control_seed",
     "transductive",
     "input_dim",
+    "basis_kind",
     "requested_rank",
     "effective_rank",
     "basis_tensor_key",
@@ -526,8 +527,30 @@ def _check_validation_evidence_payload(invalid: list[str], rel: str, section: st
         invalid.append(f"{rel}.{section}.evidence_paths: evidence status is not pass {evidence!r}")
     if not isinstance(payload.get("generated_at"), str) or not payload.get("generated_at"):
         invalid.append(f"{rel}.{section}.evidence_paths: generated_at missing {evidence!r}")
+    if not isinstance(payload.get("command"), list) or not payload.get("command"):
+        invalid.append(f"{rel}.{section}.evidence_paths: command missing {evidence!r}")
     if not _evidence_has_substantive_payload(payload):
         invalid.append(f"{rel}.{section}.evidence_paths: no substantive evidence payload {evidence!r}")
+    if section == "drift_diagnostics":
+        _check_drift_evidence_payload(invalid, rel, section, evidence, payload)
+
+
+def _check_drift_evidence_payload(invalid: list[str], rel: str, section: str, evidence: str, payload: dict) -> None:
+    for field in ("probe_split_hash", "reference_artifact_hash", "candidate_artifact_hash", "aggregation"):
+        if not isinstance(payload.get(field), str) or not payload.get(field):
+            invalid.append(f"{rel}.{section}.evidence_paths: {field} missing {evidence!r}")
+    if not _is_positive_int(payload.get("sample_count")):
+        invalid.append(f"{rel}.{section}.evidence_paths: sample_count not positive integer {evidence!r}")
+    for field in ("temperature", "epsilon"):
+        if not _is_json_number(payload.get(field)):
+            invalid.append(f"{rel}.{section}.evidence_paths: {field} not JSON number {evidence!r}")
+    metrics = payload.get("metrics")
+    if not isinstance(metrics, dict):
+        invalid.append(f"{rel}.{section}.evidence_paths: metrics missing {evidence!r}")
+        return
+    for field in ("logit_kl_mean", "hidden_state_rms_drift"):
+        if not _is_json_number(metrics.get(field)):
+            invalid.append(f"{rel}.{section}.evidence_paths: metrics.{field} not JSON number {evidence!r}")
 
 
 ENGINEERING_ADVANTAGE_THRESHOLDS = {
@@ -670,13 +693,20 @@ def _check_scientific_gate_contract(
     for field in ("locked_K", "locked_basis_rank"):
         if not _is_positive_int(section.get(field)):
             invalid.append(f"{rel}.scientific_gate_contract.{field}: not positive integer")
+    for field in ("K_grid", "basis_rank_grid"):
+        values = section.get(field)
+        if not isinstance(values, list) or not values or not all(_is_positive_int(item) for item in values):
+            invalid.append(f"{rel}.scientific_gate_contract.{field}: invalid")
+    radius_grid = section.get("radius_grid")
+    if not isinstance(radius_grid, list) or not radius_grid or not all(_is_json_number(item) for item in radius_grid):
+        invalid.append(f"{rel}.scientific_gate_contract.radius_grid: invalid")
     if not _is_finite_number(section.get("locked_radius")):
         invalid.append(f"{rel}.scientific_gate_contract.locked_radius: not finite")
     if section.get("selection_split") != "screen":
         invalid.append(f"{rel}.scientific_gate_contract.selection_split: expected 'screen'")
     if section.get("holdout_tuned") is not False:
         invalid.append(f"{rel}.scientific_gate_contract.holdout_tuned: expected false")
-    if section.get("screen_holdout_overlap") != 0:
+    if not (isinstance(section.get("screen_holdout_overlap"), int) and not isinstance(section.get("screen_holdout_overlap"), bool) and section.get("screen_holdout_overlap") == 0):
         invalid.append(f"{rel}.scientific_gate_contract.screen_holdout_overlap: expected 0")
     if section.get("selection_rule_hash") not in selection_rule_hashes:
         invalid.append(f"{rel}.scientific_gate_contract.selection_rule_hash: not present in candidate_scores")
@@ -709,6 +739,24 @@ def _check_scientific_gate_contract(
         invalid.append(f"{rel}.scientific_gate_contract.control_basis_kinds: empty")
     if set(controls or []) != {"random-orthonormal", "shuffled-activation-svd"}:
         invalid.append(f"{rel}.scientific_gate_contract.control_basis_kinds: must include exactly random-orthonormal and shuffled-activation-svd")
+    control_artifacts = section.get("compared_control_artifact_hashes")
+    if not isinstance(control_artifacts, dict):
+        invalid.append(f"{rel}.scientific_gate_contract.compared_control_artifact_hashes: not object")
+    else:
+        for basis_kind in ("random-orthonormal", "shuffled-activation-svd"):
+            if not isinstance(control_artifacts.get(basis_kind), str) or not control_artifacts.get(basis_kind):
+                invalid.append(f"{rel}.scientific_gate_contract.compared_control_artifact_hashes.{basis_kind}: empty")
+    contrasts = section.get("tested_contrasts")
+    if not isinstance(contrasts, list) or not contrasts:
+        invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts: empty")
+    else:
+        for index, contrast in enumerate(contrasts, start=1):
+            if not isinstance(contrast, dict):
+                invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}]: not object")
+                continue
+            for field in ("basis_kind", "control_basis_kind", "metric", "artifact_hash"):
+                if not isinstance(contrast.get(field), str) or not contrast.get(field):
+                    invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].{field}: empty")
     if section.get("gate_type") not in {"non-inferiority", "paired-bootstrap-positive", "engineering-proceed-no-scientific-win"}:
         invalid.append(f"{rel}.scientific_gate_contract.gate_type: invalid {section.get('gate_type')!r}")
     if section.get("comparison") != "activation_svd_minus_best_control":
@@ -815,8 +863,13 @@ def check_run(contract: RunContract) -> RunCheck:
             invalid.append("summary.command: empty")
         if not isinstance(summary.get("environment"), dict) or not summary.get("environment"):
             invalid.append("summary.environment: empty")
-        if summary.get("screen_holdout_overlap") != 0:
+        if not (isinstance(summary.get("screen_holdout_overlap"), int) and not isinstance(summary.get("screen_holdout_overlap"), bool) and summary.get("screen_holdout_overlap") == 0):
             invalid.append("summary.screen_holdout_overlap: expected 0")
+        for key in ("candidates_per_sec", "prompts_per_sec", "output_tokens_per_sec", "lazy_overhead_pct"):
+            if not _is_json_number(summary.get(key)):
+                invalid.append(f"summary.{key}: not JSON number")
+        if not _is_positive_int(summary.get("population")):
+            invalid.append("summary.population: not positive integer")
         scale_mode = summary.get("scale_mode")
         if scale_mode not in SUBSPACE_SCALE_MODES:
             invalid.append("summary.scale_mode: invalid")

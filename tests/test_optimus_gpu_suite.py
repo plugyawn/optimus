@@ -394,6 +394,7 @@ def write_subspace_contract_outputs(contract) -> None:
                     "basis_control_seed": 123,
                     "transductive": False,
                     "input_dim": 16,
+                    "basis_kind": "activation-svd",
                     "requested_rank": 8,
                     "effective_rank": 8,
                     "basis_tensor_key": "basis/layer_0.attn_in",
@@ -486,6 +487,27 @@ def write_subspace_contract_outputs(contract) -> None:
             "selection_rule_hash": "select123",
             "primary_metric": "top_k_holdout_exact",
             "multiple_comparison_correction": "none_predeclared_single_config",
+            "K_grid": [1],
+            "basis_rank_grid": [128],
+            "radius_grid": [0.01],
+            "compared_control_artifact_hashes": {
+                "random-orthonormal": "control-random123",
+                "shuffled-activation-svd": "control-shuffled123",
+            },
+            "tested_contrasts": [
+                {
+                    "basis_kind": "activation-svd",
+                    "control_basis_kind": "random-orthonormal",
+                    "metric": "top_k_holdout_exact",
+                    "artifact_hash": "contrast-random123",
+                },
+                {
+                    "basis_kind": "activation-svd",
+                    "control_basis_kind": "shuffled-activation-svd",
+                    "metric": "top_k_holdout_exact",
+                    "artifact_hash": "contrast-shuffled123",
+                },
+            ],
             "locked_K": 1,
             "locked_basis_rank": 128,
             "locked_radius": 0.01,
@@ -520,17 +542,29 @@ def write_subspace_contract_outputs(contract) -> None:
     evidence_dir = contract.root / "evidence"
     evidence_dir.mkdir(exist_ok=True)
     for section in validation_sections:
-        (evidence_dir / f"{section}.json").write_text(
-            json.dumps(
+        payload = {
+            "evidence_schema_version": "validation_evidence_v1",
+            "section": section,
+            "status": "pass",
+            "generated_at": "2026-05-25T00:00:00Z",
+            "command": ["pytest", section],
+            "checks": [{"name": f"{section}_check", "passed": True}],
+        }
+        if section == "drift_diagnostics":
+            payload.update(
                 {
-                    "evidence_schema_version": "validation_evidence_v1",
-                    "section": section,
-                    "status": "pass",
-                    "generated_at": "2026-05-25T00:00:00Z",
-                    "command": ["pytest", section],
-                    "checks": [{"name": f"{section}_check", "passed": True}],
+                    "probe_split_hash": "drift-probe123",
+                    "reference_artifact_hash": "base-logits123",
+                    "candidate_artifact_hash": "candidate-logits123",
+                    "aggregation": "mean_token_rows",
+                    "sample_count": 32,
+                    "temperature": 1.0,
+                    "epsilon": 1e-6,
+                    "metrics": {"logit_kl_mean": 0.01, "hidden_state_rms_drift": 0.02},
                 }
             )
+        (evidence_dir / f"{section}.json").write_text(
+            json.dumps(payload)
             + "\n"
         )
     (contract.root / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
@@ -937,6 +971,25 @@ def test_subspace_contract_rejects_bad_schema_versions(tmp_path: Path):
     assert any("validation_report.json.schema_version" in item for item in result.invalid)
 
 
+def test_subspace_contract_rejects_missing_site_basis_kind(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    state_summary = json.loads((contract.root / "subspace_state_summary.json").read_text())
+    state_summary["activation_sites"][0].pop("basis_kind")
+    (contract.root / "subspace_state_summary.json").write_text(json.dumps(state_summary) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("subspace_state_summary.json.activation_sites[1].basis_kind: missing" in item for item in result.invalid)
+
+
 def test_subspace_contract_rejects_state_and_score_hash_drift(tmp_path: Path):
     config = GpuSuiteConfig(
         output_root=tmp_path / "runs",
@@ -994,6 +1047,50 @@ def test_subspace_contract_rejects_hollow_validation_evidence(tmp_path: Path):
     assert any("math_tests.evidence_paths: no substantive evidence payload" in item for item in result.invalid)
 
 
+def test_subspace_contract_rejects_validation_evidence_without_command(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    evidence = json.loads((contract.root / "evidence" / "math_tests.json").read_text())
+    evidence.pop("command")
+    (contract.root / "evidence" / "math_tests.json").write_text(json.dumps(evidence) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("math_tests.evidence_paths: command missing" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_incomplete_drift_evidence(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    evidence = json.loads((contract.root / "evidence" / "drift_diagnostics.json").read_text())
+    evidence.pop("candidate_artifact_hash")
+    evidence.pop("sample_count")
+    evidence.pop("temperature")
+    evidence["metrics"].pop("hidden_state_rms_drift")
+    (contract.root / "evidence" / "drift_diagnostics.json").write_text(json.dumps(evidence) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("drift_diagnostics.evidence_paths: candidate_artifact_hash" in item for item in result.invalid)
+    assert any("drift_diagnostics.evidence_paths: sample_count" in item for item in result.invalid)
+    assert any("drift_diagnostics.evidence_paths: temperature" in item for item in result.invalid)
+    assert any("drift_diagnostics.evidence_paths: metrics.hidden_state_rms_drift" in item for item in result.invalid)
+
+
 def test_subspace_contract_rejects_holdout_overlap_claims(tmp_path: Path):
     config = GpuSuiteConfig(
         output_root=tmp_path / "runs",
@@ -1014,6 +1111,37 @@ def test_subspace_contract_rejects_holdout_overlap_claims(tmp_path: Path):
 
     assert not result.passed
     assert any("summary.screen_holdout_overlap" in item for item in result.invalid)
+    assert any("scientific_gate_contract.screen_holdout_overlap" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_bool_overlap_and_string_summary_numbers(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    summary = json.loads((contract.root / "summary.json").read_text())
+    summary["screen_holdout_overlap"] = False
+    summary["candidates_per_sec"] = "1.0"
+    summary["prompts_per_sec"] = "2.0"
+    summary["output_tokens_per_sec"] = "3.0"
+    summary["lazy_overhead_pct"] = "10.0"
+    (contract.root / "summary.json").write_text(json.dumps(summary) + "\n")
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    report["scientific_gate_contract"]["screen_holdout_overlap"] = False
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("summary.screen_holdout_overlap" in item for item in result.invalid)
+    assert any("summary.candidates_per_sec: not JSON number" in item for item in result.invalid)
+    assert any("summary.prompts_per_sec: not JSON number" in item for item in result.invalid)
+    assert any("summary.output_tokens_per_sec: not JSON number" in item for item in result.invalid)
+    assert any("summary.lazy_overhead_pct: not JSON number" in item for item in result.invalid)
     assert any("scientific_gate_contract.screen_holdout_overlap" in item for item in result.invalid)
 
 
@@ -1061,6 +1189,9 @@ def test_subspace_contract_rejects_scientific_gate_not_tied_to_artifacts(tmp_pat
     report["scientific_gate_contract"]["selection_rule_hash"] = "unknown"
     report["scientific_gate_contract"]["locked_K"] = 2
     report["scientific_gate_contract"]["holdout_tuned"] = True
+    report["scientific_gate_contract"].pop("compared_control_artifact_hashes")
+    report["scientific_gate_contract"].pop("tested_contrasts")
+    report["scientific_gate_contract"]["K_grid"] = []
     (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
 
     result = check_run(contract)
@@ -1070,6 +1201,9 @@ def test_subspace_contract_rejects_scientific_gate_not_tied_to_artifacts(tmp_pat
     assert any("locked_config_hash" in item for item in result.invalid)
     assert any("locked_K" in item for item in result.invalid)
     assert any("holdout_tuned" in item for item in result.invalid)
+    assert any("compared_control_artifact_hashes" in item for item in result.invalid)
+    assert any("tested_contrasts" in item for item in result.invalid)
+    assert any("K_grid" in item for item in result.invalid)
 
 
 def test_subspace_contract_rejects_holdout_scores_without_selector_provenance(tmp_path: Path):

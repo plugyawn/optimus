@@ -386,11 +386,13 @@ def _write_subspace_systems_out(root: Path, *, timing: bool = True, numeric_as_s
     (systems / "report.md").write_text("# Report\n")
     (systems / "systems_report.json").write_text(json.dumps(payload) + "\n")
     (systems / "subspace_systems.csv").write_text(
-        "source_run_dir,candidate_batch_size,population,target_preset,basis_rank,kernel,candidates_per_sec,prompts_per_sec,output_tokens_per_sec,lazy_overhead_pct,base_model_time_s,qx_time_s,lazy_delta_time_s,top_k_ensemble_cost_multiplier,screen_score,holdout_score,screen_to_holdout_drop,diversity_metrics,random_q_control,shuffled_q_control,antithetic_odd_even\n"
-        "run,4,128,qv,128,torch,2.2,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
-        "run,4,128,attn-qkvo,128,torch,2.0,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
-        "run,4,128,mlp,128,torch,1.8,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
-        "run,4,128,transformer-linears,128,torch,1.2,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "source_run_dir,benchmark_kind,candidate_batch_size,population,target_preset,basis_rank,kernel,candidates_per_sec,prompts_per_sec,output_tokens_per_sec,lazy_overhead_pct,base_model_time_s,qx_time_s,lazy_delta_time_s,top_k_ensemble_cost_multiplier,screen_score,holdout_score,screen_to_holdout_drop,diversity_metrics,random_q_control,shuffled_q_control,antithetic_odd_even\n"
+        "run,base_vllm,4,128,base,0,torch,3.0,2.0,3.0,0.0,1.0,0.0,0.0,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "run,lora_baseline,4,128,qv,8,torch,2.4,2.0,3.0,5.0,1.0,0.02,0.03,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "run,subspace,4,128,qv,128,torch,2.2,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "run,subspace,4,128,attn-qkvo,128,torch,2.0,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "run,subspace,4,128,mlp,128,torch,1.8,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "run,subspace,4,128,transformer-linears,128,torch,1.2,2.0,3.0,10.0,1.0,0.05,0.1,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
     )
     return systems
 
@@ -429,8 +431,8 @@ def test_subspace_release_check_rejects_invalid_source_report(tmp_path: Path):
 def test_subspace_release_check_rejects_incomplete_p128_speed_gate(tmp_path: Path):
     systems = _write_subspace_systems_out(tmp_path)
     (systems / "subspace_systems.csv").write_text(
-        "source_run_dir,candidate_batch_size,population,target_preset,basis_rank,kernel,candidates_per_sec,prompts_per_sec,output_tokens_per_sec,lazy_overhead_pct,base_model_time_s,qx_time_s,lazy_delta_time_s,top_k_ensemble_cost_multiplier,screen_score,holdout_score,screen_to_holdout_drop,diversity_metrics,random_q_control,shuffled_q_control,antithetic_odd_even\n"
-        "run,4,128,transformer-linears,128,torch,1.0,2.0,3.0,10.0,1.0,0.2,0.2,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+        "source_run_dir,benchmark_kind,candidate_batch_size,population,target_preset,basis_rank,kernel,candidates_per_sec,prompts_per_sec,output_tokens_per_sec,lazy_overhead_pct,base_model_time_s,qx_time_s,lazy_delta_time_s,top_k_ensemble_cost_multiplier,screen_score,holdout_score,screen_to_holdout_drop,diversity_metrics,random_q_control,shuffled_q_control,antithetic_odd_even\n"
+        "run,subspace,4,128,transformer-linears,128,torch,1.0,2.0,3.0,10.0,1.0,0.2,0.2,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
     )
 
     checks = systems_report_checks(systems, method="subspace")
@@ -438,6 +440,7 @@ def test_subspace_release_check_rejects_incomplete_p128_speed_gate(tmp_path: Pat
 
     assert not by_name["subspace_p128_speed_gate_enforced"].passed
     assert "missing target presets" in by_name["subspace_p128_speed_gate_enforced"].detail
+    assert "missing benchmark kinds" in by_name["subspace_p128_speed_gate_enforced"].detail
     assert "qx_plus_lazy_delta_overhead" in by_name["subspace_p128_speed_gate_enforced"].detail
 
 

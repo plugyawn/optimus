@@ -782,6 +782,7 @@ envelope is invalid.
   "prompt_contract_hash": "...",
   "screen_split_hash": "...",
   "holdout_split_hash": "...",
+  "basis_hash": "...",
   "target_preset": "transformer-linears",
   "explicit_targets": [],
   "layers": "all",
@@ -963,6 +964,13 @@ The scientific gate section also records
 `multiple_comparison_correction`, locked K/rank/radius/target/aggregation
 fields, `selection_split`, `holdout_tuned`, `screen_holdout_overlap`, and a
 numeric confidence interval so a gate result is not merely self-attested prose.
+It also records `K_grid`, `basis_rank_grid`, `radius_grid`,
+`compared_control_artifact_hashes`, and `tested_contrasts` so the locked
+selection and multiple-comparison correction can be audited after the run.
+`compared_control_artifact_hashes` contains immutable artifacts for the
+`random-orthonormal` and `shuffled-activation-svd` control families.
+`tested_contrasts` lists the exact basis/control/metric/artifact contrasts that
+entered the confidence interval.
 
 `drift_diagnostics` has a fixed v1 metric contract. The probe split is an
 immutable unlabeled prompt/token-row set identified by `probe_split_hash`, and
@@ -995,6 +1003,20 @@ candidate batch size, candidate shard id, GPU model, GPU count, memory
 allocated/reserved, base model time, `Qx` time, lazy delta time, scoring time,
 setup time, output tokens/sec, prompts/sec, candidates/sec, and per-GPU
 aggregation fields when applicable.
+
+Suite-level systems output also writes `subspace_systems.csv`. Required columns
+are `source_run_dir`, `benchmark_kind`, `candidate_batch_size`, `population`,
+`target_preset`, `basis_rank`, `kernel`, `candidates_per_sec`,
+`top_k_ensemble_cost_multiplier`, `screen_score`, `holdout_score`,
+`screen_to_holdout_drop`, `diversity_metrics`, `random_q_control`,
+`shuffled_q_control`, and `antithetic_odd_even`. The p128 speed gate requires
+rows with `benchmark_kind` values `base_vllm`, `lora_baseline`, and `subspace`.
+For `benchmark_kind=subspace`, the p128 rows must cover `qv`, `attn-qkvo`,
+`mlp`, and `transformer-linears`; the `transformer-linears` row must not be
+more than 2x slower than the matched target-band rows at the same rank and
+kernel. Suite reports include `source_report`, `source_run_dir`, and
+`timing_evidence_paths`; timing evidence must contain a synchronized timed
+region marker.
 
 Lazy top-K ensembles are evaluated by Optimus-native sample-level evaluation in
 v1. LightEval is the trusted lane for base models, single-candidate
