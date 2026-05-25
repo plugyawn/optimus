@@ -470,10 +470,15 @@ Deliverables:
   reported grids. `none_predeclared_single_config` is valid only for singleton
   grids; multi-value grids require an explicit correction or
   `separate_validation_split` with validation split and artifact hashes. That
-  validation split hash must differ from both screen and holdout hashes.
+  validation split hash must differ from both screen and holdout hashes, and
+  the validation-selection artifact contents must match the split hash and
+  selection rule in the gate contract.
 - Validate the reported grids match the observed K/rank/radius family in the
   hashed gate-family artifact, and that the artifact contains activation-SVD,
-  random-orthonormal, and shuffled-activation-SVD basis families.
+  random-orthonormal, and shuffled-activation-SVD basis families. Every
+  observed config in that family must be backed by a run-local config artifact
+  whose hash and contents match the observed K, rank, radius, target preset,
+  scale mode, aggregation, primary metric, and selection rule.
 - Validate `tested_contrasts` covers both `random-orthonormal` and
   `shuffled-activation-svd` controls on the locked primary metric, and that
   each contrast's run-local artifact hash is verified and its

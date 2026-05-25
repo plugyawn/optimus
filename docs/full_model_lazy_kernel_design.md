@@ -1007,7 +1007,11 @@ than one value, the report must either name an explicit correction
 That validation split must differ from both the screen and holdout split hashes.
 Holdout tuning remains invalid in all cases. The gate-family artifact lists the
 observed K/rank/radius family and the basis families included in the comparison.
-The validator rejects reported grids that do not match that observed family.
+Each observed config in that family records its own run-local `artifact_path` /
+`artifact_hash`, and the config artifact must match the observed K, rank,
+radius, target preset, scale mode, aggregation, primary metric, and selection
+rule. The validator rejects reported grids that do not match that observed
+family or observed configs that are not backed by matching artifacts.
 `compared_control_artifact_paths` and `compared_control_artifact_hashes` bind
 immutable artifacts for the `random-orthonormal` and `shuffled-activation-svd`
 control families.

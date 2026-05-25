@@ -801,6 +801,11 @@ def _check_scientific_gate_contract(
         )
         if validation_artifact is not None and validation_artifact.get("schema_version") != "validation_selection_artifact_v1":
             invalid.append(f"{rel}.scientific_gate_contract.validation_selection_artifact_path: invalid schema_version")
+        if validation_artifact is not None:
+            if validation_artifact.get("selection_split_hash") != section.get("validation_selection_split_hash"):
+                invalid.append(f"{rel}.scientific_gate_contract.validation_selection_artifact.selection_split_hash: does not match contract")
+            if validation_artifact.get("selection_rule_hash") != section.get("selection_rule_hash"):
+                invalid.append(f"{rel}.scientific_gate_contract.validation_selection_artifact.selection_rule_hash: does not match contract")
     gate_family_artifact = _read_hashed_json_artifact(
         invalid,
         rel,
@@ -853,6 +858,34 @@ def _check_scientific_gate_contract(
             )
             if not locked_seen:
                 invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs: locked config missing")
+            for index, config in enumerate(observed_configs, start=1):
+                if not isinstance(config, dict):
+                    invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs[{index}]: not object")
+                    continue
+                config_artifact = _read_hashed_json_artifact(
+                    invalid,
+                    rel,
+                    f"gate_family_artifact.observed_configs[{index}].artifact",
+                    root,
+                    config.get("artifact_path"),
+                    config.get("artifact_hash"),
+                )
+                if config_artifact is None:
+                    continue
+                if config_artifact.get("schema_version") != "scientific_gate_config_v1":
+                    invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs[{index}].artifact_path: invalid schema_version")
+                for field in ("basis_kind", "K", "basis_rank", "target_preset", "scale_mode", "aggregation"):
+                    if config_artifact.get(field) != config.get(field):
+                        invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs[{index}].artifact.{field}: does not match observed config")
+                if _is_json_number(config_artifact.get("radius")) and _is_json_number(config.get("radius")):
+                    if abs(float(config_artifact["radius"]) - float(config["radius"])) > 1e-12:
+                        invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs[{index}].artifact.radius: does not match observed config")
+                else:
+                    invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs[{index}].artifact.radius: does not match observed config")
+                if config_artifact.get("primary_metric") != section.get("primary_metric"):
+                    invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs[{index}].artifact.primary_metric: does not match contract")
+                if config_artifact.get("selection_rule_hash") != section.get("selection_rule_hash"):
+                    invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs[{index}].artifact.selection_rule_hash: does not match contract")
     if section.get("selection_split") != "screen":
         invalid.append(f"{rel}.scientific_gate_contract.selection_split: expected 'screen'")
     if section.get("holdout_tuned") is not False:
