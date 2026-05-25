@@ -212,6 +212,37 @@ def public_api_surface_checks(root: Path) -> list[ReleaseCheck]:
     ]
 
 
+def source_of_truth_contract_checks(root: Path) -> list[ReleaseCheck]:
+    design = root / "docs" / "full_model_lazy_kernel_design.md"
+    roadmap = root / "docs" / "subspace_implementation_roadmap.md"
+    subspace_init = root / "optimus" / "subspace" / "__init__.py"
+    problems: list[str] = []
+    design_text = design.read_text() if design.exists() else ""
+    roadmap_text = roadmap.read_text() if roadmap.exists() else ""
+    subspace_text = subspace_init.read_text() if subspace_init.exists() else ""
+    if "ActivationSiteSpec" in design_text or "ActivationSiteSpec" in roadmap_text:
+        problems.append("ActivationSiteSpec")
+    if "class ActivationSite" not in subspace_text or "`ActivationSite`" not in design_text or "`ActivationSite`" not in roadmap_text:
+        problems.append("ActivationSite")
+    if "subspace_state_payload_v1" not in design_text or "subspace_state_payload_v1" not in roadmap_text:
+        problems.append("subspace_state_payload_v1")
+    if re.search(r"subspace_state\.pt` read/write with schema\s+`subspace_state_v1`", roadmap_text):
+        problems.append("subspace_state.pt/subspace_state_v1")
+    if "`--targets`" in design_text:
+        problems.append("design_doc_--targets")
+    if "disabled/candidate-keyed" in roadmap_text:
+        problems.append("disabled/candidate-keyed")
+    if "child artifact" in design_text or "parent summary hash" in roadmap_text:
+        problems.append("child-artifact-provenance")
+    return [
+        ReleaseCheck(
+            "subspace_source_of_truth_identifiers_consistent",
+            not problems,
+            "source-of-truth identifiers consistent" if not problems else f"problems={problems!r}",
+        )
+    ]
+
+
 def _module_all(path: Path) -> list[str]:
     if not path.exists():
         return []
@@ -846,6 +877,7 @@ def build_release_checks(
     checks.extend(pyproject_checks(root))
     checks.extend(public_doc_checks(root))
     checks.extend(public_api_surface_checks(root))
+    checks.extend(source_of_truth_contract_checks(root))
     checks.extend(run_plan_surface_checks(root))
     checks.extend(package_code_checks(root))
     checks.extend(repo_structure_checks(root))

@@ -504,6 +504,40 @@ def _timing_evidence_has_sync_marker(path: Path) -> bool:
     return False
 
 
+def _evidence_has_substantive_payload(payload: dict) -> bool:
+    for key in ("checks", "metrics", "artifacts"):
+        value = payload.get(key)
+        if isinstance(value, dict) and value:
+            return True
+        if isinstance(value, list) and value:
+            return True
+    return False
+
+
+def _check_validation_evidence_payload(invalid: list[str], rel: str, section: str, evidence: str, payload: object) -> None:
+    if not isinstance(payload, dict):
+        invalid.append(f"{rel}.{section}.evidence_paths: evidence is not an object {evidence!r}")
+        return
+    if payload.get("evidence_schema_version") != "validation_evidence_v1":
+        invalid.append(f"{rel}.{section}.evidence_paths: evidence_schema_version missing or invalid {evidence!r}")
+    if payload.get("section") != section:
+        invalid.append(f"{rel}.{section}.evidence_paths: evidence section mismatch {evidence!r}")
+    if payload.get("status") != "pass":
+        invalid.append(f"{rel}.{section}.evidence_paths: evidence status is not pass {evidence!r}")
+    if not isinstance(payload.get("generated_at"), str) or not payload.get("generated_at"):
+        invalid.append(f"{rel}.{section}.evidence_paths: generated_at missing {evidence!r}")
+    if not _evidence_has_substantive_payload(payload):
+        invalid.append(f"{rel}.{section}.evidence_paths: no substantive evidence payload {evidence!r}")
+
+
+ENGINEERING_ADVANTAGE_THRESHOLDS = {
+    "logit_kl_mean_reduction_pct": 25.0,
+    "hidden_state_rms_drift_reduction_pct": 25.0,
+    "lazy_overhead_reduction_pct": 20.0,
+    "captured_energy_gain_pct_points": 10.0,
+}
+
+
 def _check_subspace_state_summary(invalid: list[str], rel: str, payload: dict) -> None:
     if payload.get("basis_kind") not in {"activation-svd", "random-orthonormal", "shuffled-activation-svd"}:
         invalid.append(f"{rel}.basis_kind: invalid")
@@ -703,8 +737,23 @@ def _check_scientific_gate_contract(
                 invalid.append(f"{rel}.scientific_gate_contract.engineering_exception: missing accepted label")
             else:
                 advantage = exception.get("operational_advantage")
-                if not isinstance(advantage, dict) or not advantage.get("metric") or not _is_json_number(advantage.get("delta")):
-                    invalid.append(f"{rel}.scientific_gate_contract.engineering_exception.operational_advantage: missing metric/delta")
+                if not isinstance(advantage, dict):
+                    invalid.append(f"{rel}.scientific_gate_contract.engineering_exception.operational_advantage: missing")
+                else:
+                    metric = advantage.get("metric")
+                    delta = advantage.get("delta")
+                    threshold = ENGINEERING_ADVANTAGE_THRESHOLDS.get(metric)
+                    if threshold is None:
+                        invalid.append(f"{rel}.scientific_gate_contract.engineering_exception.operational_advantage.metric: invalid {metric!r}")
+                    if not _is_json_number(delta):
+                        invalid.append(f"{rel}.scientific_gate_contract.engineering_exception.operational_advantage.delta: not JSON number")
+                    elif threshold is not None and float(delta) < threshold:
+                        invalid.append(
+                            f"{rel}.scientific_gate_contract.engineering_exception.operational_advantage.delta: {float(delta):.3f} below {threshold:.3f}"
+                        )
+                    for field in ("probe_split_hash", "reference_artifact_hash", "aggregation", "direction"):
+                        if not isinstance(advantage.get(field), str) or not advantage.get(field):
+                            invalid.append(f"{rel}.scientific_gate_contract.engineering_exception.operational_advantage.{field}: empty")
 
 
 def _candidate_identity_projection(row: dict) -> dict:
@@ -947,8 +996,7 @@ def check_run(contract: RunContract) -> RunCheck:
                         except json.JSONDecodeError:
                             invalid.append(f"{rel}.{section}.evidence_paths: evidence is not JSON {evidence!r}")
                             continue
-                        if not isinstance(evidence_payload, dict) or evidence_payload.get("section") != section or evidence_payload.get("status") != "pass":
-                            invalid.append(f"{rel}.{section}.evidence_paths: evidence does not prove section pass {evidence!r}")
+                        _check_validation_evidence_payload(invalid, rel, section, evidence, evidence_payload)
                 failures = value.get("failures")
                 if not isinstance(failures, list):
                     invalid.append(f"{rel}.{section}.failures: not list")

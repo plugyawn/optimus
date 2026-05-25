@@ -92,17 +92,24 @@ include = {package_include}
     docs.mkdir()
     for name in [
         "api.md",
-        "full_model_lazy_kernel_design.md",
         "gpu_suite.md",
         "index.md",
         "optimus_design.md",
         "evaluation.md",
         "prime_gpu_runbook.md",
         "release_checklist.md",
-        "subspace_implementation_roadmap.md",
     ]:
         (docs / name).write_text(f"# {name}\n\nUse `optimus` commands.\n")
+    (docs / "full_model_lazy_kernel_design.md").write_text(
+        "# Design\n\n`ActivationSite` uses `subspace_state_payload_v1` and v1 public target selection uses `--target-preset`.\n"
+    )
+    (docs / "subspace_implementation_roadmap.md").write_text(
+        "# Roadmap\n\nPhase 1 adds `ActivationSite` and writes `subspace_state.pt` with payload schema `subspace_state_payload_v1`.\n"
+    )
     (root / "README.md").write_text("# Optimus\n\nUse `optimus` commands.\n")
+    subspace = package / "subspace"
+    subspace.mkdir()
+    (subspace / "__init__.py").write_text("class ActivationSite:\n    pass\n")
     systems = root / "results" / "report" / "optimus_systems"
     systems.mkdir(parents=True)
     (systems / "report.md").write_text("# Report\n\nScreen-selected heldout transfer is checked.\n")
@@ -258,6 +265,33 @@ def test_release_check_scans_source_of_truth_docs_for_legacy_public_surface(tmp_
     assert not by_name["public_docs_do_not_promote_legacy_subspace_surface"].passed
     assert "full_model_lazy_kernel_design.md" in by_name["public_docs_do_not_promote_legacy_subspace_surface"].detail
     assert "subspace_implementation_roadmap.md" in by_name["public_docs_do_not_promote_legacy_subspace_surface"].detail
+
+
+def test_release_check_locks_subspace_source_of_truth_identifiers(tmp_path: Path):
+    gpu, systems = write_minimal_release_tree(tmp_path)
+    (tmp_path / "docs" / "full_model_lazy_kernel_design.md").write_text(
+        "Every site is an `ActivationSiteSpec`; extend through `--targets`.\n"
+    )
+    (tmp_path / "docs" / "subspace_implementation_roadmap.md").write_text(
+        "Implement `subspace_state.pt` read/write with schema `subspace_state_v1`; use disabled/candidate-keyed cache policy.\n"
+    )
+
+    checks = build_release_checks(
+        root=tmp_path,
+        systems_out=systems,
+        gpu_root=gpu,
+        populations=(1024, 4096),
+        bench_adapters=(8,),
+        run_halving=False,
+        method="lora",
+        remote="https://github.com/plugyawn/optimus.git",
+    )
+    by_name = {check.name: check for check in checks}
+
+    assert not by_name["subspace_source_of_truth_identifiers_consistent"].passed
+    assert "ActivationSiteSpec" in by_name["subspace_source_of_truth_identifiers_consistent"].detail
+    assert "design_doc_--targets" in by_name["subspace_source_of_truth_identifiers_consistent"].detail
+    assert "subspace_state.pt/subspace_state_v1" in by_name["subspace_source_of_truth_identifiers_consistent"].detail
 
 
 def test_release_check_rejects_legacy_package_level_exports(tmp_path: Path):

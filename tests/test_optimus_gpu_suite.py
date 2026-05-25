@@ -520,7 +520,19 @@ def write_subspace_contract_outputs(contract) -> None:
     evidence_dir = contract.root / "evidence"
     evidence_dir.mkdir(exist_ok=True)
     for section in validation_sections:
-        (evidence_dir / f"{section}.json").write_text(json.dumps({"section": section, "status": "pass"}) + "\n")
+        (evidence_dir / f"{section}.json").write_text(
+            json.dumps(
+                {
+                    "evidence_schema_version": "validation_evidence_v1",
+                    "section": section,
+                    "status": "pass",
+                    "generated_at": "2026-05-25T00:00:00Z",
+                    "command": ["pytest", section],
+                    "checks": [{"name": f"{section}_check", "passed": True}],
+                }
+            )
+            + "\n"
+        )
     (contract.root / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1, "cuda_synchronized": True}) + "\n")
 
 
@@ -964,6 +976,24 @@ def test_subspace_contract_rejects_self_attesting_validation_evidence(tmp_path: 
     assert any("math_tests.evidence_paths: self-attesting" in item for item in result.invalid)
 
 
+def test_subspace_contract_rejects_hollow_validation_evidence(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    (contract.root / "evidence" / "math_tests.json").write_text(json.dumps({"section": "math_tests", "status": "pass"}) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("math_tests.evidence_paths: evidence_schema_version" in item for item in result.invalid)
+    assert any("math_tests.evidence_paths: no substantive evidence payload" in item for item in result.invalid)
+
+
 def test_subspace_contract_rejects_holdout_overlap_claims(tmp_path: Path):
     config = GpuSuiteConfig(
         output_root=tmp_path / "runs",
@@ -985,6 +1015,36 @@ def test_subspace_contract_rejects_holdout_overlap_claims(tmp_path: Path):
     assert not result.passed
     assert any("summary.screen_holdout_overlap" in item for item in result.invalid)
     assert any("scientific_gate_contract.screen_holdout_overlap" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_weak_engineering_exception(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    gate = report["scientific_gate_contract"]
+    gate["gate_type"] = "engineering-proceed-no-scientific-win"
+    gate["confidence_interval"]["lower"] = -0.01
+    gate["engineering_exception"] = {
+        "accepted_label": "engineering_proceed_no_scientific_win",
+        "operational_advantage": {
+            "metric": "logit_kl_mean_reduction_pct",
+            "delta": 3.0,
+        },
+    }
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("operational_advantage.delta" in item for item in result.invalid)
+    assert any("operational_advantage.probe_split_hash" in item for item in result.invalid)
+    assert any("operational_advantage.reference_artifact_hash" in item for item in result.invalid)
 
 
 def test_subspace_contract_rejects_scientific_gate_not_tied_to_artifacts(tmp_path: Path):

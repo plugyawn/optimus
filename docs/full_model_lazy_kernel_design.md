@@ -91,19 +91,31 @@ target random fields per layer. A target module must not own a duplicate basis
 when it reads from an existing activation site unless the run explicitly opts
 into a non-default basis family.
 
-Every activation site must be represented by an `ActivationSiteSpec` before it
-can be used by a backend. Required fields are:
+Every activation site must be represented by the public `ActivationSite` schema
+before it can be used by a backend. Required fields are:
 
 - `site_id`;
-- architecture family, for example `qwen3_text` or `llama_decoder`;
-- layer index and owning block path;
-- exact read tensor path and hook point;
-- pre/post RMSNorm or LayerNorm location;
-- tensor shape convention `[tokens, hidden]` after any sequence flattening;
-- runtime dtype and accumulation dtype;
-- tensor-parallel sharding policy;
-- target modules that read the site;
-- calibration prompt ids hash and decode/config hash.
+- `architecture_family`, for example `qwen3_text` or `llama_decoder`;
+- `layer_index` and `block_path`;
+- `read_tensor_path` and `hook_point`;
+- `norm_position`;
+- `shape_convention`, with `[tokens, hidden]` after sequence flattening in v1;
+- `runtime_dtype` and `accumulation_dtype`;
+- `tensor_parallel_sharding_policy`;
+- `target_module_ids`;
+- `calibration_prompt_ids_hash` and `calibration_decode_config_hash`;
+- `basis_control_seed`;
+- `transductive`;
+- `input_dim`;
+- `basis_kind`;
+- `requested_rank` and `effective_rank`;
+- `basis_tensor_key` and `basis_tensor_sha256`;
+- `singular_values`;
+- `captured_energy`, `prefill_captured_energy`, and
+  `decode_captured_energy`;
+- `H_s` and `A_s`;
+- `orthonormality_error` and `gram_error`;
+- `num_calibration_tokens`.
 
 The v1 Qwen/Llama mapping is: `attn_in` is the normalized attention input read
 by q/k/v projections, `o_in` is the attention output-projection input after
@@ -115,8 +127,10 @@ same semantics needs an explicit mapping entry and tests before it can use the
 
 The default full transformer preset is `transformer-linears`. It means selected
 dense transformer block linear maps. It excludes embeddings, LM head, layer
-norms, routers, and architecture-specific nonstandard modules unless explicitly
-added through `--targets`.
+norms, routers, and architecture-specific nonstandard modules. V1 public target
+selection is `--target-preset` plus `--layers` only. The artifact field
+`explicit_targets` is reserved for internal metadata and future target-manifest
+work; it is not a public ad hoc target-selection flag in v1.
 
 ## Projection Contract
 
@@ -549,11 +563,12 @@ paired bootstrap 95% confidence interval lower bound above zero versus both
 random-orthonormal and shuffled-SVD controls on the locked primary metric. A
 statistically indistinguishable tie may authorize an engineering proceed, but it
 must be labeled `engineering_proceed_no_scientific_win` and requires one
-predeclared operational advantage at equal quality: at least 25% lower
-logit-KL/drift, at least 20% lower lazy overhead, or at least 10 percentage
-points higher captured activation energy. Secondary metrics are reported for
-diagnosis only: improvement density, best single-candidate holdout score,
-diversity-adjusted ensemble gain, and screen-to-holdout drop.
+predeclared operational advantage at equal quality using the metric contract in
+`drift_diagnostics`: at least 25% lower `logit_kl_mean`, at least 25% lower
+`hidden_state_rms_drift`, at least 20% lower lazy overhead, or at least 10
+percentage points higher captured activation energy. Secondary metrics are
+reported for diagnosis only: improvement density, best single-candidate holdout
+score, diversity-adjusted ensemble gain, and screen-to-holdout drop.
 
 If holdout is used to choose rank, radius, K, target preset, or basis family,
 that split becomes validation, not final test evidence. Final claims then need a
@@ -740,22 +755,33 @@ A run writes:
 | `systems_report.json` | Throughput and memory report. |
 | `exports/` | Optional single-winner or distillation artifacts only. |
 
-All JSON artifacts include `schema_version`, `created_at`, `optimus_version`,
-`git_commit`, `git_dirty`, `command`, `environment`, `model_id_or_path`,
-`model_revision`, `tokenizer_hash`, `task_config_hash`, `decode_config_hash`,
-`prompt_contract_hash`, `screen_split_hash`, and `holdout_split_hash` unless the
-artifact is explicitly marked as a child artifact that references `summary.json`
-by hash.
+All JSON artifacts include the provenance envelope directly: `schema_version`,
+`created_at`, `optimus_version`, `git_commit`, `git_dirty`, `command`,
+`environment`, `model_id_or_path`, `model_revision`, `tokenizer_hash`,
+`task_config_hash`, `decode_config_hash`, `prompt_contract_hash`,
+`screen_split_hash`, and `holdout_split_hash`. V1 does not support inherited
+provenance through parent-summary references; a JSON artifact that omits this
+envelope is invalid.
 
 `subspace_state_summary.json` required fields:
 
 ```json
 {
   "schema_version": "subspace_state_v1",
+  "created_at": "2026-05-25T00:00:00Z",
+  "optimus_version": "0.1.0",
+  "git_commit": "...",
+  "git_dirty": false,
+  "command": ["optimus", "search", "..."],
+  "environment": {"python": "...", "cuda": "..."},
   "model_id_or_path": "...",
   "model_revision": "...",
   "tokenizer_hash": "...",
+  "task_config_hash": "...",
+  "decode_config_hash": "...",
   "prompt_contract_hash": "...",
+  "screen_split_hash": "...",
+  "holdout_split_hash": "...",
   "target_preset": "transformer-linears",
   "explicit_targets": [],
   "layers": "all",
@@ -766,7 +792,27 @@ by hash.
   "activation_sites": [
     {
       "site_id": "layer_17.attn_in",
+      "architecture_family": "qwen3_text",
+      "layer_index": 17,
+      "block_path": "model.layers.17",
+      "read_tensor_path": "model.layers.17.input_layernorm.output",
+      "hook_point": "forward_output",
+      "norm_position": "post_input_norm",
+      "shape_convention": "[tokens, hidden]",
+      "runtime_dtype": "bf16",
+      "accumulation_dtype": "fp32",
+      "tensor_parallel_sharding_policy": "replicated",
+      "target_module_ids": [
+        "layer_17.self_attn.q_proj",
+        "layer_17.self_attn.k_proj",
+        "layer_17.self_attn.v_proj"
+      ],
+      "calibration_prompt_ids_hash": "...",
+      "calibration_decode_config_hash": "...",
+      "basis_control_seed": 1234,
+      "transductive": false,
       "input_dim": 4096,
+      "basis_kind": "activation-svd",
       "requested_rank": 128,
       "effective_rank": 128,
       "basis_tensor_key": "...",
@@ -800,7 +846,7 @@ lands, validators require a loadable payload with schema
 `basis_tensor_sha256`. They also recompute the file digest and compare it to
 `summary.json.subspace_state_hash`.
 
-`summary.json` required scale and budget fields:
+`summary.json` required fields:
 
 ```json
 {
@@ -814,6 +860,15 @@ lands, validators require a loadable payload with schema
   "git_dirty": false,
   "command": ["optimus", "search", "..."],
   "environment": {"python": "...", "cuda": "..."},
+  "model_id_or_path": "Qwen/Qwen3-4B",
+  "model_revision": "...",
+  "tokenizer_hash": "...",
+  "task_config_hash": "...",
+  "prompt_contract_hash": "...",
+  "screen_split_hash": "...",
+  "holdout_split_hash": "...",
+  "screen_holdout_overlap": 0,
+  "population": 1024,
   "scale_mode": "relative-output-rms",
   "rho_grid": [0.002, 0.005, 0.01, 0.02],
   "sigma_w_grid": null,
@@ -839,9 +894,17 @@ lands, validators require a loadable payload with schema
   "sample_set_hash": "...",
   "prompt_scoring_config_hash": "...",
   "decode_config_hash": "...",
-  "kernel": "torch"
+  "kernel": "torch",
+  "candidates_per_sec": 12.3,
+  "prompts_per_sec": 45.6,
+  "output_tokens_per_sec": 789.0,
+  "lazy_overhead_pct": 0.18
 }
 ```
+
+`screen_holdout_overlap` is a required integer and must be `0` for strict
+subspace validation. Throughput fields in `summary.json` mirror measured
+systems evidence; they must be JSON numbers, not string-coercible values.
 
 `candidates.jsonl` rows contain the complete `SubspaceCandidate` identity:
 `candidate_id`, `direction_seed`, `sign`, `basis_hash`, `target_set_hash`,
@@ -875,11 +938,57 @@ machine-readable failure list. A completed run passes validation only when every
 required section has `status: "pass"`, nonempty evidence paths that exist in the
 run directory, and an empty failure list. Evidence paths must point to
 section-specific JSON evidence, not back to `summary.json` or
-`validation_report.json`. The scientific gate section also records
+`validation_report.json`.
+
+Each evidence file must use this minimal schema:
+
+```json
+{
+  "evidence_schema_version": "validation_evidence_v1",
+  "section": "math_tests",
+  "status": "pass",
+  "generated_at": "2026-05-25T00:00:00Z",
+  "command": ["python", "-m", "pytest", "..."],
+  "checks": [{"name": "projection_covariance", "passed": true}],
+  "metrics": {"max_error": 0.00001},
+  "artifacts": ["math_projection_covariance.json"]
+}
+```
+
+At least one of `checks`, `metrics`, or `artifacts` must be nonempty. A bare
+`{"section": "...", "status": "pass"}` marker is invalid.
+
+The scientific gate section also records
 `locked_config_hash`, `selection_rule_hash`, `primary_metric`,
 `multiple_comparison_correction`, locked K/rank/radius/target/aggregation
 fields, `selection_split`, `holdout_tuned`, `screen_holdout_overlap`, and a
 numeric confidence interval so a gate result is not merely self-attested prose.
+
+`drift_diagnostics` has a fixed v1 metric contract. The probe split is an
+immutable unlabeled prompt/token-row set identified by `probe_split_hash`, and
+the reference output is the unperturbed base model under the same model
+revision, tokenizer, decode config, dtype policy, and target preset. The
+required logit statistic is `logit_kl_mean`: mean token-row
+`KL(softmax(base_logits / T) || softmax(candidate_logits / T))` with
+temperature `T=1.0` unless the evidence artifact records another value. The
+required activation statistic is `hidden_state_rms_drift`: mean over reported
+probe rows and sites of `||h_candidate - h_base||_2 / max(||h_base||_2, eps)`,
+with `eps` recorded in the evidence artifact. Evidence must record
+`probe_split_hash`, `reference_artifact_hash`, `candidate_artifact_hash`,
+aggregation rule, temperature/epsilon where applicable, and sample count.
+
+An `engineering_proceed_no_scientific_win` gate may cite only one of these
+operational-advantage metrics:
+
+| metric | required direction | minimum delta |
+| --- | --- | --- |
+| `logit_kl_mean_reduction_pct` | lower than best equal-quality control | `25.0` |
+| `hidden_state_rms_drift_reduction_pct` | lower than best equal-quality control | `25.0` |
+| `lazy_overhead_reduction_pct` | lower synchronized overhead | `20.0` |
+| `captured_energy_gain_pct_points` | higher captured energy | `10.0` |
+
+The operational-advantage record stores `metric`, `delta`, `direction`,
+`probe_split_hash`, `reference_artifact_hash`, and `aggregation`.
 
 `systems_report.json` records warmup policy, CUDA synchronization policy,
 candidate batch size, candidate shard id, GPU model, GPU count, memory

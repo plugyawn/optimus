@@ -42,6 +42,17 @@ class ActivationSite:
     basis_kind: BasisKind
     requested_rank: int
     effective_rank: int
+    basis_tensor_key: str
+    basis_tensor_sha256: str
+    singular_values: tuple[float, ...]
+    captured_energy: float
+    prefill_captured_energy: float | None
+    decode_captured_energy: float | None
+    H_s: float
+    A_s: float
+    orthonormality_error: float
+    gram_error: float
+    num_calibration_tokens: int
 
 
 @dataclass(frozen=True)

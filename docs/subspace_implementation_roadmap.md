@@ -44,7 +44,7 @@ Current saved state, 2026-05-25:
   5. run the reference smoke gate against activation-SVD and mandatory random
      controls;
   6. integrate the vLLM eager wrapper with explicit row-candidate routing and
-     disabled/candidate-keyed cache policy;
+     `disabled-for-search` cache policy;
   7. run the production scientific gate;
   8. run the p128 speed/search gate before p1024;
   9. harden top-K lazy ensemble serving;
@@ -67,9 +67,8 @@ start basis capture, vLLM hooks, lazy kernels, or optimized kernels.
      version, git commit/dirty state, command, environment, model revision,
      tokenizer hash, task config hash, prompt contract hash, screen split hash,
      holdout split hash, and decode config hash.
-   - Artifacts that inherit provenance only through a parent summary hash must
-     declare that parent explicitly; otherwise they must include the envelope
-     directly.
+   - V1 JSON artifacts must include the provenance envelope directly. Inherited
+     provenance through parent-summary references is not supported.
    - `schema_version` values must match the exact versioned schema ids. Unknown
      schema strings are invalid, not forward-compatible by default.
 2. Scientific gate metadata:
@@ -271,11 +270,10 @@ Do not start Phase 1 until every item below is true:
   as subspace artifacts.
 - Systems reporting requires measured timing evidence and preserves target
   preset, rank, population, kernel, and conservative throughput evidence.
-- p128 speed evidence includes synchronized timing markers, enforces the
-  `Qx + lazy_delta <= 25%` hot-model overhead threshold, and preserves
-  `qv`, `attn-qkvo`, `mlp`, and `transformer-linears` target-band comparisons.
 - Scientific gate logic distinguishes smoke non-inferiority, production
   positive acceptance, and explicitly labeled engineering proceed.
+- Phase 6 p128 speed requirements are documented, but not treated as a
+  prerequisite to start Phase 1 runtime implementation.
 - Five independent review axes have passed after the final Phase 0 changes.
 
 ## Phase 0: Stop-The-Line Legacy Surface Cleanup
@@ -449,8 +447,16 @@ Deliverables:
   - scorer version;
   - prompt/sample-set hashes;
   - decode config hash.
+- Validate `summary.json` includes `screen_holdout_overlap`, `population`,
+  `candidates_per_sec`, `prompts_per_sec`, `output_tokens_per_sec`, and
+  `lazy_overhead_pct`; strict subspace validation requires
+  `screen_holdout_overlap == 0`.
 - Validate `top_k_ensemble.json` contains full candidate identities, not only
   candidate ids.
+- Validate every `validation_report.json.evidence_paths` entry points to a
+  section-specific `validation_evidence_v1` JSON object with `section`,
+  `status`, `generated_at`, and at least one nonempty `checks`, `metrics`, or
+  `artifacts` payload. Bare pass markers are invalid.
 - Add `gaussian_hash_v1` golden-vector tests before any random-field backend is
   accepted.
 
@@ -480,10 +486,17 @@ Deliverables:
   - `CandidateRandomField`;
   - `SubspaceCandidate`;
   - `SubspaceEnsemble`.
-- Implement `subspace_state.pt` read/write with schema
+- Canonical activation-site type name is `ActivationSite`; do not introduce
+  a second public activation-site identifier with a different suffix.
+- Implement `subspace_state_summary.json` with JSON schema
   `subspace_state_v1`.
+- Implement `subspace_state.pt` read/write with tensor payload schema
+  `subspace_state_payload_v1`.
 - Implement target presets `qv`, `attn-qkvo`, `mlp`, and
   `transformer-linears`.
+- V1 public target selection is `--target-preset` plus `--layers` only.
+  `explicit_targets` remains artifact metadata for internal/future
+  target-manifest work, not a public ad hoc target-selection flag.
 - Implement activation-site sharing:
   - q/k/v share `attn_in`;
   - o uses `o_in`;
@@ -718,11 +731,17 @@ Acceptance gate:
   engineering review accepts the label
   `engineering_proceed_no_scientific_win` and shows at least one operational
   advantage at equal quality:
-  - at least 25% lower logit-KL/drift;
-  - at least 20% lower lazy overhead;
-  - at least 10 percentage points higher captured activation energy.
-- All secondary metrics, logit-KL/drift diagnostics, and screen-to-holdout drops
-  are reported but do not replace the primary gate.
+  - `logit_kl_mean_reduction_pct >= 25.0`;
+  - `hidden_state_rms_drift_reduction_pct >= 25.0`;
+  - `lazy_overhead_reduction_pct >= 20.0`;
+  - `captured_energy_gain_pct_points >= 10.0`.
+- Drift diagnostics use the design-doc metric contract: fixed probe split,
+  base-model reference artifact, `logit_kl_mean` over token-row logits, and
+  `hidden_state_rms_drift` over reported activation sites. Evidence records
+  `probe_split_hash`, `reference_artifact_hash`, `candidate_artifact_hash`,
+  aggregation rule, and sample count.
+- All secondary metrics, drift diagnostics, and screen-to-holdout drops are
+  reported but do not replace the primary gate.
 - Holdout-tuned rank/radius/K/target choices are labeled validation and require
   a fresh final test split for claims.
 
