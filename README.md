@@ -13,8 +13,9 @@ The supported public interface is the `optimus` package and CLI.
 - Backend-neutral perturbation panels with explicit `dense`, `lora`, and
   `subspace` methods.
 - High-throughput GPU screening through vLLM: adapter serving for LoRA and the
-  planned production substrate for subspace search. Transformers remains the
-  trusted reference path for dense, LoRA, and subspace checks.
+  planned production substrate for subspace search. Transformers is the trusted
+  reference path for dense and LoRA checks today; the subspace reference
+  evaluator is a planned Phase 3 route and fails closed until it lands.
 - Population scaling studies for P1024/P4096 zeroth-order search.
 - Systems plots: candidate/sec, prompts/sec, token throughput, backend/method
   throughput, best-of-N scaling, and quality scaling. Staged-search reporting
@@ -163,7 +164,8 @@ The vLLM subspace route fails closed until the backend reaches the Phase 5
 acceptance gate in `docs/subspace_implementation_roadmap.md`. When enabled,
 subspace search stores the activation basis in `subspace_state.pt`, samples
 per-seed output noise, and applies `G Q x` inside the vLLM execution path
-without adapter swapping.
+without adapter swapping. Until that backend lands, this command shape is a
+planned fail-closed route rather than supported runtime behavior.
 
 Run a backend parity gate before trusting vLLM as selector of record:
 

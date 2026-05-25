@@ -56,8 +56,8 @@ class PerturbationSpec:
     """Stable identity for a zeroth-order perturbation candidate.
 
     `method` states whether the perturbation is a dense update, a low-rank
-    adapter update, or an implicit activation-subspace update. Four-field
-    manifest keys are still accepted for reading older local run artifacts.
+    adapter update, or an implicit activation-subspace update. Public manifest
+    keys are method-qualified; legacy four-field keys are rejected.
     """
 
     family: str
@@ -116,10 +116,6 @@ class PerturbationSpec:
             parts.append("t" + ",".join(self.targets))
         return ":".join(parts)
 
-    @property
-    def legacy_key(self) -> str:
-        return f"{self.family}:seed{self.seed}:s{self.sigma:g}:sign{self.sign}"
-
     def with_method(self, method: str) -> "PerturbationSpec":
         return PerturbationSpec(
             self.family,
@@ -134,7 +130,6 @@ class PerturbationSpec:
     def to_record(self) -> dict[str, Any]:
         return {
             "key": self.key,
-            "legacy_key": self.legacy_key,
             "method": self.method,
             "family": self.family,
             "seed": self.seed,
@@ -152,10 +147,11 @@ class PerturbationSpec:
         sigma = record.get("sigma")
         sign = record.get("sign", 1)
         if family is None or seed is None or sigma is None:
-            key = record.get("key") or record.get("candidate") or record.get("legacy_key")
+            key = record.get("key") or record.get("candidate")
             if key is None:
                 raise ValueError(f"missing perturbation identity fields: {record!r}")
-            parsed = parse_perturbation_key(str(key), default_method=method)
+            else:
+                parsed = parse_perturbation_key(str(key))
             rank = record.get("rank")
             targets = record.get("targets")
             if rank in {"", None} and targets is None:
@@ -209,7 +205,7 @@ class PerturbationMaterializer(Protocol):
         ...
 
 
-def parse_perturbation_key(key: str, *, default_method: str = "lora") -> PerturbationSpec:
+def parse_perturbation_key(key: str) -> PerturbationSpec:
     parts = key.split(":")
     rank = None
     targets: tuple[str, ...] = ()
@@ -222,12 +218,9 @@ def parse_perturbation_key(key: str, *, default_method: str = "lora") -> Perturb
                 targets = tuple(target for target in item.removeprefix("t").split(",") if target)
             else:
                 raise ValueError(f"invalid perturbation key component {item!r}: {key}")
-    elif len(parts) == 4:
-        method = default_method
-        family, seed_text, sigma_text, sign_text = parts
-        if family == "dense_gaussian":
-            method = "dense"
     else:
+        if len(parts) == 4:
+            raise ValueError("legacy perturbation keys are unsupported; use method-qualified keys")
         raise ValueError(f"invalid perturbation key: {key}")
     return PerturbationSpec(
         family,
@@ -283,7 +276,7 @@ def read_perturbation_file(path: str | Path, *, default_method: str = "lora") ->
                 if isinstance(item, Mapping):
                     perturbations.append(PerturbationSpec.from_record(item, default_method=default_method))
                 else:
-                    perturbations.append(parse_perturbation_key(str(item), default_method=default_method))
+                    perturbations.append(parse_perturbation_key(str(item)))
             except ValueError as exc:
                 raise ValueError(f"{path}:{line_no}: {exc}") from exc
     if not perturbations:

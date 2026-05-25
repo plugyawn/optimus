@@ -46,11 +46,11 @@ def make_run(root: Path, name: str, scores: list[float], *, summary_extra: dict 
 
 
 class BackendParityGateTests(unittest.TestCase):
-    def test_candidate_join_key_matches_legacy_and_method_qualified_keys(self):
-        legacy = "isotropic:seed123:s0.0075:sign-1"
-        qualified = "lora:isotropic:seed123:s0.0075:sign-1:r8:tq_proj,v_proj"
+    def test_candidate_join_key_ignores_method_qualified_materialization_details(self):
+        qv = "lora:isotropic:seed123:s0.0075:sign-1:r8:tq_proj,v_proj"
+        qkvo = "lora:isotropic:seed123:s0.0075:sign-1:r8:tq_proj,k_proj,v_proj,o_proj"
 
-        self.assertEqual(candidate_join_key(legacy), candidate_join_key(qualified))
+        self.assertEqual(candidate_join_key(qv), candidate_join_key(qkvo))
 
     def test_resolve_adapter_model_path_falls_back_to_local_run_dir(self):
         with tempfile.TemporaryDirectory() as tmp:

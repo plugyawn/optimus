@@ -63,8 +63,9 @@ Backends must state the methods they support:
 - `--backend vllm --method subspace` is the planned production subspace search
   path and currently fails closed with a Phase 5 pointer.
 - `--backend vllm --method lora` is adapter-search/replay infrastructure.
-- `--backend transformers` is the trusted reference path for dense, LoRA, and
-  subspace checks.
+- `--backend transformers` is the trusted reference path for dense and LoRA
+  checks today. The Transformers subspace reference evaluator is planned for
+  Phase 3 and fails closed until it exists.
 - Subspace PEFT/vLLM adapter export is an explicit materialization step for
   selected winners, not the search hot path.
 - LightEval is a final-evaluation lane, not the full candidate-screening loop.

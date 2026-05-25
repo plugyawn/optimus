@@ -11,7 +11,7 @@ from optimus.search.adaptive import candidate_score_rows, col_scale_from_rows, t
 def test_candidate_score_rows_reads_summary_and_deduplicates_best_candidate(tmp_path: Path):
     run = tmp_path / "run"
     run.mkdir()
-    key = "factor_gaussian_lora:seed1:s0.01:sign1"
+    key = "lora:factor_gaussian_lora:seed1:s0.01:sign1:r8:tq_proj,v_proj"
     (run / "candidate_summary.jsonl").write_text(
         json.dumps({"candidate": key, "exact_mean": 0.1}) + "\n"
         + json.dumps({"candidate": "bad-key", "exact_mean": 1.0}) + "\n"

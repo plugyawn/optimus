@@ -43,7 +43,6 @@ __all__ = [
     "rows_by_candidate_and_example",
     "protocol_valid_variants",
     "run_adaptive_search",
-    "run_peft_search",
     "select_top_k",
     "sorted_records",
 ]
@@ -51,11 +50,5 @@ __all__ = [
 
 def run_adaptive_search(*args, **kwargs):
     from .adaptive import run_search
-
-    return run_search(*args, **kwargs)
-
-
-def run_peft_search(*args, **kwargs):
-    from .peft import run_search
 
     return run_search(*args, **kwargs)

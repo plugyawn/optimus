@@ -5,7 +5,12 @@ import csv
 import json
 from pathlib import Path
 
-from optimus.evaluation.validation import SUBSPACE_JSON_PROVENANCE_FIELDS, SUBSPACE_SYSTEMS_FIELDS, SUBSPACE_SYSTEMS_NUMERIC_FIELDS
+from optimus.evaluation.validation import (
+    SUBSPACE_JSON_PROVENANCE_FIELDS,
+    SUBSPACE_SYSTEMS_AXIS_FIELDS,
+    SUBSPACE_SYSTEMS_FIELDS,
+    SUBSPACE_SYSTEMS_NUMERIC_FIELDS,
+)
 
 
 def as_float(value, default: float = 0.0) -> float:
@@ -116,7 +121,14 @@ def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], li
         except json.JSONDecodeError:
             invalid.append(f"{path}: invalid JSON")
             continue
-        absent = [field for field in (*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_SYSTEMS_FIELDS) if field not in payload]
+        if payload.get("schema_version") != "subspace_systems_report_v1":
+            invalid.append(f"{path}: invalid schema_version {payload.get('schema_version')!r}")
+            continue
+        absent = [
+            field
+            for field in (*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_SYSTEMS_FIELDS, *SUBSPACE_SYSTEMS_AXIS_FIELDS)
+            if field not in payload
+        ]
         if absent:
             invalid.append(f"{path}: missing fields {', '.join(absent)}")
             continue
@@ -124,17 +136,47 @@ def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], li
         if bad_numeric:
             invalid.append(f"{path}: nonnumeric fields {', '.join(bad_numeric)}")
             continue
+        evidence_paths = payload.get("timing_evidence_paths")
+        if not isinstance(evidence_paths, list) or not evidence_paths:
+            invalid.append(f"{path}: missing timing_evidence_paths")
+            continue
+        missing_evidence = []
+        for evidence in evidence_paths:
+            evidence_path = Path(str(evidence))
+            resolved = evidence_path if evidence_path.is_absolute() else path.parent / evidence_path
+            if not resolved.exists():
+                missing_evidence.append(str(evidence))
+        if missing_evidence:
+            invalid.append(f"{path}: missing timing evidence {', '.join(missing_evidence)}")
+            continue
         if payload.get("prefix_cache_policy") != "disabled-for-search":
             invalid.append(f"{path}: invalid prefix_cache_policy {payload.get('prefix_cache_policy')!r}")
             continue
-        reports.append(payload | {"source_report": str(path), "source_run_dir": row["run_dir"]})
+        enriched = payload | {
+            "source_report": str(path),
+            "source_run_dir": row["run_dir"],
+            "population": payload.get("population", row.get("population")),
+            "target_preset": payload.get("target_preset", row.get("target_preset")),
+            "basis_rank": payload.get("basis_rank", row.get("basis_rank")),
+            "kernel": payload.get("kernel", row.get("kernel")),
+        }
+        missing_axes = [field for field in SUBSPACE_SYSTEMS_AXIS_FIELDS if not enriched.get(field)]
+        if missing_axes:
+            invalid.append(f"{path}: missing comparison axes {', '.join(missing_axes)}")
+            continue
+        reports.append(enriched)
     return reports, missing, invalid
 
 
 def selected_subspace_system_report(reports: list[dict]) -> dict:
     if not reports:
         return {}
-    return max(reports, key=lambda row: as_float(row.get("candidates_per_sec"), float("-inf")))
+    selected = min(reports, key=lambda row: as_float(row.get("candidates_per_sec"), float("inf")))
+    return selected | {
+        "systems_selection_policy": "slowest_candidates_per_sec_conservative_gate",
+        "all_reports_count": len(reports),
+        "all_report_sources": [row.get("source_report") for row in reports],
+    }
 
 
 def subspace_system_rows(reports: list[dict]) -> list[dict]:
@@ -142,6 +184,10 @@ def subspace_system_rows(reports: list[dict]) -> list[dict]:
         [
             {
                 "source_run_dir": row.get("source_run_dir"),
+                "population": row.get("population"),
+                "target_preset": row.get("target_preset"),
+                "basis_rank": row.get("basis_rank"),
+                "kernel": row.get("kernel"),
                 "gpu_model": row.get("gpu_model"),
                 "gpu_count": row.get("gpu_count"),
                 "candidate_batch_size": row.get("candidate_batch_size"),
@@ -180,6 +226,10 @@ def append_subspace_systems_report(path: Path, rows: list[dict]) -> None:
                 [
                     "source_run_dir",
                     "gpu_model",
+                    "population",
+                    "target_preset",
+                    "basis_rank",
+                    "kernel",
                     "gpu_count",
                     "candidate_batch_size",
                     "candidates_per_sec",
@@ -854,6 +904,10 @@ def main(argv: list[str] | None = None) -> int:
             [
                 "source_run_dir",
                 "gpu_model",
+                "population",
+                "target_preset",
+                "basis_rank",
+                "kernel",
                 "gpu_count",
                 "candidate_batch_size",
                 "candidates_per_sec",

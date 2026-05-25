@@ -18,12 +18,14 @@ from optimus.core.perturbations import (
 from optimus.search.zeroth_order import ZerothOrderStudy, select_top_k
 
 
-def test_perturbation_key_roundtrips_new_and_legacy_forms():
+def test_perturbation_key_roundtrips_method_qualified_forms():
     spec = PerturbationSpec("isotropic", 123, 0.0075, -1, method="lora", rank=8, targets="q_proj,v_proj")
 
     assert parse_perturbation_key(spec.key) == spec
-    assert parse_perturbation_key(spec.legacy_key) == PerturbationSpec("isotropic", 123, 0.0075, -1, method="lora")
-    assert parse_perturbation_key("dense_gaussian:seed7:s0.01:sign1").method == "dense"
+    dense = PerturbationSpec("dense_gaussian", 7, 0.01, 1, method="dense")
+    assert parse_perturbation_key(dense.key) == dense
+    with pytest.raises(ValueError, match="legacy perturbation keys"):
+        parse_perturbation_key("dense_gaussian:seed7:s0.01:sign1")
 
 
 def test_perturbation_records_preserve_method_rank_and_targets(tmp_path: Path):

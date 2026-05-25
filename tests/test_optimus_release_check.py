@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from optimus.evaluation.release import FORBIDDEN_PACKAGE, FORBIDDEN_REPO, build_release_checks, summary
+from optimus.evaluation.release import FORBIDDEN_PACKAGE, FORBIDDEN_REPO, build_release_checks, summary, systems_report_checks
 
 
 CANDIDATE = "lora:isotropic:seed1:s0.0075:sign1:r8:tq_proj,v_proj"
@@ -258,6 +258,120 @@ def test_release_check_scans_source_of_truth_docs_for_legacy_public_surface(tmp_
     assert not by_name["public_docs_do_not_promote_legacy_subspace_surface"].passed
     assert "full_model_lazy_kernel_design.md" in by_name["public_docs_do_not_promote_legacy_subspace_surface"].detail
     assert "subspace_implementation_roadmap.md" in by_name["public_docs_do_not_promote_legacy_subspace_surface"].detail
+
+
+def test_release_check_rejects_legacy_package_level_exports(tmp_path: Path):
+    gpu, systems = write_minimal_release_tree(tmp_path)
+    serving = tmp_path / "optimus" / "serving"
+    serving.mkdir()
+    (serving / "__init__.py").write_text("__all__ = ['AdapterSpec', 'score_rows', 'make_sampling_params']\n")
+    search = tmp_path / "optimus" / "search"
+    search.mkdir()
+    (search / "__init__.py").write_text("__all__ = ['run_peft_search']\n")
+
+    checks = build_release_checks(
+        root=tmp_path,
+        systems_out=systems,
+        gpu_root=gpu,
+        populations=(1024, 4096),
+        bench_adapters=(8,),
+        run_halving=False,
+        method="lora",
+        remote="https://github.com/plugyawn/optimus.git",
+    )
+    by_name = {check.name: check for check in checks}
+
+    assert not by_name["public_package_surface_excludes_legacy_subspace_internals"].passed
+    assert "AdapterSpec" in by_name["public_package_surface_excludes_legacy_subspace_internals"].detail
+    assert "run_peft_search" in by_name["public_package_surface_excludes_legacy_subspace_internals"].detail
+
+
+def _write_subspace_systems_out(root: Path, *, timing: bool = True, numeric_as_string: bool = False) -> Path:
+    systems = root / "systems"
+    systems.mkdir()
+    source_run = root / "run"
+    source_run.mkdir()
+    source_report = source_run / "systems_report.json"
+    source_report.write_text("{}\n")
+    if timing:
+        (source_run / "timing_trace.jsonl").write_text(json.dumps({"elapsed_s": 0.1}) + "\n")
+    payload = {
+        "schema_version": "subspace_systems_report_v1",
+        "created_at": "2026-05-25T00:00:00Z",
+        "optimus_version": "0.1.0",
+        "git_commit": "testcommit",
+        "git_dirty": False,
+        "command": ["optimus", "systems-report"],
+        "environment": {"python": "test"},
+        "model_id_or_path": "Qwen/Qwen3-4B",
+        "model_revision": "testrev",
+        "tokenizer_hash": "tok123",
+        "task_config_hash": "task123",
+        "prompt_contract_hash": "promptcontract123",
+        "screen_split_hash": "screen123",
+        "holdout_split_hash": "holdout123",
+        "decode_config_hash": "decode123",
+        "warmup_policy": "one_warmup_batch",
+        "cuda_sync_policy": "sync_timed_regions",
+        "population": 128,
+        "target_preset": "transformer-linears",
+        "basis_rank": 128,
+        "kernel": "torch",
+        "candidate_batch_size": 4,
+        "candidate_shard_id": "single",
+        "gpu_model": "test-gpu",
+        "gpu_count": "1" if numeric_as_string else 1,
+        "gpu_memory_allocated_bytes": 1024,
+        "gpu_memory_reserved_bytes": 2048,
+        "base_model_time_s": 1.0,
+        "qx_time_s": 0.1,
+        "lazy_delta_time_s": 0.2,
+        "scoring_time_s": 0.3,
+        "setup_time_s": 0.4,
+        "candidates_per_sec": 1.0,
+        "prompts_per_sec": 2.0,
+        "output_tokens_per_sec": 3.0,
+        "lazy_overhead_pct": 10.0,
+        "prefix_cache_policy": "disabled-for-search",
+        "top_k_ensemble_cost_multiplier": 1.0,
+        "screen_score": 0.1,
+        "holdout_score": 0.2,
+        "screen_to_holdout_drop": -0.1,
+        "diversity_metrics": {"distinct_answers": 1},
+        "random_q_control": {"score": 0.1},
+        "shuffled_q_control": {"score": 0.1},
+        "antithetic_odd_even": {"odd": 0.0, "even": 0.0},
+        "timing_evidence_paths": ["timing_trace.jsonl"],
+        "source_report": str(source_report),
+        "source_run_dir": str(source_run),
+    }
+    (systems / "report.md").write_text("# Report\n")
+    (systems / "systems_report.json").write_text(json.dumps(payload) + "\n")
+    (systems / "subspace_systems.csv").write_text(
+        "source_run_dir,candidate_batch_size,population,target_preset,basis_rank,kernel,candidates_per_sec,top_k_ensemble_cost_multiplier,screen_score,holdout_score,screen_to_holdout_drop,diversity_metrics,random_q_control,shuffled_q_control,antithetic_odd_even\n"
+        "run,4,128,transformer-linears,128,torch,1.0,1.0,0.1,0.2,-0.1,{},{},{},{}\n"
+    )
+    return systems
+
+
+def test_subspace_release_check_requires_measured_systems_evidence(tmp_path: Path):
+    systems = _write_subspace_systems_out(tmp_path, timing=False)
+
+    checks = systems_report_checks(systems, method="subspace")
+    by_name = {check.name: check for check in checks}
+
+    assert not by_name["subspace_systems_report_fields_present"].passed
+    assert "missing_timing_evidence" in by_name["subspace_systems_report_fields_present"].detail
+
+
+def test_subspace_release_check_rejects_string_numeric_systems_fields(tmp_path: Path):
+    systems = _write_subspace_systems_out(tmp_path, numeric_as_string=True)
+
+    checks = systems_report_checks(systems, method="subspace")
+    by_name = {check.name: check for check in checks}
+
+    assert not by_name["subspace_systems_report_fields_present"].passed
+    assert "gpu_count" in by_name["subspace_systems_report_fields_present"].detail
 
 
 def test_release_check_accepts_verified_prime_zero_ledger(tmp_path: Path):

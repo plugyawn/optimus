@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import json
 import re
@@ -10,6 +11,7 @@ from pathlib import Path
 
 from optimus.evaluation.validation import (
     SUBSPACE_JSON_PROVENANCE_FIELDS,
+    SUBSPACE_SYSTEMS_AXIS_FIELDS,
     SUBSPACE_SYSTEMS_FIELDS,
     SUBSPACE_SYSTEMS_NUMERIC_FIELDS,
     check_run,
@@ -203,6 +205,25 @@ def public_api_surface_checks(root: Path) -> list[ReleaseCheck]:
     ]
 
 
+def _module_all(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    try:
+        module = ast.parse(path.read_text())
+    except SyntaxError:
+        return []
+    for node in module.body:
+        if isinstance(node, ast.Assign):
+            if any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets):
+                try:
+                    value = ast.literal_eval(node.value)
+                except (ValueError, SyntaxError):
+                    return []
+                if isinstance(value, list):
+                    return [str(item) for item in value]
+    return []
+
+
 def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
     checks: list[ReleaseCheck] = []
     legacy_tokens = {"peft-search", "vllm-search", "vllm-halving", "vllm-bench"}
@@ -298,6 +319,26 @@ def package_code_checks(root: Path) -> list[ReleaseCheck]:
         for token in forbidden_hot_path_tokens:
             if token in text:
                 hot_path_leaks.append(f"{path.relative_to(root)}:{token}")
+    surface_leaks: list[str] = []
+    serving_exports = set(_module_all(package_root / "serving" / "__init__.py"))
+    forbidden_serving_exports = {
+        "AdapterSpec",
+        "PerturbationSpec",
+        "TransformersDenseGaussianBackend",
+        "TransformersLoraBackend",
+        "make_sampling_params",
+        "perturbation_panel",
+        "run_halving",
+        "run_search",
+        "run_vllm_search",
+        "build_adapter_specs",
+        "import_vllm_lora_request",
+    }
+    for name in sorted(serving_exports & forbidden_serving_exports):
+        surface_leaks.append(f"optimus/serving/__init__.py:{name}")
+    search_exports = set(_module_all(package_root / "search" / "__init__.py"))
+    for name in sorted(search_exports & {"run_peft_search"}):
+        surface_leaks.append(f"optimus/search/__init__.py:{name}")
     return [
         ReleaseCheck("optimus_package_source_present", True, str(package_root)),
         ReleaseCheck(
@@ -309,6 +350,13 @@ def package_code_checks(root: Path) -> list[ReleaseCheck]:
             "subspace_hot_path_has_no_adapter_imports",
             not hot_path_leaks,
             "no adapter hot-path imports in subspace modules" if not hot_path_leaks else f"matches={hot_path_leaks!r}",
+        ),
+        ReleaseCheck(
+            "public_package_surface_excludes_legacy_subspace_internals",
+            not surface_leaks,
+            "package-level public surface excludes legacy adapter internals"
+            if not surface_leaks
+            else f"matches={surface_leaks!r}",
         ),
     ]
 
@@ -466,17 +514,74 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
         except json.JSONDecodeError:
             checks.append(ReleaseCheck("subspace_systems_report_fields_present", False, "invalid systems_report.json"))
             return checks
-        missing = sorted(set((*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_SYSTEMS_FIELDS)) - set(payload))
+        required_fields = (
+            *SUBSPACE_JSON_PROVENANCE_FIELDS,
+            *SUBSPACE_SYSTEMS_FIELDS,
+            *SUBSPACE_SYSTEMS_AXIS_FIELDS,
+            "source_report",
+            "source_run_dir",
+        )
+        missing = sorted(set(required_fields) - set(payload))
         bad_numeric = sorted(
             field
             for field in SUBSPACE_SYSTEMS_NUMERIC_FIELDS
             if field in payload and (not isinstance(payload.get(field), (int, float)) or isinstance(payload.get(field), bool))
         )
+        bad_axes = sorted(field for field in SUBSPACE_SYSTEMS_AXIS_FIELDS if not payload.get(field))
+        schema_ok = payload.get("schema_version") == "subspace_systems_report_v1"
+        timing_evidence_paths = payload.get("timing_evidence_paths")
+        missing_timing_evidence: list[str] = []
+        if not isinstance(timing_evidence_paths, list) or not timing_evidence_paths:
+            missing_timing_evidence.append("<empty>")
+        else:
+            source_run_dir = Path(str(payload.get("source_run_dir", "")))
+            if not source_run_dir.is_absolute():
+                source_run_dir = systems_out / source_run_dir
+            for evidence in timing_evidence_paths:
+                evidence_path = Path(str(evidence))
+                if not evidence_path.is_absolute():
+                    evidence_path = source_run_dir / evidence_path
+                if not evidence_path.exists():
+                    missing_timing_evidence.append(str(evidence))
+        missing_sources: list[str] = []
+        source_report = payload.get("source_report")
+        if isinstance(source_report, str) and source_report:
+            source_report_path = Path(source_report)
+            if not source_report_path.is_absolute():
+                source_report_path = systems_out / source_report_path
+            if not source_report_path.exists():
+                missing_sources.append(f"source_report={source_report!r}")
+        source_run_dir = payload.get("source_run_dir")
+        if isinstance(source_run_dir, str) and source_run_dir:
+            source_run_path = Path(source_run_dir)
+            if not source_run_path.is_absolute():
+                source_run_path = systems_out / source_run_path
+            if not source_run_path.exists():
+                missing_sources.append(f"source_run_dir={source_run_dir!r}")
         checks.append(
             ReleaseCheck(
                 "subspace_systems_report_fields_present",
-                not missing and not bad_numeric and payload.get("prefix_cache_policy") == "disabled-for-search",
-                "subspace systems fields present" if not missing and not bad_numeric and payload.get("prefix_cache_policy") == "disabled-for-search" else f"missing={missing!r} bad_numeric={bad_numeric!r} prefix_cache_policy={payload.get('prefix_cache_policy')!r}",
+                not missing
+                and not bad_numeric
+                and not bad_axes
+                and not missing_timing_evidence
+                and not missing_sources
+                and schema_ok
+                and payload.get("prefix_cache_policy") == "disabled-for-search",
+                "subspace systems fields present"
+                if not missing
+                and not bad_numeric
+                and not bad_axes
+                and not missing_timing_evidence
+                and not missing_sources
+                and schema_ok
+                and payload.get("prefix_cache_policy") == "disabled-for-search"
+                else (
+                    f"missing={missing!r} bad_numeric={bad_numeric!r} bad_axes={bad_axes!r} "
+                    f"missing_timing_evidence={missing_timing_evidence!r} missing_sources={missing_sources!r} "
+                    f"schema_version={payload.get('schema_version')!r} "
+                    f"prefix_cache_policy={payload.get('prefix_cache_policy')!r}"
+                ),
             )
         )
         if systems_csv.exists():
@@ -487,6 +592,10 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
             required_columns = {
                 "source_run_dir",
                 "candidate_batch_size",
+                "population",
+                "target_preset",
+                "basis_rank",
+                "kernel",
                 "candidates_per_sec",
                 "top_k_ensemble_cost_multiplier",
                 "screen_score",

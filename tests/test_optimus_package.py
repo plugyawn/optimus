@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 try:
     import tomllib
 except ModuleNotFoundError:  # Python 3.10
@@ -258,7 +260,8 @@ def test_public_cli_does_not_expose_experiment_catchall():
 def test_perturbation_surface_uses_stable_key_contract():
     candidate = PerturbationSpec("isotropic", seed=123, sigma=0.0075, sign=-1, method="lora")
     assert parse_perturbation_key(candidate.key) == candidate
-    assert parse_perturbation_key(candidate.legacy_key) == candidate
+    with pytest.raises(ValueError, match="legacy perturbation keys"):
+        parse_perturbation_key("isotropic:seed123:s0.0075:sign-1")
 
 
 def test_core_perturbation_spec_supports_dense_and_lora_keys():
@@ -268,7 +271,7 @@ def test_core_perturbation_spec_supports_dense_and_lora_keys():
     assert lora.key.startswith("lora:")
     assert dense.key.startswith("dense:")
     assert parse_perturbation_key(lora.key) == lora
-    assert parse_perturbation_key(dense.legacy_key) == dense
+    assert parse_perturbation_key(dense.key) == dense
 
 
 def test_perturbation_core_import_is_lightweight():
@@ -321,6 +324,10 @@ def test_serving_namespace_import_is_lightweight():
 
     assert "backend_contract" in result.stdout
     assert "score_rows" in result.stdout
+    assert "AdapterSpec" not in result.stdout
+    assert "TransformersLoraBackend" not in result.stdout
+    assert "make_sampling_params" not in result.stdout
+    assert "perturbation_panel" not in result.stdout
     assert "run_vllm_search" not in result.stdout
     assert "run_halving" not in result.stdout
     assert "import_vllm_lora_request" not in result.stdout
@@ -409,7 +416,7 @@ print(json.dumps([gaussian_hash_v1(**item) for item in reversed(cases)]))
     assert forward == list(reversed(reversed_values))
 
 
-def test_vllm_serving_metadata_import_is_lightweight():
+def test_vllm_adapter_module_is_explicit_legacy_baseline_import():
     result = subprocess.run(
         [sys.executable, "-c", "from optimus.serving.vllm import AdapterSpec, perturbation_panel; print(AdapterSpec.__name__, perturbation_panel.__name__)"],
         check=True,

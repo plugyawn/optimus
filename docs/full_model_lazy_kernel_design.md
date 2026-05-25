@@ -730,8 +730,8 @@ A run writes:
 
 | file | purpose |
 | --- | --- |
-| `subspace_state.pt` | Versioned activation-site basis tensors and calibration stats. |
-| `subspace_state_summary.json` | Human-readable basis and scale metadata. |
+| `subspace_state.pt` | Versioned activation-site basis tensors referenced by the summary metadata. |
+| `subspace_state_summary.json` | Validated activation-site basis, provenance, and scale metadata. |
 | `candidates.jsonl` | Candidate identities before or during scoring. |
 | `candidate_scores.jsonl` | Per-candidate screen and selected holdout scores. |
 | `top_k_ensemble.json` | Primary top-K lazy ensemble artifact. |
@@ -747,7 +747,7 @@ All JSON artifacts include `schema_version`, `created_at`, `optimus_version`,
 artifact is explicitly marked as a child artifact that references `summary.json`
 by hash.
 
-`subspace_state.pt` required fields:
+`subspace_state_summary.json` required fields:
 
 ```json
 {
@@ -791,6 +791,11 @@ by hash.
   ]
 }
 ```
+
+`subspace_state.pt` is the tensor payload. Until the Phase 1 writer/reader
+lands, validators check that the payload exists and that the summary records
+the tensor keys and hashes needed to replay it; they do not treat the binary
+payload as a JSON schema.
 
 `summary.json` required scale and budget fields:
 

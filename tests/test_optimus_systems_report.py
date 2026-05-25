@@ -34,6 +34,10 @@ def _subspace_systems_payload() -> dict:
         "decode_config_hash": "decode123",
         "warmup_policy": "one_warmup_batch",
         "cuda_sync_policy": "sync_timed_regions",
+        "population": 128,
+        "target_preset": "transformer-linears",
+        "basis_rank": 128,
+        "kernel": "torch",
         "candidate_batch_size": 4,
         "candidate_shard_id": "single",
         "gpu_model": "test-gpu",
@@ -58,6 +62,7 @@ def _subspace_systems_payload() -> dict:
         "random_q_control": {"score": 0.1},
         "shuffled_q_control": {"score": 0.1},
         "antithetic_odd_even": {"odd": 0.0, "even": 0.0},
+        "timing_evidence_paths": ["timing_trace.jsonl"],
     }
     assert not [field for field in SUBSPACE_SYSTEMS_FIELDS if field not in payload]
     return payload
@@ -209,6 +214,7 @@ def test_systems_report_writes_subspace_systems_json_from_measured_runs(tmp_path
         json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128}) + "\n"
     )
     (run / "systems_report.json").write_text(json.dumps(_subspace_systems_payload()) + "\n")
+    (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1}) + "\n")
 
     out = tmp_path / "report"
     assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 0
@@ -218,7 +224,36 @@ def test_systems_report_writes_subspace_systems_json_from_measured_runs(tmp_path
     assert payload["prefix_cache_policy"] == "disabled-for-search"
     assert payload["source_run_dir"] == str(run)
     assert "source_run_dir" in (out / "subspace_systems.csv").read_text()
+    assert "target_preset" in (out / "subspace_systems.csv").read_text()
     assert "Subspace Systems" in (out / "report.md").read_text()
+
+
+def test_systems_report_selects_conservative_slowest_subspace_row(tmp_path: Path):
+    suite = tmp_path / "optimus_gpu_suite"
+    for name, candidate_sec, target_preset in [
+        ("search_p128_subspace_qv", 10.0, "qv"),
+        ("search_p128_subspace_transformer_linears", 1.0, "transformer-linears"),
+    ]:
+        run = suite / name
+        run.mkdir(parents=True)
+        (run / "summary.json").write_text(
+            json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128, "target_preset": target_preset}) + "\n"
+        )
+        payload = _subspace_systems_payload()
+        payload["candidates_per_sec"] = candidate_sec
+        payload["target_preset"] = target_preset
+        (run / "systems_report.json").write_text(json.dumps(payload) + "\n")
+        (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1}) + "\n")
+
+    out = tmp_path / "report"
+    assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 0
+
+    selected = json.loads((out / "systems_report.json").read_text())
+    assert selected["candidates_per_sec"] == 1.0
+    assert selected["target_preset"] == "transformer-linears"
+    assert selected["systems_selection_policy"] == "slowest_candidates_per_sec_conservative_gate"
+    assert selected["all_reports_count"] == 2
+    assert "qv" in (out / "subspace_systems.csv").read_text()
 
 
 def test_systems_report_rejects_bad_subspace_system_types(tmp_path: Path):
@@ -232,6 +267,7 @@ def test_systems_report_rejects_bad_subspace_system_types(tmp_path: Path):
     payload["candidates_per_sec"] = "1.0"
     payload["top_k_ensemble_cost_multiplier"] = "huge"
     (run / "systems_report.json").write_text(json.dumps(payload) + "\n")
+    (run / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1}) + "\n")
 
     out = tmp_path / "report"
     assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 1

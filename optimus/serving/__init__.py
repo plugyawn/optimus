@@ -6,15 +6,8 @@ import importlib
 from typing import Any
 
 __all__ = [
-    "AdapterSpec",
-    "GenerationResult",
-    "PerturbationSpec",
-    "TransformersDenseGaussianBackend",
-    "TransformersLoraBackend",
     "backend_contract",
     "make_vllm_prompt_inputs",
-    "make_sampling_params",
-    "perturbation_panel",
     "sampling_params_contract",
     "score_mixed_rows",
     "score_rows",
@@ -32,9 +25,6 @@ _EXPORT_MODULES = {
     "score_rows": "optimus.serving.runtime",
     "timed_generate": "optimus.serving.runtime",
     "tokenizer_contract": "optimus.serving.contracts",
-    "GenerationResult": "optimus.serving.transformers",
-    "TransformersDenseGaussianBackend": "optimus.serving.transformers",
-    "TransformersLoraBackend": "optimus.serving.transformers",
     "visible_token_count": "optimus.serving.transformers",
     "vllm_tokenizer_contract": "optimus.serving.contracts",
 }
@@ -43,5 +33,5 @@ _EXPORT_MODULES = {
 def __getattr__(name: str) -> Any:
     if name not in __all__:
         raise AttributeError(name)
-    module = importlib.import_module(_EXPORT_MODULES.get(name, "optimus.serving.vllm"))
+    module = importlib.import_module(_EXPORT_MODULES[name])
     return getattr(module, name)

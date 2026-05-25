@@ -98,8 +98,13 @@ def write_contract_outputs(contract) -> None:
             "quality_scaling.csv": "suite,run,screen_selected_holdout_exact,screen_selected_holdout_delta_vs_base,promoted_holdout_oracle_exact,promoted_holdout_oracle_delta_vs_base\noptimus_gpu_suite,search_p1024_chunk32,0.2,0.1,0.3,0.2\n",
             "parity.csv": "suite,run,trusted_name,candidate_name,n_common,pass,pass_protocol,pass_base_rows,pass_adapter_tensors,pass_output_diff\nbackend_parity_gate,gate,peft,vllm,1,true,true,true,true,true\n",
             "halving.csv": "suite,run,stage_prompts,survivors,prompt_eval_savings\noptimus_gpu_suite,halving_p1024_stage8_surv64,8,64,0.5\n",
-            "subspace_systems.csv": "source_run_dir,gpu_model,candidate_batch_size,candidates_per_sec,top_k_ensemble_cost_multiplier\nrun,test-gpu,4,1.0,1.0\n",
+            "subspace_systems.csv": "source_run_dir,gpu_model,population,target_preset,basis_rank,kernel,candidate_batch_size,candidates_per_sec,top_k_ensemble_cost_multiplier\nrun,test-gpu,16,transformer-linears,128,torch,4,1.0,1.0\n",
         }
+        source_run = contract.root / "source_run"
+        source_run.mkdir(parents=True, exist_ok=True)
+        (source_run / "timing_trace.jsonl").write_text(json.dumps({"event": "suite_timed_region", "elapsed_s": 0.1}) + "\n")
+        source_report = source_run / "systems_report.json"
+        source_report.write_text("{}\n")
         for rel in contract.required_files:
             path = contract.root / rel
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -126,6 +131,10 @@ def write_contract_outputs(contract) -> None:
                             "decode_config_hash": "decode123",
                             "warmup_policy": "one_warmup_batch",
                             "cuda_sync_policy": "sync_timed_regions",
+                            "population": 16,
+                            "target_preset": "transformer-linears",
+                            "basis_rank": 128,
+                            "kernel": "torch",
                             "candidate_batch_size": 4,
                             "candidate_shard_id": "single",
                             "gpu_model": "test-gpu",
@@ -150,6 +159,9 @@ def write_contract_outputs(contract) -> None:
                             "random_q_control": {"score": 0.1},
                             "shuffled_q_control": {"score": 0.1},
                             "antithetic_odd_even": {"odd": 0.0, "even": 0.0},
+                            "timing_evidence_paths": ["timing_trace.jsonl"],
+                            "source_report": str(source_report),
+                            "source_run_dir": str(source_run),
                         }
                     )
                     + "\n"
@@ -306,6 +318,7 @@ def write_subspace_contract_outputs(contract) -> None:
             "prompt_contract_hash": "promptcontract123",
             "basis_hash": "basis123",
             "target_preset": "transformer-linears",
+            "explicit_targets": [],
             "layers": "all",
             "basis_kind": "activation-svd",
             "basis_centering": "none",
@@ -335,6 +348,8 @@ def write_subspace_contract_outputs(contract) -> None:
                     "basis_tensor_key": "basis/layer_0.attn_in",
                     "singular_values": [1.0, 0.5],
                     "captured_energy": 0.9,
+                    "prefill_captured_energy": 0.9,
+                    "decode_captured_energy": None,
                     "H_s": 1.0,
                     "A_s": 1.1,
                     "orthonormality_error": 0.0,
@@ -382,6 +397,10 @@ def write_subspace_contract_outputs(contract) -> None:
             **artifact_provenance,
             "warmup_policy": "one_warmup_batch",
             "cuda_sync_policy": "sync_timed_regions",
+            "population": 16,
+            "target_preset": "transformer-linears",
+            "basis_rank": 128,
+            "kernel": "torch",
             "candidate_batch_size": 4,
             "candidate_shard_id": "single",
             "gpu_model": "test-gpu",
@@ -406,6 +425,7 @@ def write_subspace_contract_outputs(contract) -> None:
             "random_q_control": {"score": 0.1},
             "shuffled_q_control": {"score": 0.1},
             "antithetic_odd_even": {"odd": 0.0, "even": 0.0},
+            "timing_evidence_paths": ["timing_trace.jsonl"],
         },
     }
     json_files["validation_report.json"]["scientific_gate_contract"].update(
@@ -459,6 +479,7 @@ def write_subspace_contract_outputs(contract) -> None:
             path.write_text(json.dumps(json_files[rel]) + "\n")
         else:
             path.write_text("placeholder\n")
+    (contract.root / "timing_trace.jsonl").write_text(json.dumps({"event": "timed_region", "elapsed_s": 0.1}) + "\n")
 
 
 def test_gpu_suite_specs_include_p1024_and_p4096_searches(tmp_path: Path):
@@ -979,6 +1000,33 @@ def test_subspace_contract_rejects_exact_duplicate_candidates_and_scores(tmp_pat
     assert any("duplicate score row" in item for item in result.invalid)
 
 
+def test_subspace_contract_rejects_empty_candidate_ids(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    rows = [json.loads(line) for line in (contract.root / "candidates.jsonl").read_text().splitlines()]
+    rows[0]["candidate_id"] = ""
+    (contract.root / "candidates.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows))
+    score_rows = [json.loads(line) for line in (contract.root / "candidate_scores.jsonl").read_text().splitlines()]
+    score_rows[0]["candidate_id"] = ""
+    (contract.root / "candidate_scores.jsonl").write_text("".join(json.dumps(row) + "\n" for row in score_rows))
+    top_k = json.loads((contract.root / "top_k_ensemble.json").read_text())
+    top_k["candidates"][0]["candidate_id"] = ""
+    (contract.root / "top_k_ensemble.json").write_text(json.dumps(top_k) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("candidates.jsonl: row 1.candidate_id: empty" in item for item in result.invalid)
+    assert any("candidate_scores.jsonl: row 1.candidate_id: empty" in item for item in result.invalid)
+    assert any("top_k_ensemble.json.candidates[1].candidate_id: empty" in item for item in result.invalid)
+
+
 def test_subspace_contract_rejects_bad_systems_report_types(tmp_path: Path):
     config = GpuSuiteConfig(
         output_root=tmp_path / "runs",
@@ -1000,6 +1048,31 @@ def test_subspace_contract_rejects_bad_systems_report_types(tmp_path: Path):
     assert any("systems_report.json.gpu_count" in item for item in result.invalid)
     assert any("systems_report.json.candidates_per_sec" in item for item in result.invalid)
     assert any("systems_report.json.top_k_ensemble_cost_multiplier" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_invalid_basis_metadata_enums(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    summary = json.loads((contract.root / "subspace_state_summary.json").read_text())
+    summary["basis_kind"] = "task-biased"
+    summary["basis_centering"] = "median"
+    summary["basis_token_source"] = "train"
+    summary["basis_split"] = "holdout_labeled"
+    (contract.root / "subspace_state_summary.json").write_text(json.dumps(summary) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("subspace_state_summary.json.basis_kind" in item for item in result.invalid)
+    assert any("subspace_state_summary.json.basis_centering" in item for item in result.invalid)
+    assert any("subspace_state_summary.json.basis_token_source" in item for item in result.invalid)
+    assert any("subspace_state_summary.json.basis_split" in item for item in result.invalid)
 
 
 def test_lora_artifacts_cannot_pass_as_subspace_run(tmp_path: Path):
