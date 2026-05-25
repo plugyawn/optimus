@@ -77,7 +77,7 @@ optimus/
   backends/    backend and method names plus compatibility boundaries
   runs/        reusable workload specifications for GPU validation suites
   search/      zeroth-order studies, selection, and trusted HF execution
-  serving/     vLLM adapter-swapping and throughput-oriented execution
+  serving/     prompt/token contracts, runtime helpers, and scoring utilities
   evaluation/  reports, gates, and plot-oriented summaries
 ```
 

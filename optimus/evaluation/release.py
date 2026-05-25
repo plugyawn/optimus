@@ -28,8 +28,10 @@ LEGACY_PUBLIC_PATTERNS = (
     r"\bactivation_subspace\b",
     r"\blazy-subspace\b",
     r"\blazy_subspace\b",
+    r"\bengine\b",
     r"\bfamily_state(?:\.pt)?\b",
     r"--activation-state-prompts\b",
+    r"\badapter-swapping\b",
     r"\boptimus\s+(?:peft-search|vllm-search|vllm-halving|vllm-bench)\b",
 )
 LEGACY_DOC_GUARD_TERMS = (

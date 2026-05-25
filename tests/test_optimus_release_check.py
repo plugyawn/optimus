@@ -247,6 +247,7 @@ def test_release_check_requires_all_public_docs(tmp_path: Path):
 
 def test_release_check_scans_source_of_truth_docs_for_legacy_public_surface(tmp_path: Path):
     gpu, systems = write_minimal_release_tree(tmp_path)
+    (tmp_path / "README.md").write_text("Package layout: serving/ vLLM adapter-swapping engine surface.\n")
     (tmp_path / "docs" / "full_model_lazy_kernel_design.md").write_text("Use optimus vllm-search as the production route.\n")
     (tmp_path / "docs" / "subspace_implementation_roadmap.md").write_text("Load family_state.pt before search.\n")
 
@@ -263,6 +264,7 @@ def test_release_check_scans_source_of_truth_docs_for_legacy_public_surface(tmp_
     by_name = {check.name: check for check in checks}
 
     assert not by_name["public_docs_do_not_promote_legacy_subspace_surface"].passed
+    assert "README.md" in by_name["public_docs_do_not_promote_legacy_subspace_surface"].detail
     assert "full_model_lazy_kernel_design.md" in by_name["public_docs_do_not_promote_legacy_subspace_surface"].detail
     assert "subspace_implementation_roadmap.md" in by_name["public_docs_do_not_promote_legacy_subspace_surface"].detail
 
