@@ -224,7 +224,7 @@ def test_systems_report_writes_subspace_systems_json_from_measured_runs(tmp_path
     assert payload["schema_version"] == "subspace_systems_report_v1"
     assert payload["benchmark_kind"] == "subspace"
     assert payload["prefix_cache_policy"] == "disabled-for-search"
-    assert payload["source_run_dir"] == str(run)
+    assert (out / payload["source_run_dir"]).resolve() == run.resolve()
     assert "source_run_dir" in (out / "subspace_systems.csv").read_text()
     assert "benchmark_kind" in (out / "subspace_systems.csv").read_text()
     assert "target_preset" in (out / "subspace_systems.csv").read_text()

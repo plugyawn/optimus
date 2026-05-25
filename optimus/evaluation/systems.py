@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 from pathlib import Path
 
 from optimus.evaluation.validation import (
@@ -206,7 +207,14 @@ def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], li
     return reports, missing, invalid
 
 
-def selected_subspace_system_report(reports: list[dict]) -> dict:
+def _portable_path(path: Path, base: Path | None) -> str:
+    resolved = path.resolve()
+    if base is None:
+        return str(resolved)
+    return os.path.relpath(resolved, base.resolve())
+
+
+def selected_subspace_system_report(reports: list[dict], *, report_root: Path | None = None) -> dict:
     if not reports:
         return {}
     selectable = [row for row in reports if row.get("benchmark_kind") == "subspace"] or reports
@@ -214,11 +222,11 @@ def selected_subspace_system_report(reports: list[dict]) -> dict:
     source_report = Path(str(selected.get("source_report", ""))).resolve()
     source_run_dir = Path(str(selected.get("source_run_dir", ""))).resolve()
     return selected | {
-        "source_report": str(source_report),
-        "source_run_dir": str(source_run_dir),
+        "source_report": _portable_path(source_report, report_root),
+        "source_run_dir": _portable_path(source_run_dir, report_root),
         "systems_selection_policy": "slowest_candidates_per_sec_conservative_gate",
         "all_reports_count": len(reports),
-        "all_report_sources": [str(Path(str(row.get("source_report", ""))).resolve()) for row in reports],
+        "all_report_sources": [_portable_path(Path(str(row.get("source_report", ""))), report_root) for row in reports],
     }
 
 
@@ -934,7 +942,7 @@ def main(argv: list[str] | None = None) -> int:
                 invalid=invalid_subspace_reports,
             )
             return 1
-        selected_subspace = selected_subspace_system_report(subspace_reports)
+        selected_subspace = selected_subspace_system_report(subspace_reports, report_root=args.out)
         if not selected_subspace:
             write_subspace_fail_closed_report(
                 args.out / "report.md",
