@@ -5,7 +5,7 @@ import csv
 import json
 from pathlib import Path
 
-from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS
+from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS, SUBSPACE_SYSTEMS_NUMERIC_FIELDS
 
 
 def as_float(value, default: float = 0.0) -> float:
@@ -116,6 +116,13 @@ def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], li
         if absent:
             invalid.append(f"{path}: missing fields {', '.join(absent)}")
             continue
+        bad_numeric = [field for field in SUBSPACE_SYSTEMS_NUMERIC_FIELDS if not isinstance(payload.get(field), (int, float))]
+        if bad_numeric:
+            invalid.append(f"{path}: nonnumeric fields {', '.join(bad_numeric)}")
+            continue
+        if payload.get("prefix_cache_policy") != "disabled-for-search":
+            invalid.append(f"{path}: invalid prefix_cache_policy {payload.get('prefix_cache_policy')!r}")
+            continue
         reports.append(payload | {"source_report": str(path), "source_run_dir": row["run_dir"]})
     return reports, missing, invalid
 
@@ -124,6 +131,54 @@ def selected_subspace_system_report(reports: list[dict]) -> dict:
     if not reports:
         return {}
     return max(reports, key=lambda row: as_float(row.get("candidates_per_sec"), float("-inf")))
+
+
+def subspace_system_rows(reports: list[dict]) -> list[dict]:
+    return sorted(
+        [
+            {
+                "source_run_dir": row.get("source_run_dir"),
+                "gpu_model": row.get("gpu_model"),
+                "gpu_count": row.get("gpu_count"),
+                "candidate_batch_size": row.get("candidate_batch_size"),
+                "candidates_per_sec": row.get("candidates_per_sec"),
+                "prompts_per_sec": row.get("prompts_per_sec"),
+                "output_tokens_per_sec": row.get("output_tokens_per_sec"),
+                "lazy_overhead_pct": row.get("lazy_overhead_pct"),
+                "base_model_time_s": row.get("base_model_time_s"),
+                "qx_time_s": row.get("qx_time_s"),
+                "lazy_delta_time_s": row.get("lazy_delta_time_s"),
+                "prefix_cache_policy": row.get("prefix_cache_policy"),
+            }
+            for row in reports
+        ],
+        key=lambda row: as_float(row.get("candidates_per_sec")),
+        reverse=True,
+    )
+
+
+def append_subspace_systems_report(path: Path, rows: list[dict]) -> None:
+    if not rows:
+        return
+    with path.open("a") as f:
+        f.write("\n## Subspace Systems\n\n")
+        f.write(
+            md_table(
+                rows,
+                [
+                    "source_run_dir",
+                    "gpu_model",
+                    "gpu_count",
+                    "candidate_batch_size",
+                    "candidates_per_sec",
+                    "prompts_per_sec",
+                    "output_tokens_per_sec",
+                    "lazy_overhead_pct",
+                    "prefix_cache_policy",
+                ],
+            )
+        )
+        f.write("\n")
 
 
 def write_subspace_fail_closed_report(path: Path, *, missing: list[str], invalid: list[str]) -> None:
@@ -777,6 +832,24 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
         (args.out / "systems_report.json").write_text(json.dumps(selected_subspace, indent=2, sort_keys=True) + "\n")
+        csv_write(
+            args.out / "subspace_systems.csv",
+            subspace_system_rows(subspace_reports),
+            [
+                "source_run_dir",
+                "gpu_model",
+                "gpu_count",
+                "candidate_batch_size",
+                "candidates_per_sec",
+                "prompts_per_sec",
+                "output_tokens_per_sec",
+                "lazy_overhead_pct",
+                "base_model_time_s",
+                "qx_time_s",
+                "lazy_delta_time_s",
+                "prefix_cache_policy",
+            ],
+        )
     full = full_search_rows(rows)
     bench = bench_rows(rows)
     quality = quality_rows(rows)
@@ -940,6 +1013,7 @@ def main(argv: list[str] | None = None) -> int:
     if halving:
         plot_halving(args.out / "halving_tradeoff.png", halving)
     write_report(args.out / "report.md", full, bench, quality, best_of_n, parity, halving)
+    append_subspace_systems_report(args.out / "report.md", subspace_system_rows(subspace_reports))
     return 0
 
 

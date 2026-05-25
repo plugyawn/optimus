@@ -17,8 +17,8 @@ The supported public interface is the `optimus` package and CLI.
   trusted reference path for dense, LoRA, and subspace checks.
 - Population scaling studies for P1024/P4096 zeroth-order search.
 - Systems plots: candidate/sec, prompts/sec, token throughput, backend/method
-  throughput, best-of-N scaling, quality scaling, and staged-search savings
-  when a staged run is present.
+  throughput, best-of-N scaling, and quality scaling. Staged-search reporting
+  is legacy artifact parsing only until a final public staged route is added.
 - Auditable run outputs: candidate manifests, per-prompt rows, validation
   reports, execution logs, parity gates, and plot inputs.
 
@@ -290,15 +290,14 @@ The reference GPU workload is encoded in `scripts/run_optimus_gpu_suite.sh`:
 
 1. P1024 full perturbation search with complete throughput and heldout outputs.
 2. P4096 full perturbation search for best-of-N and scaling plots.
-3. P1024 staged search to measure prompt-eval savings and selected-regret.
-4. Trusted confirmation for selected candidates or final materialized models.
-5. `optimus validate-run` to verify the required run outputs.
-6. A final report with best-of-N curves and MFU/scaling-style
+3. Trusted confirmation for selected candidates or final materialized models.
+4. `optimus validate-run` to verify the required run outputs.
+5. A final report with best-of-N curves and MFU/scaling-style
    plots for zeroth-order optimization.
 
 Prime GPU use must be logged in the project ledger before launch, and active
 pods must be shut down or explicitly reported at the end of the run.
 
-Publication-grade claims additionally require staged-search evidence when
-staging is claimed and a passing trusted-backend or LightEval confirmation for
-the selected model state.
+Publication-grade claims require a passing trusted-backend or LightEval
+confirmation for the selected model state. Staged-search claims require a new
+final public staged route; the current GPU suite does not expose one.

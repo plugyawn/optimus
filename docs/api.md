@@ -12,7 +12,7 @@ screening, validation, and systems reporting are separate contracts.
 | `optimus.tasks` | Countdown examples, prompt variants, exact-answer scoring, and split hygiene helpers. |
 | `optimus.modeling` | Dense Gaussian patches, low-rank update geometry, and explicit export/materialization helpers. |
 | `optimus.subspace` | Subspace basis state, candidate noise, and reference math. |
-| `optimus.backends` | vLLM and Transformers backend integrations, including vLLM subspace search. |
+| `optimus.backends` | Backend names and compatibility boundaries. vLLM subspace search is the planned production backend and fails closed until Phase 5 lands. |
 | `optimus.search` | Backend-neutral zeroth-order studies, prompt-condition scoring, and replay helpers. |
 | `optimus.serving` | Prompt/token contracts and output scoring helpers used by backend integrations. |
 | `optimus.runs` | GPU-suite run specs, stable experiment keys, plan serialization, and resumable execution records. |
@@ -27,13 +27,13 @@ packages are implementation details.
 | command | purpose |
 | --- | --- |
 | `optimus perturbation-panel` | Write deterministic dense or LoRA perturbation panels. Subspace panels are produced by the subspace candidate schema and `run-plan`; this command fails closed for `--method subspace`. |
-| `optimus search` | Run perturbation search with `--backend vllm|transformers` and `--method dense|lora|subspace`. |
+| `optimus search` | Run implemented perturbation search routes with `--backend vllm|transformers` and `--method dense|lora|subspace`; planned subspace routes fail closed until their roadmap phase lands. |
 | `optimus bench` | Measure implemented backend throughput paths. `--backend vllm --method subspace` is reserved for the Phase 6 speed gate and fails closed until that backend lands. |
 | `optimus make-countdown-data` | Generate deterministic Countdown evaluation data. |
 | `optimus backend-parity-gate` | Gate vLLM selector trust against trusted outputs and adapter tensor checks. |
 | `optimus lighteval` | Plan or run a LightEval job for standard or custom-task confirmation. |
 | `optimus lighteval-sweep` | Plan or run LightEval across population-labelled materialized model artifacts. |
-| `optimus systems-report` | Build backend/method-aware plot inputs and throughput/quality PNGs from result directories. |
+| `optimus systems-report` | Build LoRA/dense plot inputs and throughput/quality PNGs, and aggregate measured subspace `systems_report.json` files without inventing metrics. |
 | `optimus run-plan` | Serialize the normalized P1024/P4096 GPU-suite plan. |
 | `optimus run-suite` | Execute the normalized GPU-suite plan and write an execution log with stable point identities. |
 | `optimus validate-run` | Validate that required GPU-suite outputs are present. |

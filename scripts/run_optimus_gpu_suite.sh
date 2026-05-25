@@ -42,7 +42,6 @@ MAX_CPU_LORAS=${MAX_CPU_LORAS:-8192}
 TENSOR_PARALLEL_SIZE=${TENSOR_PARALLEL_SIZE:-1}
 SYSTEMS_OUT=${SYSTEMS_OUT:-results/report/optimus_systems}
 BENCH_ADAPTERS=${BENCH_ADAPTERS:-8,16,32}
-RUN_HALVING=${RUN_HALVING:-0}
 KEEP_ADAPTERS=${KEEP_ADAPTERS:-0}
 
 export PYTHONUNBUFFERED=1
@@ -55,12 +54,6 @@ if [[ -n "${OPTIMUS_VLLM_ATTENTION_BACKEND:-}" ]]; then
 fi
 mkdir -p "$OUT_ROOT" "$SYSTEMS_OUT" "$XDG_CONFIG_HOME"
 
-halving_arg=()
-if [[ "$RUN_HALVING" == "1" ]]; then
-  halving_arg=(--run-halving)
-else
-  halving_arg=(--skip-halving)
-fi
 artifact_arg=()
 if [[ "$KEEP_ADAPTERS" == "1" && "$METHOD" == "lora" ]]; then
   artifact_arg=(--keep-adapters)
@@ -150,9 +143,8 @@ optimus run-plan \
   "${method_args[@]}" \
   --tensor-parallel-size "$TENSOR_PARALLEL_SIZE" \
   --bench-adapters "$BENCH_ADAPTERS" \
-  "${vllm_runtime_args[@]}" \
-  "${artifact_arg[@]}" \
-  "${halving_arg[@]}" \
+  ${vllm_runtime_args[@]+"${vllm_runtime_args[@]}"} \
+  ${artifact_arg[@]+"${artifact_arg[@]}"} \
   --out "$OUT_ROOT/plan.json"
 
 optimus run-suite \
@@ -172,17 +164,9 @@ optimus run-suite \
   "${method_args[@]}" \
   --tensor-parallel-size "$TENSOR_PARALLEL_SIZE" \
   --bench-adapters "$BENCH_ADAPTERS" \
-  "${vllm_runtime_args[@]}" \
-  "${artifact_arg[@]}" \
-  "${halving_arg[@]}" \
+  ${vllm_runtime_args[@]+"${vllm_runtime_args[@]}"} \
+  ${artifact_arg[@]+"${artifact_arg[@]}"} \
   --execution-log "$OUT_ROOT/execution.json"
-
-validate_halving_arg=()
-if [[ "$RUN_HALVING" == "1" ]]; then
-  validate_halving_arg=(--run-halving)
-else
-  validate_halving_arg=(--skip-halving)
-fi
 
 optimus validate-run \
   --root "$OUT_ROOT" \
@@ -191,6 +175,5 @@ optimus validate-run \
   --method "$METHOD" \
   --populations "$(echo "$POPULATIONS" | tr ' ' ',')" \
   --bench-adapters "$BENCH_ADAPTERS" \
-  "${validate_halving_arg[@]}" \
   --out "$OUT_ROOT/validation.json" \
   --strict

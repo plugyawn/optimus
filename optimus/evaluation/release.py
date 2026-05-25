@@ -8,7 +8,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS, check_run, gpu_suite_contracts, summary_payload
+from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS, SUBSPACE_SYSTEMS_NUMERIC_FIELDS, check_run, gpu_suite_contracts, summary_payload
 from optimus.runs.gpu_suite import GpuSuiteConfig, parse_int_tuple, plan_payload
 
 
@@ -98,6 +98,8 @@ def public_doc_checks(root: Path) -> list[ReleaseCheck]:
         root / "docs" / "gpu_suite.md",
         root / "docs" / "index.md",
         root / "docs" / "optimus_design.md",
+        root / "docs" / "evaluation.md",
+        root / "docs" / "prime_gpu_runbook.md",
         root / "docs" / "release_checklist.md",
         root / "docs" / "subspace_implementation_roadmap.md",
     ]
@@ -137,6 +139,8 @@ def public_api_surface_checks(root: Path) -> list[ReleaseCheck]:
         root / "docs" / "gpu_suite.md",
         root / "docs" / "index.md",
         root / "docs" / "optimus_design.md",
+        root / "docs" / "evaluation.md",
+        root / "docs" / "prime_gpu_runbook.md",
         root / "docs" / "release_checklist.md",
     ]
     leaks: list[str] = []
@@ -409,11 +413,12 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
             checks.append(ReleaseCheck("subspace_systems_report_fields_present", False, "invalid systems_report.json"))
             return checks
         missing = sorted(set(SUBSPACE_SYSTEMS_FIELDS) - set(payload))
+        bad_numeric = sorted(field for field in SUBSPACE_SYSTEMS_NUMERIC_FIELDS if field in payload and not isinstance(payload.get(field), (int, float)))
         checks.append(
             ReleaseCheck(
                 "subspace_systems_report_fields_present",
-                not missing and payload.get("prefix_cache_policy") == "disabled-for-search",
-                "subspace systems fields present" if not missing and payload.get("prefix_cache_policy") == "disabled-for-search" else f"missing={missing!r} prefix_cache_policy={payload.get('prefix_cache_policy')!r}",
+                not missing and not bad_numeric and payload.get("prefix_cache_policy") == "disabled-for-search",
+                "subspace systems fields present" if not missing and not bad_numeric and payload.get("prefix_cache_policy") == "disabled-for-search" else f"missing={missing!r} bad_numeric={bad_numeric!r} prefix_cache_policy={payload.get('prefix_cache_policy')!r}",
             )
         )
         return checks
@@ -524,7 +529,11 @@ def ledger_check(root: Path) -> ReleaseCheck:
     if not ledger.exists():
         return ReleaseCheck("prime_ledger_local_check", True, "no local Prime ledger present")
     text = ledger.read_text()
-    passed = "No active Prime pods" in text and "Compute Pods (Total: 0)" in text
+    lower = text.lower()
+    active_status = re.search(r"(?m)^\s*status:\s*(active|running|pending|provisioning)\b", lower)
+    explicit_zero = "no active prime pods" in lower and "compute pods (total: 0)" in lower
+    verified_zero = "verified prime pods list total 0" in lower
+    passed = not active_status and (explicit_zero or verified_zero)
     return ReleaseCheck(
         "prime_ledger_local_check",
         passed,
@@ -573,8 +582,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--method", choices=["subspace", "lora"], default="subspace")
     parser.add_argument("--populations", default="1024,4096")
     parser.add_argument("--bench-adapters", default="8,16,32")
-    parser.add_argument("--run-halving", action="store_true", help="Reserved until a final staged-search route exists.")
-    parser.add_argument("--skip-halving", action="store_true", help="Compatibility no-op; staged search is disabled by default.")
     parser.add_argument("--remote-url")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--strict", action="store_true")
@@ -589,7 +596,7 @@ def main(argv: list[str] | None = None) -> int:
         gpu_root=args.gpu_root,
         populations=parse_int_tuple(args.populations),
         bench_adapters=parse_int_tuple(args.bench_adapters),
-        run_halving=args.run_halving and not args.skip_halving,
+        run_halving=False,
         method=args.method,
         remote=args.remote_url,
     )

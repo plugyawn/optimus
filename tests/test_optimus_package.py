@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import types
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -152,6 +153,18 @@ def test_backend_parity_help_is_lightweight_and_optimus_owned():
     assert "usage: optimus backend-parity-gate" in result.stdout
     assert "PyTorch" not in result.stderr
     assert "NumPy" not in result.stderr
+
+
+def test_public_validation_and_release_help_exclude_dead_staged_flags():
+    for command in ["validate-run", "release-check", "run-plan"]:
+        result = subprocess.run(
+            [sys.executable, "-m", "optimus.cli", command, "--help"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert "--run-halving" not in result.stdout
+        assert "--skip-halving" not in result.stdout
 
 
 def test_legacy_search_wrappers_are_not_public_commands():
@@ -335,6 +348,29 @@ def test_gaussian_hash_v1_golden_vectors_and_antithetic_sign():
         assert observed == expected
         assert gaussian_hash_v1(**kwargs, sign=-1) == -expected
         assert gaussian_hash_v1(**kwargs, sign="-") == -expected
+
+
+def test_gaussian_hash_v1_replay_is_process_and_order_independent():
+    payload = """
+import json
+from optimus.subspace import gaussian_hash_v1
+cases = [
+    dict(direction_seed=3, target_id='layer_0.self_attn.q_proj', output_index=2, basis_index=1, salt='a'),
+    dict(direction_seed=4, target_id='layer_1.self_attn.v_proj', output_index=5, basis_index=7, salt='b'),
+    dict(direction_seed=5, target_id='layer_2.mlp.down_proj', output_index=11, basis_index=13, salt='c'),
+]
+print(json.dumps([gaussian_hash_v1(**item) for item in cases]))
+print(json.dumps([gaussian_hash_v1(**item) for item in reversed(cases)]))
+"""
+    first = subprocess.run([sys.executable, "-c", payload], check=True, capture_output=True, text=True)
+    second = subprocess.run([sys.executable, "-c", payload], check=True, capture_output=True, text=True)
+
+    first_lines = first.stdout.splitlines()
+    second_lines = second.stdout.splitlines()
+    assert first_lines == second_lines
+    forward = json.loads(first_lines[0])
+    reversed_values = json.loads(first_lines[1])
+    assert forward == list(reversed(reversed_values))
 
 
 def test_vllm_serving_metadata_import_is_lightweight():

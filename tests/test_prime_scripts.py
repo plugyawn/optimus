@@ -49,6 +49,9 @@ def test_gpu_suite_launcher_delegates_execution_to_optimus_runner():
     assert "--strict" in text
     assert "PROMPT_VARIANTS=${PROMPT_VARIANTS:-default}" in text
     assert "--prompt-variants \"$PROMPT_VARIANTS\"" in text
+    assert "RUN_HALVING" not in text
+    assert "--run-halving" not in text
+    assert "--skip-halving" not in text
     assert "run_bench()" not in text
     assert "run_search()" not in text
 
@@ -62,6 +65,7 @@ def test_population_lighteval_pipeline_closes_eval_loop():
     assert "optimus lighteval-sweep" in text
     assert "optimus lighteval-report" in text
     assert "KEEP_ADAPTERS=${KEEP_ADAPTERS:-1}" in text
+    assert "RUN_HALVING" not in text
     assert "MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507}" in text
     assert "PROMPT_VARIANTS=${PROMPT_VARIANTS:-bare}" in text
     assert "LIGHTEVAL_USE_CHAT_TEMPLATE=${LIGHTEVAL_USE_CHAT_TEMPLATE:-auto}" in text

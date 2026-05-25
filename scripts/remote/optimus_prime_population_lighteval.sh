@@ -12,7 +12,6 @@ if [[ -n "${OPTIMUS_VLLM_ATTENTION_BACKEND:-}" ]]; then
 fi
 mkdir -p "$XDG_CONFIG_HOME"
 
-RUN_HALVING=${RUN_HALVING:-0} \
 KEEP_ADAPTERS=${KEEP_ADAPTERS:-1} \
 MODEL=${MODEL:-Qwen/Qwen3-4B-Instruct-2507} \
 DATA=${DATA:-data/countdown_generated_1200_seed20260507.json} \

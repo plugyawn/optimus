@@ -31,9 +31,10 @@ python -m pip install -e ".[eval,serving]"
 python -m pip install -e ".[dev]"
 ```
 
-The serving extra is for vLLM-backed LoRA adapter serving and the production
-subspace backend. The eval extra installs LightEval for standard and custom-task
-confirmation; combine eval and serving extras for LightEval's vLLM backend.
+The serving extra is for vLLM-backed LoRA adapter serving and for the planned
+production subspace backend once Phase 5 lands. The eval extra installs
+LightEval for standard and custom-task confirmation; combine eval and serving
+extras for LightEval's vLLM backend.
 
 ## Package Layout
 
@@ -44,7 +45,7 @@ confirmation; combine eval and serving extras for LightEval's vLLM backend.
 | `optimus.commands` | Public CLI entrypoint modules. |
 | `optimus.modeling` | Dense Gaussian patching, low-rank geometry, Qwen shape/config helpers, and explicit export/materialization helpers. |
 | `optimus.subspace` | Subspace basis state, candidate noise, and reference math. |
-| `optimus.backends` | vLLM and Transformers backend integrations, including vLLM subspace search. |
+| `optimus.backends` | Backend names and compatibility boundaries; vLLM subspace search is planned and fails closed until Phase 5. |
 | `optimus.search` | Backend-neutral zeroth-order study helpers, selector scoring, and replay helpers. |
 | `optimus.serving` | Prompt/token contracts and output scoring helpers used by backend integrations. |
 | `optimus.runs` | GPU workload specs, stable point identities, resumable execution logs, and plan serialization. |
@@ -59,7 +60,8 @@ are JSONL records with method-qualified keys.
 
 Backends must state the methods they support:
 
-- `--backend vllm --method subspace` is the production subspace search path.
+- `--backend vllm --method subspace` is the planned production subspace search
+  path and currently fails closed with a Phase 5 pointer.
 - `--backend vllm --method lora` is adapter-search/replay infrastructure.
 - `--backend transformers` is the trusted reference path for dense, LoRA, and
   subspace checks.
@@ -81,8 +83,9 @@ The library treats monitorability and throughput as part of the API:
   and elapsed time for each point;
 - summaries include candidate/sec, prompts/sec, tokens/sec, load time, eval
   elapsed time, tensor parallel size, batch/chunk settings, and method/backend;
-- plots and CSVs keep selector quality, holdout-oracle quality, throughput, and
-  staged-search regret separate.
+- plots and CSVs keep selector quality, holdout-oracle quality, and throughput
+  separate. Historical staged-search artifacts are parsed separately when
+  present, but staged search is not a supported public route yet.
 
 This mirrors the operational discipline used for large training sweeps: do not
 infer state from terminal history, do not mix budgets inside one claim, and make
@@ -123,7 +126,7 @@ Quality claims require:
 | Backend parity | Protocol match, base-row checks, ranking agreement, output-diff checks, and adapter tensor checks where applicable. |
 | Dense/LoRA distinction | Rank-`r` LoRA is not claimed as dense parity unless a dense reference run actually passes. |
 | LightEval confirmation | Standard-harness results and saved details for externally materialized final models; lazy top-K ensembles use Optimus-native sample-level evaluation until a direct LightEval runtime adapter exists. |
-| Systems reporting | Backend/method-aware CSVs and PNGs for candidate/sec, token throughput, best-of-N, quality scaling, and staged search. |
+| Systems reporting | Backend/method-aware CSVs and PNGs for candidate/sec, token throughput, best-of-N, and quality scaling. Staged artifacts are legacy report inputs only until a final staged route exists. |
 | GPU operations | Execution log, run validation, and pod cleanup ledger. |
 
 ## Completion Criteria

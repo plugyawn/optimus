@@ -1,7 +1,9 @@
 # Optimus GPU Suite
 
 This runbook defines the P1024/P4096 GPU workloads used to validate Optimus
-search quality, GPU throughput, and staged-search behavior.
+search quality and GPU throughput. Staged-search artifacts can still be parsed
+for historical reports, but staged search is not a supported public GPU-suite
+route until a final command is added.
 
 ## Required Runs
 
@@ -9,9 +11,8 @@ search quality, GPU throughput, and staged-search behavior.
 | --- | --- | --- |
 | P1024 full search | `results/optimus_gpu_suite/search_p1024` | Matched quality and systems baseline. |
 | P4096 full search | `results/optimus_gpu_suite/search_p4096` | Best-of-N and scaling evidence. |
-| P1024 staged search | `results/optimus_gpu_suite/staged_p1024` | Staged-search savings and regret when enabled. |
 | Backend throughput benches | `results/optimus_gpu_suite/bench_*` | Candidate/sec, prompts/sec, tokens/sec, and backend-scaling data. |
-| Systems report | `results/report/optimus_systems` | Backend/method-aware plot inputs and PNGs for candidate/sec, backend throughput, token throughput, best-of-N, quality scaling, and staging tradeoffs. |
+| Systems report | `results/report/optimus_systems` | LoRA/dense plot inputs and PNGs for candidate/sec, backend throughput, token throughput, best-of-N, and quality scaling; subspace suites aggregate measured per-run `systems_report.json` into `subspace_systems.csv` and a suite-level `systems_report.json`. |
 | Execution log | `results/optimus_gpu_suite/execution.json` | Ordered command/status record from `optimus run-suite`. |
 
 ## Launcher
@@ -81,7 +82,6 @@ BASIS_KIND=activation-svd \
 TOP_K_GRID=1,4,8,16 \
 CANDIDATE_BATCH_SIZE=auto \
 KERNEL=torch \
-RUN_HALVING=0 \
 scripts/run_optimus_gpu_suite.sh
 ```
 
@@ -108,8 +108,7 @@ optimus run-plan \
   --basis-kind activation-svd \
   --top-k-grid 1,4,8,16 \
   --candidate-batch-size auto \
-  --kernel torch \
-  --skip-halving
+  --kernel torch
 ```
 
 For Qwen3-4B, prefer data-parallel independent jobs or LightEval
@@ -130,8 +129,9 @@ The generated evidence is not enough by itself. A final claim requires:
 4. Backend parity or trusted confirmation before using any fast backend ranking
    as the selector of record.
 5. P1024/P4096 best-of-N curves from saved candidate summaries.
-6. Systems plots from `optimus systems-report`, including backend throughput,
-   token throughput, best-of-N, quality scaling, and top-K ensemble quality.
+6. Systems outputs from `optimus systems-report`: LoRA/dense plots for backend
+   throughput, token throughput, best-of-N, and quality scaling; subspace
+   runtime summaries in `systems_report.json` and `subspace_systems.csv`.
 7. `optimus validate-run` passes for the run root and systems report.
 8. Active GPU pods stopped or explicitly reported after the run.
 
@@ -156,7 +156,7 @@ not a selector claim. Concrete numbers should come from the local generated
 
 Remaining publication-grade gaps:
 
-- add a final public staged-search route before reintroducing staged P1024
+- add a final public staged-search route before introducing staged P1024
   prompt-eval savings and selected-regret plots;
 - add trusted Transformers, dense-reference, or LightEval confirmation for the
   selected materialized model state;

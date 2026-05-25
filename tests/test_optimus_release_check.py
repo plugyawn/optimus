@@ -96,6 +96,8 @@ include = {package_include}
         "gpu_suite.md",
         "index.md",
         "optimus_design.md",
+        "evaluation.md",
+        "prime_gpu_runbook.md",
         "release_checklist.md",
         "subspace_implementation_roadmap.md",
     ]:
@@ -217,6 +219,46 @@ def test_release_check_flags_old_root_shape(tmp_path: Path):
     assert "repo_has_no_archive_experiment_tree" in failed
 
 
+def test_release_check_requires_all_public_docs(tmp_path: Path):
+    gpu, systems = write_minimal_release_tree(tmp_path)
+    (tmp_path / "docs" / "evaluation.md").unlink()
+
+    checks = build_release_checks(
+        root=tmp_path,
+        systems_out=systems,
+        gpu_root=gpu,
+        populations=(1024, 4096),
+        bench_adapters=(8,),
+        run_halving=False,
+        method="lora",
+        remote="https://github.com/plugyawn/optimus.git",
+    )
+    failed = {check.name for check in checks if not check.passed}
+
+    assert "public_docs_present" in failed
+
+
+def test_release_check_accepts_verified_prime_zero_ledger(tmp_path: Path):
+    gpu, systems = write_minimal_release_tree(tmp_path)
+    ledger = tmp_path / ".opencode" / "prime-gpu-ledger.md"
+    ledger.parent.mkdir()
+    ledger.write_text("- pod_id: p1\n  status: terminated; verified prime pods list total 0\n")
+
+    checks = build_release_checks(
+        root=tmp_path,
+        systems_out=systems,
+        gpu_root=gpu,
+        populations=(1024, 4096),
+        bench_adapters=(8,),
+        run_halving=False,
+        method="lora",
+        remote="https://github.com/plugyawn/optimus.git",
+    )
+    by_name = {check.name: check for check in checks}
+
+    assert by_name["prime_ledger_local_check"].passed
+
+
 def test_release_check_cli_is_lightweight(tmp_path: Path):
     gpu, systems = write_minimal_release_tree(tmp_path)
 
@@ -236,7 +278,6 @@ def test_release_check_cli_is_lightweight(tmp_path: Path):
             "1024,4096",
             "--bench-adapters",
             "8",
-            "--skip-halving",
             "--method",
             "lora",
             "--remote-url",

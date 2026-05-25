@@ -461,9 +461,11 @@ Metrics:
 Acceptance gate:
 
 - Reference path passes math, replay, artifact, and scorer contracts.
-- Activation-SVD is not obviously worse than both random controls on the
-  predeclared primary metric. This gate only authorizes vLLM parity work; it is
-  not the production scientific claim.
+- Activation-SVD passes a predeclared non-inferiority test against both random
+  controls on the locked primary metric: paired bootstrap 95% CI lower bound for
+  `activation_svd - best_control` must be at least `-epsilon`, where `epsilon`
+  is written in the run config before scoring starts. This gate only authorizes
+  vLLM parity work; it is not the production scientific claim.
 
 ## Phase 5: vLLM Eager Wrapper
 

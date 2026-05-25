@@ -549,7 +549,6 @@ def _config_payload(config: GpuSuiteConfig) -> dict[str, Any]:
         "enable_chunked_prefill": config.enable_chunked_prefill,
         "kv_cache_dtype": config.kv_cache_dtype,
         "vllm_kwargs": config.vllm_kwargs,
-        "run_halving": config.run_halving,
     }
     if config.method == "subspace":
         common.update(
@@ -664,11 +663,6 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--vllm-kwarg", action="append", default=[], help="Extra vLLM LLM() kwarg as KEY=VALUE.")
     parser.add_argument("--keep-adapters", action="store_true")
     parser.add_argument("--bench-adapters", default="8,16,32")
-    parser.add_argument("--halving-population", type=int, default=1024)
-    parser.add_argument("--halving-stage-prompts", type=int, default=8)
-    parser.add_argument("--halving-survivors", type=int, default=64)
-    parser.add_argument("--run-halving", action="store_true", help="Reserved until a final staged-search route exists.")
-    parser.add_argument("--skip-halving", action="store_true", help="Compatibility no-op; staged search is disabled by default.")
 
 
 def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:
@@ -721,10 +715,7 @@ def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:
         vllm_kwargs=tuple(args.vllm_kwarg),
         keep_adapters=args.keep_adapters,
         bench_adapters=parse_int_tuple(args.bench_adapters),
-        halving_population=args.halving_population,
-        halving_stage_prompts=args.halving_stage_prompts,
-        halving_survivors=args.halving_survivors,
-        run_halving=args.run_halving and not args.skip_halving,
+        run_halving=False,
     )
 
 

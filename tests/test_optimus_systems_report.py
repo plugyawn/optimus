@@ -203,6 +203,27 @@ def test_systems_report_writes_subspace_systems_json_from_measured_runs(tmp_path
     assert payload["schema_version"] == "subspace_systems_report_v1"
     assert payload["prefix_cache_policy"] == "disabled-for-search"
     assert payload["source_run_dir"] == str(run)
+    assert "source_run_dir" in (out / "subspace_systems.csv").read_text()
+    assert "Subspace Systems" in (out / "report.md").read_text()
+
+
+def test_systems_report_rejects_bad_subspace_system_types(tmp_path: Path):
+    run = tmp_path / "optimus_gpu_suite" / "search_p128_subspace_r128"
+    run.mkdir(parents=True)
+    (run / "summary.json").write_text(
+        json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128}) + "\n"
+    )
+    payload = _subspace_systems_payload()
+    payload["gpu_count"] = "many"
+    payload["candidates_per_sec"] = "fast"
+    payload["top_k_ensemble_cost_multiplier"] = "huge"
+    (run / "systems_report.json").write_text(json.dumps(payload) + "\n")
+
+    out = tmp_path / "report"
+    assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 1
+
+    report = (out / "report.md").read_text()
+    assert "nonnumeric fields" in report
 
 
 def test_systems_report_fails_closed_for_subspace_without_measured_report(tmp_path: Path):

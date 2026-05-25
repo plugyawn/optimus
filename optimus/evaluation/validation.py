@@ -31,6 +31,13 @@ SUBSPACE_REQUIRED_SUMMARY = (
     "git_dirty",
     "command",
     "environment",
+    "model_id_or_path",
+    "model_revision",
+    "tokenizer_hash",
+    "task_config_hash",
+    "prompt_contract_hash",
+    "screen_split_hash",
+    "holdout_split_hash",
     "population",
     "basis_hash",
     "target_set_hash",
@@ -50,6 +57,8 @@ SUBSPACE_REQUIRED_SUMMARY = (
     "sample_set_hash",
     "prompt_scoring_config_hash",
     "decode_config_hash",
+    "kernel",
+    "resolved_target_scales",
     "candidates_per_sec",
     "prompts_per_sec",
     "output_tokens_per_sec",
@@ -124,6 +133,7 @@ SUBSPACE_VALIDATION_SECTIONS = (
     "drift_diagnostics",
     "random_shuffled_controls",
     "throughput_gates",
+    "scientific_gate_contract",
 )
 SUBSPACE_SYSTEMS_FIELDS = (
     "schema_version",
@@ -153,6 +163,42 @@ SUBSPACE_SYSTEMS_FIELDS = (
     "random_q_control",
     "shuffled_q_control",
     "antithetic_odd_even",
+)
+SUBSPACE_STATE_SUMMARY_FIELDS = (
+    "schema_version",
+    "model_id_or_path",
+    "model_revision",
+    "tokenizer_hash",
+    "prompt_contract_hash",
+    "basis_hash",
+    "target_preset",
+    "layers",
+    "basis_kind",
+    "basis_centering",
+    "basis_token_source",
+    "basis_split",
+    "activation_sites",
+    "targets",
+)
+SUBSPACE_ACTIVATION_SITE_FIELDS = (
+    "site_id",
+    "input_dim",
+    "requested_rank",
+    "effective_rank",
+    "basis_tensor_key",
+    "singular_values",
+    "captured_energy",
+    "H_s",
+    "A_s",
+    "orthonormality_error",
+    "gram_error",
+    "num_calibration_tokens",
+)
+SUBSPACE_TARGET_FIELDS = (
+    "target_id",
+    "activation_site_id",
+    "output_dim",
+    "base_output_power_P_t",
 )
 
 
@@ -210,6 +256,24 @@ SUBSPACE_CANDIDATE_IDENTITY_FIELDS = (
     "budget_policy",
     "rng_version",
     "prompt_scoring_config_hash",
+)
+SUBSPACE_SYSTEMS_NUMERIC_FIELDS = (
+    "gpu_count",
+    "gpu_memory_allocated_bytes",
+    "gpu_memory_reserved_bytes",
+    "base_model_time_s",
+    "qx_time_s",
+    "lazy_delta_time_s",
+    "scoring_time_s",
+    "setup_time_s",
+    "candidates_per_sec",
+    "prompts_per_sec",
+    "output_tokens_per_sec",
+    "lazy_overhead_pct",
+    "top_k_ensemble_cost_multiplier",
+    "screen_score",
+    "holdout_score",
+    "screen_to_holdout_drop",
 )
 
 
@@ -286,7 +350,7 @@ def _check_subspace_score(invalid: list[str], prefix: str, row: dict, summary: d
     for field in ("elapsed_s", "output_tokens"):
         if not _is_finite_number(row.get(field)):
             invalid.append(f"{prefix}.{field}: not finite")
-    for field in ("scorer_version", "prompt_ids_hash", "sample_set_hash", "decode_config_hash"):
+    for field in ("scorer_name", "scorer_version", "prompt_ids_hash", "sample_set_hash", "decode_config_hash"):
         expected = summary.get(field)
         if expected is not None and row.get(field) != expected:
             invalid.append(f"{prefix}.{field}: expected summary.{field} {expected!r}, got {row.get(field)!r}")
@@ -295,6 +359,65 @@ def _check_subspace_score(invalid: list[str], prefix: str, row: dict, summary: d
 def _evidence_path_exists(root: Path, value: str) -> bool:
     path = Path(value)
     return path.exists() if path.is_absolute() else (root / path).exists()
+
+
+def _check_subspace_state_summary(invalid: list[str], rel: str, payload: dict) -> None:
+    sites = payload.get("activation_sites")
+    if isinstance(sites, list) and sites:
+        for index, site in enumerate(sites, start=1):
+            if not isinstance(site, dict):
+                invalid.append(f"{rel}.activation_sites[{index}]: not object")
+                continue
+            for field in SUBSPACE_ACTIVATION_SITE_FIELDS:
+                if field not in site:
+                    invalid.append(f"{rel}.activation_sites[{index}].{field}: missing")
+            for field in ("input_dim", "requested_rank", "effective_rank", "num_calibration_tokens"):
+                if field in site and not _is_positive_int(site.get(field)):
+                    invalid.append(f"{rel}.activation_sites[{index}].{field}: not positive integer")
+            for field in ("captured_energy", "H_s", "A_s", "orthonormality_error", "gram_error"):
+                if field in site and not _is_finite_number(site.get(field)):
+                    invalid.append(f"{rel}.activation_sites[{index}].{field}: not finite")
+    targets = payload.get("targets")
+    if isinstance(targets, list) and targets:
+        for index, target in enumerate(targets, start=1):
+            if not isinstance(target, dict):
+                invalid.append(f"{rel}.targets[{index}]: not object")
+                continue
+            for field in SUBSPACE_TARGET_FIELDS:
+                if field not in target:
+                    invalid.append(f"{rel}.targets[{index}].{field}: missing")
+            if "output_dim" in target and not _is_positive_int(target.get("output_dim")):
+                invalid.append(f"{rel}.targets[{index}].output_dim: not positive integer")
+            if "base_output_power_P_t" in target and not _is_finite_number(target.get("base_output_power_P_t")):
+                invalid.append(f"{rel}.targets[{index}].base_output_power_P_t: not finite")
+
+
+def _check_subspace_systems(invalid: list[str], rel: str, payload: dict) -> None:
+    for field in SUBSPACE_SYSTEMS_NUMERIC_FIELDS:
+        if field in payload and not _is_finite_number(payload.get(field)):
+            invalid.append(f"{rel}.{field}: not finite")
+    for field in ("diversity_metrics", "random_q_control", "shuffled_q_control", "antithetic_odd_even"):
+        if field in payload and not isinstance(payload.get(field), dict):
+            invalid.append(f"{rel}.{field}: not object")
+    if payload.get("prefix_cache_policy") != "disabled-for-search":
+        invalid.append(f"{rel}.prefix_cache_policy: expected 'disabled-for-search', got {payload.get('prefix_cache_policy')!r}")
+
+
+def _check_scientific_gate_contract(invalid: list[str], rel: str, section: dict) -> None:
+    for field in ("locked_config_hash", "selection_rule_hash", "primary_metric", "multiple_comparison_correction"):
+        if not isinstance(section.get(field), str) or not section.get(field):
+            invalid.append(f"{rel}.scientific_gate_contract.{field}: empty")
+    ci = section.get("confidence_interval")
+    if not isinstance(ci, dict):
+        invalid.append(f"{rel}.scientific_gate_contract.confidence_interval: not object")
+        return
+    for field in ("lower", "upper"):
+        if not _is_finite_number(ci.get(field)):
+            invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.{field}: not finite")
+
+
+def _candidate_identity_projection(row: dict) -> dict:
+    return {field: row.get(field) for field in SUBSPACE_CANDIDATE_FIELDS}
 
 
 def check_run(contract: RunContract) -> RunCheck:
@@ -361,6 +484,8 @@ def check_run(contract: RunContract) -> RunCheck:
             elif not all(_is_finite_number(item) for item in summary["sigma_w_grid"]):
                 invalid.append("summary.sigma_w_grid: contains non-finite value")
     jsonl_counts: dict[str, int] = {}
+    subspace_candidates: dict[str, dict] = {}
+    subspace_scored_candidate_ids: set[str] = set()
     for rel in contract.required_jsonl_nonempty:
         path = contract.root / rel
         if not path.exists():
@@ -377,6 +502,13 @@ def check_run(contract: RunContract) -> RunCheck:
                             invalid.append(f"{rel}: row {line_no} missing {field}")
                     if is_subspace_contract and rel == "candidates.jsonl":
                         _check_subspace_candidate(invalid, f"{rel}: row {line_no}", row, summary)
+                        candidate_id = row.get("candidate_id")
+                        if isinstance(candidate_id, str) and candidate_id:
+                            projected = _candidate_identity_projection(row)
+                            if candidate_id in subspace_candidates and subspace_candidates[candidate_id] != projected:
+                                invalid.append(f"{rel}: row {line_no} duplicate candidate_id with conflicting identity")
+                            else:
+                                subspace_candidates[candidate_id] = projected
                     elif rel == "candidates.jsonl":
                         if row.get("scale_mode") not in SUBSPACE_SCALE_MODES:
                             invalid.append(f"{rel}: row {line_no} invalid scale_mode")
@@ -384,6 +516,9 @@ def check_run(contract: RunContract) -> RunCheck:
                             invalid.append(f"{rel}: row {line_no} invalid budget_policy")
                     if is_subspace_contract and rel == "candidate_scores.jsonl":
                         _check_subspace_score(invalid, f"{rel}: row {line_no}", row, summary)
+                        candidate_id = row.get("candidate_id")
+                        if isinstance(candidate_id, str) and candidate_id:
+                            subspace_scored_candidate_ids.add(candidate_id)
                     elif rel == "candidate_scores.jsonl":
                         if row.get("split") not in {"screen", "holdout", "validation", "test"}:
                             invalid.append(f"{rel}: row {line_no} invalid split")
@@ -399,6 +534,9 @@ def check_run(contract: RunContract) -> RunCheck:
         expected = int(summary[summary_key])
         if jsonl_counts[rel] != expected:
             invalid.append(f"{rel}: rows {jsonl_counts[rel]} != summary.{summary_key} {expected}")
+    if is_subspace_contract:
+        for candidate_id in sorted(subspace_scored_candidate_ids - set(subspace_candidates)):
+            invalid.append(f"candidate_scores.jsonl.candidate_id: unknown {candidate_id!r}")
     for rel, fields in (contract.required_json_fields or {}).items():
         path = contract.root / rel
         if not path.exists():
@@ -419,6 +557,8 @@ def check_run(contract: RunContract) -> RunCheck:
             observed = payload.get(field)
             if observed != expected:
                 invalid.append(f"{rel}.{field}: expected {expected!r}, got {observed!r}")
+        if is_subspace_contract and rel == "subspace_state_summary.json":
+            _check_subspace_state_summary(invalid, rel, payload)
         if rel == "top_k_ensemble.json" and "candidates" in fields:
             _check_identity_consistency(invalid=invalid, prefix=rel, payload=payload, summary=summary)
             for field in ("subspace_state_hash", "candidate_scores_hash"):
@@ -445,6 +585,15 @@ def check_run(contract: RunContract) -> RunCheck:
                         if field not in candidate:
                             invalid.append(f"{rel}.candidates[{index}].{field}: missing")
                     _check_subspace_candidate(invalid, f"{rel}.candidates[{index}]", candidate, summary)
+                    candidate_id = candidate.get("candidate_id")
+                    if isinstance(candidate_id, str) and candidate_id:
+                        expected = subspace_candidates.get(candidate_id)
+                        if expected is None:
+                            invalid.append(f"{rel}.candidates[{index}].candidate_id: unknown {candidate_id!r}")
+                        elif _candidate_identity_projection(candidate) != expected:
+                            invalid.append(f"{rel}.candidates[{index}]: identity differs from candidates.jsonl")
+                        if candidate_id not in subspace_scored_candidate_ids:
+                            invalid.append(f"{rel}.candidates[{index}].candidate_id: no candidate_scores row")
         if rel == "validation_report.json":
             required_sections = fields
             for section in required_sections:
@@ -469,6 +618,10 @@ def check_run(contract: RunContract) -> RunCheck:
                     invalid.append(f"{rel}.{section}.failures: not list")
                 elif failures:
                     invalid.append(f"{rel}.{section}.failures: nonempty")
+                if section == "scientific_gate_contract":
+                    _check_scientific_gate_contract(invalid, rel, value)
+        if is_subspace_contract and rel == "systems_report.json":
+            _check_subspace_systems(invalid, rel, payload)
     for rel in contract.required_csv_nonempty:
         path = contract.root / rel
         if not path.exists():
@@ -535,12 +688,21 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
                     "basis_collection_config_hash",
                     "subspace_state_hash",
                     "candidate_scores_hash",
+                    "model_id_or_path",
+                    "model_revision",
+                    "tokenizer_hash",
+                    "task_config_hash",
+                    "prompt_contract_hash",
+                    "screen_split_hash",
+                    "holdout_split_hash",
                     "scorer_name",
                     "scorer_version",
                     "prompt_ids_hash",
                     "sample_set_hash",
                     "prompt_scoring_config_hash",
                     "decode_config_hash",
+                    "kernel",
+                    "resolved_target_scales",
                 )
                 required_path_keys = ()
                 expected_summary_values = {
@@ -551,6 +713,7 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
                     "budget_policy": config.budget_policy,
                     "candidate_routing": "row_candidate_id",
                     "prefix_cache_policy": "disabled-for-search",
+                    "kernel": config.kernel,
                 }
                 required_jsonl_nonempty = ("candidates.jsonl", "candidate_scores.jsonl")
                 required_jsonl_fields = {
@@ -560,7 +723,7 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
                 expected_jsonl_counts = {"candidates.jsonl": "population"}
                 required_bool_keys = ()
                 required_json_fields = {
-                    "subspace_state_summary.json": ("schema_version", "basis_hash", "activation_sites", "targets"),
+                    "subspace_state_summary.json": SUBSPACE_STATE_SUMMARY_FIELDS,
                     "top_k_ensemble.json": SUBSPACE_TOP_K_FIELDS,
                     "validation_report.json": SUBSPACE_VALIDATION_SECTIONS,
                     "systems_report.json": SUBSPACE_SYSTEMS_FIELDS,
@@ -689,8 +852,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--method", choices=["lora", "subspace"], default="lora")
     parser.add_argument("--populations", default="1024,4096")
     parser.add_argument("--bench-adapters", default="8,16,32")
-    parser.add_argument("--run-halving", action="store_true", help="Reserved until a final staged-search route exists.")
-    parser.add_argument("--skip-halving", action="store_true", help="Compatibility no-op; staged search is disabled by default.")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--strict", action="store_true")
     return parser
@@ -705,7 +866,7 @@ def main(argv: list[str] | None = None) -> int:
         method=args.method,
         populations=parse_int_tuple(args.populations),
         bench_adapters=parse_int_tuple(args.bench_adapters),
-        run_halving=args.run_halving and not args.skip_halving,
+        run_halving=False,
     )
     try:
         contracts = gpu_suite_contracts(config)

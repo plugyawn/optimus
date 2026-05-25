@@ -849,11 +849,14 @@ corresponding run-summary hashes.
 
 `validation_report.json` has separate sections for math tests, RNG/replay tests,
 routing/cache tests, selector quality, holdout quality, ensemble quality, drift
-diagnostics, random/shuffled controls, and throughput gates. Each section has
-`status`, `evidence_paths`, and a machine-readable failure list. A completed
-run passes validation only when every required section has `status: "pass"`,
-nonempty evidence paths that exist in the run directory, and an empty failure
-list.
+diagnostics, random/shuffled controls, throughput gates, and a
+`scientific_gate_contract`. Each section has `status`, `evidence_paths`, and a
+machine-readable failure list. A completed run passes validation only when every
+required section has `status: "pass"`, nonempty evidence paths that exist in the
+run directory, and an empty failure list. The scientific gate section also
+records `locked_config_hash`, `selection_rule_hash`, `primary_metric`,
+`multiple_comparison_correction`, and a numeric confidence interval so a
+gate result is not merely self-attested prose.
 
 `systems_report.json` records warmup policy, CUDA synchronization policy,
 candidate batch size, candidate shard id, GPU model, GPU count, memory
