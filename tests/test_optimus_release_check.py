@@ -162,6 +162,7 @@ def test_release_check_passes_clean_optimus_tree(tmp_path: Path):
         populations=(1024, 4096),
         bench_adapters=(8,),
         run_halving=False,
+        method="lora",
         remote="https://github.com/plugyawn/optimus.git",
     )
 
@@ -179,6 +180,7 @@ def test_release_check_flags_old_package_and_old_remote(tmp_path: Path):
         populations=(1024, 4096),
         bench_adapters=(8,),
         run_halving=False,
+        method="lora",
         remote=f"https://github.com/plugyawn/{FORBIDDEN_REPO}.git",
     )
     payload = summary(checks)
@@ -204,6 +206,7 @@ def test_release_check_flags_old_root_shape(tmp_path: Path):
         populations=(1024, 4096),
         bench_adapters=(8,),
         run_halving=False,
+        method="lora",
         remote="https://github.com/plugyawn/optimus.git",
     )
     payload = summary(checks)
@@ -234,6 +237,8 @@ def test_release_check_cli_is_lightweight(tmp_path: Path):
             "--bench-adapters",
             "8",
             "--skip-halving",
+            "--method",
+            "lora",
             "--remote-url",
             "https://github.com/plugyawn/optimus.git",
         ],

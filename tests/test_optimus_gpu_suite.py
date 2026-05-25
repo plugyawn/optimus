@@ -171,9 +171,14 @@ def write_subspace_contract_outputs(contract) -> None:
         "basis_hash": "basis123",
         "target_set_hash": "target123",
         "scale_mode": "relative-output-rms",
+        "rho_or_sigma_w": 0.01,
         "budget_policy": "per-block-equal",
+        "budget_hash": "budget123",
         "rng_version": "gaussian_hash_v1",
         "runtime_dtype": "bf16",
+        "radius_index": 0,
+        "target_preset": "transformer-linears",
+        "basis_rank": 128,
     }
     summary = {
         "kind": "subspace_vllm_search",
@@ -212,6 +217,9 @@ def write_subspace_contract_outputs(contract) -> None:
             "K": 1,
             "candidates": [candidate],
             "basis_hash": "basis123",
+            "scale_mode": "relative-output-rms",
+            "rho_or_sigma_w": 0.01,
+            "budget_policy": "per-block-equal",
             "target_set_hash": "target123",
             "scorer_version": "countdown_v1",
             "prompt_ids_hash": "prompts123",
@@ -219,24 +227,47 @@ def write_subspace_contract_outputs(contract) -> None:
             "decode_config_hash": "decode123",
         },
         "validation_report.json": {
-            "schema_version": "subspace_validation_report_v1",
-            "scientific_gate": {},
-            "drift_diagnostics": {},
-            "diversity_metrics": {},
+            key: {"status": "pass", "evidence_paths": ["summary.json"], "failures": []}
+            for key in [
+                "math_tests",
+                "rng_replay_tests",
+                "routing_cache_tests",
+                "selector_quality",
+                "holdout_quality",
+                "ensemble_quality",
+                "drift_diagnostics",
+                "random_shuffled_controls",
+                "throughput_gates",
+            ]
         },
         "systems_report.json": {
             "schema_version": "subspace_systems_report_v1",
-            "candidates_per_sec": 1.0,
-            "prompts_per_sec": 2.0,
-            "output_tokens_per_sec": 3.0,
+            "warmup_policy": "one_warmup_batch",
+            "cuda_sync_policy": "sync_timed_regions",
+            "candidate_batch_size": 4,
+            "candidate_shard_id": "single",
+            "gpu_model": "test-gpu",
+            "gpu_count": 1,
+            "gpu_memory_allocated_bytes": 1024,
+            "gpu_memory_reserved_bytes": 2048,
             "base_model_time_s": 1.0,
             "qx_time_s": 0.1,
             "lazy_delta_time_s": 0.2,
             "scoring_time_s": 0.3,
             "setup_time_s": 0.4,
+            "candidates_per_sec": 1.0,
+            "prompts_per_sec": 2.0,
+            "output_tokens_per_sec": 3.0,
             "lazy_overhead_pct": 10.0,
-            "gpu_memory_allocated_bytes": 1024,
-            "candidate_batch_size": 4,
+            "prefix_cache_policy": "disabled-for-search",
+            "top_k_ensemble_cost_multiplier": 1.0,
+            "screen_score": 0.1,
+            "holdout_score": 0.2,
+            "screen_to_holdout_drop": -0.1,
+            "diversity_metrics": {"distinct_answers": 1},
+            "random_q_control": {"score": 0.1},
+            "shuffled_q_control": {"score": 0.1},
+            "antithetic_odd_even": {"odd": 0.0, "even": 0.0},
         },
     }
     for rel in contract.required_files:
@@ -247,7 +278,26 @@ def write_subspace_contract_outputs(contract) -> None:
         elif rel == "candidates.jsonl":
             path.write_text("".join(json.dumps(candidate | {"candidate_id": f"seed{idx}:+:rho0.01", "direction_seed": idx}) + "\n" for idx in range(1, 17)))
         elif rel == "candidate_scores.jsonl":
-            path.write_text("".join(json.dumps({"candidate_id": f"seed{idx}:+:rho0.01", "screen_score": 0.1, "scorer_version": "countdown_v1", "prompt_ids_hash": "prompts123"}) + "\n" for idx in range(1, 17)))
+            path.write_text(
+                "".join(
+                    json.dumps(
+                        {
+                            "candidate_id": f"seed{idx}:+:rho0.01",
+                            "split": "screen",
+                            "scorer_name": "countdown",
+                            "scorer_version": "countdown_v1",
+                            "aggregate_metrics": {"exact": 0.1},
+                            "sample_count": 8,
+                            "prompt_ids_hash": "prompts123",
+                            "decode_config_hash": "decode123",
+                            "elapsed_s": 0.01,
+                            "output_tokens": 16,
+                        }
+                    )
+                    + "\n"
+                    for idx in range(1, 17)
+                )
+            )
         elif rel in json_files:
             path.write_text(json.dumps(json_files[rel]) + "\n")
         else:
@@ -351,11 +401,54 @@ def test_subspace_plan_uses_final_public_surface(tmp_path: Path):
     assert "256" in search["command"]
     assert "--basis-prompts" in search["command"]
     assert "--target-preset" in search["command"]
+    assert "--layers" in search["command"]
+    assert "--basis-centering" in search["command"]
+    assert "--basis-token-source" in search["command"]
+    assert "--candidate-batch-size" in search["command"]
+    assert "--kernel" in search["command"]
+    assert "--prefix-cache-policy" in search["command"]
+    assert "disabled-for-search" in search["command"]
     assert "--rho-grid" in search["command"]
     assert "--rank" not in search["command"]
     assert "--sigma" not in search["command"]
     assert "--max-loras" not in search["command"]
     assert not any("vllm-search" in command or "vllm-bench" in command or "vllm-halving" in command for command in commands)
+    for adapter_key in ["rank", "sigma", "targets", "chunk_adapters", "max_loras", "max_cpu_loras", "keep_adapters", "bench_adapters"]:
+        assert adapter_key not in payload["config"]
+
+
+def test_subspace_plan_accepts_documented_screen_matching_flags(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(128,),
+        match_screen_to_holdout_base_exact=True,
+        screen_pool_prompts=512,
+    )
+
+    command = next(run for run in plan_payload(config)["runs"] if run["kind"] == "search")["command"]
+
+    assert "--match-screen-to-holdout-base-exact" in command
+    assert "--screen-pool-prompts" in command
+    assert "512" in command
+
+
+def test_subspace_plan_rejects_shared_prefix_caching(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(128,),
+        enable_prefix_caching=True,
+    )
+
+    try:
+        plan_payload(config)
+    except RuntimeError as exc:
+        assert "shared prefix caching is forbidden" in str(exc)
+    else:
+        raise AssertionError("subspace plan must reject shared prefix caching")
 
 
 def test_halving_plan_uses_full_search_reference_for_regret_metrics(tmp_path: Path):
@@ -421,6 +514,59 @@ def test_subspace_contract_requires_subspace_artifacts_and_candidate_identities(
     failed = check_run(contract)
     assert not failed.passed
     assert any("top_k_ensemble.json.candidates" in item for item in failed.invalid)
+
+
+def test_subspace_contract_rejects_bad_routing_cache_and_hollow_reports(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    summary = json.loads((contract.root / "summary.json").read_text())
+    summary["candidate_routing"] = "physical_row_order"
+    summary["prefix_cache_policy"] = "enabled_shared"
+    (contract.root / "summary.json").write_text(json.dumps(summary) + "\n")
+    systems = json.loads((contract.root / "systems_report.json").read_text())
+    systems["prefix_cache_policy"] = "enabled_shared"
+    (contract.root / "systems_report.json").write_text(json.dumps(systems) + "\n")
+    (contract.root / "validation_report.json").write_text(
+        json.dumps({key: {} for key in ["math_tests", "rng_replay_tests", "routing_cache_tests", "selector_quality", "holdout_quality", "ensemble_quality", "drift_diagnostics", "random_shuffled_controls", "throughput_gates"]})
+        + "\n"
+    )
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("summary.candidate_routing" in item for item in result.invalid)
+    assert any("summary.prefix_cache_policy" in item for item in result.invalid)
+    assert any("systems_report.json.prefix_cache_policy" in item for item in result.invalid)
+    assert any("validation_report.json.math_tests: empty" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_invalid_top_k_semantics(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    top_k = json.loads((contract.root / "top_k_ensemble.json").read_text())
+    top_k["aggregation"] = "custom-bad-value"
+    top_k["K"] = 16
+    top_k["candidates"][0].pop("budget_hash")
+    (contract.root / "top_k_ensemble.json").write_text(json.dumps(top_k) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("top_k_ensemble.json.aggregation" in item for item in result.invalid)
+    assert any("top_k_ensemble.json.K" in item for item in result.invalid)
+    assert any("top_k_ensemble.json.candidates[1].budget_hash" in item for item in result.invalid)
 
 
 def test_lora_artifacts_cannot_pass_as_subspace_run(tmp_path: Path):

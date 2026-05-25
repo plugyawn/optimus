@@ -15,12 +15,17 @@ SIGMA=${SIGMA:-0.0075}
 BASIS_RANK=${BASIS_RANK:-128}
 BASIS_PROMPTS=${BASIS_PROMPTS:-32}
 TARGET_PRESET=${TARGET_PRESET:-transformer-linears}
+LAYERS=${LAYERS:-all}
+BASIS_CENTERING=${BASIS_CENTERING:-none}
+BASIS_TOKEN_SOURCE=${BASIS_TOKEN_SOURCE:-prefill}
 SCALE_MODE=${SCALE_MODE:-relative-output-rms}
 RHO_GRID=${RHO_GRID:-0.002,0.005,0.01,0.02}
 SIGMA_W_GRID=${SIGMA_W_GRID:-}
 BUDGET_POLICY=${BUDGET_POLICY:-per-block-equal}
 BASIS_KIND=${BASIS_KIND:-activation-svd}
 TOP_K_GRID=${TOP_K_GRID:-1,4,8,16}
+CANDIDATE_BATCH_SIZE=${CANDIDATE_BATCH_SIZE:-auto}
+KERNEL=${KERNEL:-torch}
 SEED=${SEED:-2468}
 TARGETS=${TARGETS:-q_proj,v_proj}
 MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-32}
@@ -96,11 +101,22 @@ if [[ "$METHOD" == "subspace" ]]; then
     --basis-rank "$BASIS_RANK"
     --basis-prompts "$BASIS_PROMPTS"
     --target-preset "$TARGET_PRESET"
+    --layers "$LAYERS"
+    --basis-centering "$BASIS_CENTERING"
+    --basis-token-source "$BASIS_TOKEN_SOURCE"
     --scale-mode "$SCALE_MODE"
     --budget-policy "$BUDGET_POLICY"
     --basis-kind "$BASIS_KIND"
     --top-k-grid "$TOP_K_GRID"
+    --candidate-batch-size "$CANDIDATE_BATCH_SIZE"
+    --kernel "$KERNEL"
   )
+  if [[ "${MATCH_SCREEN_TO_HOLDOUT_BASE_EXACT:-0}" == "1" ]]; then
+    method_args+=(--match-screen-to-holdout-base-exact)
+  fi
+  if [[ -n "${SCREEN_POOL_PROMPTS:-}" ]]; then
+    method_args+=(--screen-pool-prompts "$SCREEN_POOL_PROMPTS")
+  fi
   if [[ "$SCALE_MODE" == "projected-dense" ]]; then
     method_args+=(--sigma-w-grid "$SIGMA_W_GRID")
   else

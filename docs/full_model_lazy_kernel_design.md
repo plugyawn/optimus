@@ -378,9 +378,9 @@ Candidate identity contains:
   "sign": "+",
   "basis_hash": "...",
   "target_set_hash": "...",
-  "scale_mode": "relative_output_rms",
+  "scale_mode": "relative-output-rms",
   "rho_or_sigma_w": 0.01,
-  "budget_policy": "per_block_equal",
+  "budget_policy": "per-block-equal",
   "budget_hash": "...",
   "rng_version": "gaussian_hash_v1",
   "runtime_dtype": "bf16"
@@ -421,7 +421,7 @@ It contains:
 {
   "ensemble_kind": "lazy_top_k",
   "schema_version": "top_k_ensemble_v1",
-  "aggregation": "majority-vote | mean-logprob | score-sum | custom",
+  "aggregation": "majority-vote | mean-logprob | score-sum",
   "tie_break_policy": "lowest_candidate_id",
   "selection_rule": "screen_top_k_fixed_config",
   "K": 16,
@@ -432,16 +432,16 @@ It contains:
       "sign": "+",
       "basis_hash": "...",
       "target_set_hash": "...",
-      "scale_mode": "relative_output_rms",
+      "scale_mode": "relative-output-rms",
       "rho_or_sigma_w": 0.01,
-      "budget_policy": "per_block_equal",
+      "budget_policy": "per-block-equal",
       "budget_hash": "...",
       "rng_version": "gaussian_hash_v1",
       "runtime_dtype": "bf16"
     }
   ],
   "basis_hash": "...",
-  "scale_mode": "relative_output_rms",
+  "scale_mode": "relative-output-rms",
   "rho_or_sigma_w": 0.01,
   "target_set_hash": "...",
   "scorer_version": "...",
@@ -789,10 +789,10 @@ by hash.
   "kind": "subspace_search",
   "backend": "vllm",
   "method": "subspace",
-  "scale_mode": "relative_output_rms",
+  "scale_mode": "relative-output-rms",
   "rho_grid": [0.002, 0.005, 0.01, 0.02],
   "sigma_w_grid": null,
-  "budget_policy": "per_block_equal",
+  "budget_policy": "per-block-equal",
   "resolved_target_scales": [
     {
       "target_id": "layer_17.self_attn.q_proj",
@@ -802,7 +802,7 @@ by hash.
   ],
   "rng_version": "gaussian_hash_v1",
   "candidate_routing": "row_candidate_id",
-  "prefix_cache_policy": "disabled_for_search",
+  "prefix_cache_policy": "disabled-for-search",
   "kernel": "torch"
 }
 ```
@@ -847,9 +847,11 @@ Mathematical tests:
 
 - Projection covariance: with activation rows `X` shaped `[tokens, d]`, basis
   `Q` shaped `[r, d]`, and Gaussian field `G` shaped `[m, r]`, form
-  `Y = X Q.T G.T` shaped `[tokens, m]`. For each output coordinate, empirical
-  covariance across calibration tokens must match `sigma_w^2 X Q.T Q X.T`
-  within tolerance.
+  `Y = X Q.T G.T` shaped `[tokens, m]`. Estimate token-token covariance by
+  averaging `Y[:, j] Y[:, j].T` over many independent random-field draws and/or
+  output coordinates `j`. The estimator must match
+  `sigma_w^2 X Q.T Q X.T` within a predeclared tolerance; one output coordinate
+  from one draw is not sufficient evidence.
 - Full-rank equivalence: if `Q` spans the input dimension, lazy perturbation
   matches dense Gaussian effect law.
 - Projected-dense rank law: under `projected-dense`, measured perturbation RMS

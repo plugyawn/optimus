@@ -89,7 +89,7 @@ if [[ -z "${OPTIMUS_TRANSFORMERS_PACKAGE:-}" && "${OPTIMUS_VLLM_PACKAGE:-}" == v
 fi
 
 if [[ "${INSTALL_VLLM:-1}" == "1" ]]; then
-  python -m pip install --upgrade "${OPTIMUS_VLLM_PACKAGE:-vllm>=0.19.0}"
+  python -m pip install --upgrade "${OPTIMUS_VLLM_PACKAGE:-vllm>=0.19.0,<0.20}"
 fi
 
 if [[ "${OPTIMUS_INSTALL_FLASHINFER:-0}" == "1" ]]; then

@@ -5,7 +5,7 @@ import hashlib
 import json
 import subprocess
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -30,12 +30,19 @@ class GpuSuiteConfig:
     basis_rank: int = 128
     basis_prompts: int = 32
     target_preset: str = "transformer-linears"
+    layers: str = "all"
+    basis_centering: str = "none"
+    basis_token_source: str = "prefill"
     scale_mode: str = "relative-output-rms"
     rho_grid: str = "0.002,0.005,0.01,0.02"
     sigma_w_grid: str = ""
     budget_policy: str = "per-block-equal"
     basis_kind: str = "activation-svd"
     top_k_grid: str = "1,4,8,16"
+    candidate_batch_size: str = "auto"
+    kernel: str = "torch"
+    match_screen_to_holdout_base_exact: bool = False
+    screen_pool_prompts: int | None = None
     seed: int = 2468
     targets: str = DEFAULT_TARGETS
     max_new_tokens: int = 32
@@ -91,6 +98,7 @@ class RunSpec:
 
 
 def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int) -> list[str]:
+    runtime_args = _subspace_runtime_args(config) if config.method == "subspace" else _vllm_runtime_args(config)
     args = [
         "optimus",
         "search",
@@ -130,7 +138,7 @@ def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int
         str(config.min_selection_prompt_variants),
         "--stop-at-answer",
         "--antithetic",
-    ] + _search_prompt_args(config) + _vllm_runtime_args(config)
+    ] + _search_prompt_args(config) + runtime_args
     if config.method == "subspace":
         return args + _subspace_args(config)
     return args + _lora_search_args(config) + _search_artifact_args(config)
@@ -161,6 +169,12 @@ def _subspace_args(config: GpuSuiteConfig) -> list[str]:
         str(config.basis_prompts),
         "--target-preset",
         config.target_preset,
+        "--layers",
+        config.layers,
+        "--basis-centering",
+        config.basis_centering,
+        "--basis-token-source",
+        config.basis_token_source,
         "--scale-mode",
         config.scale_mode,
         "--budget-policy",
@@ -169,7 +183,15 @@ def _subspace_args(config: GpuSuiteConfig) -> list[str]:
         config.basis_kind,
         "--top-k-grid",
         config.top_k_grid,
+        "--candidate-batch-size",
+        config.candidate_batch_size,
+        "--kernel",
+        config.kernel,
     ]
+    if config.match_screen_to_holdout_base_exact:
+        args.append("--match-screen-to-holdout-base-exact")
+    if config.screen_pool_prompts is not None:
+        args.extend(["--screen-pool-prompts", str(config.screen_pool_prompts)])
     if config.scale_mode == "projected-dense":
         args.extend(["--sigma-w-grid", config.sigma_w_grid or "1e-5,3e-5,1e-4"])
     else:
@@ -190,6 +212,19 @@ def _vllm_runtime_args(config: GpuSuiteConfig) -> list[str]:
     args = []
     if config.enable_prefix_caching is not None:
         args.append("--enable-prefix-caching" if config.enable_prefix_caching else "--no-enable-prefix-caching")
+    if config.enable_chunked_prefill is not None:
+        args.append("--enable-chunked-prefill" if config.enable_chunked_prefill else "--no-enable-chunked-prefill")
+    if config.kv_cache_dtype:
+        args.extend(["--kv-cache-dtype", config.kv_cache_dtype])
+    for item in config.vllm_kwargs:
+        args.extend(["--vllm-kwarg", item])
+    return args
+
+
+def _subspace_runtime_args(config: GpuSuiteConfig) -> list[str]:
+    if config.enable_prefix_caching:
+        raise RuntimeError("subspace v1 requires --prefix-cache-policy disabled-for-search; shared prefix caching is forbidden")
+    args = ["--prefix-cache-policy", "disabled-for-search"]
     if config.enable_chunked_prefill is not None:
         args.append("--enable-chunked-prefill" if config.enable_chunked_prefill else "--no-enable-chunked-prefill")
     if config.kv_cache_dtype:
@@ -231,12 +266,20 @@ def search_identity(config: GpuSuiteConfig, population: int) -> dict[str, Any]:
                 "basis_rank": config.basis_rank,
                 "basis_prompts": config.basis_prompts,
                 "target_preset": config.target_preset,
+                "layers": config.layers,
+                "basis_centering": config.basis_centering,
+                "basis_token_source": config.basis_token_source,
                 "scale_mode": config.scale_mode,
                 "rho_grid": config.rho_grid,
                 "sigma_w_grid": config.sigma_w_grid,
                 "budget_policy": config.budget_policy,
                 "basis_kind": config.basis_kind,
                 "top_k_grid": config.top_k_grid,
+                "candidate_batch_size": config.candidate_batch_size,
+                "kernel": config.kernel,
+                "prefix_cache_policy": "disabled-for-search",
+                "match_screen_to_holdout_base_exact": config.match_screen_to_holdout_base_exact,
+                "screen_pool_prompts": config.screen_pool_prompts,
             }
         )
     else:
@@ -372,6 +415,8 @@ def report_specs(config: GpuSuiteConfig) -> list[RunSpec]:
 def gpu_suite_specs(config: GpuSuiteConfig) -> list[RunSpec]:
     if config.run_halving:
         raise RuntimeError("staged search is disabled until it has a final public route")
+    if config.method == "subspace" and config.enable_prefix_caching:
+        raise RuntimeError("subspace v1 requires --prefix-cache-policy disabled-for-search; shared prefix caching is forbidden")
     return [*bench_specs(config), *search_specs(config), *report_specs(config)]
 
 
@@ -479,12 +524,75 @@ def execute_specs(
     return rows
 
 
+def _config_payload(config: GpuSuiteConfig) -> dict[str, Any]:
+    common = {
+        "output_root": str(config.output_root),
+        "systems_output_root": str(config.systems_output_root),
+        "data": str(config.data),
+        "model": config.model,
+        "backend": config.backend,
+        "method": config.method,
+        "populations": config.populations,
+        "prompts": config.prompts,
+        "holdout_prompts": config.holdout_prompts,
+        "promote": config.promote,
+        "seed": config.seed,
+        "max_new_tokens": config.max_new_tokens,
+        "prompt_variants": config.prompt_variants,
+        "prompt_input": config.prompt_input,
+        "use_chat_template": config.use_chat_template,
+        "max_base_malformed_for_selection": config.max_base_malformed_for_selection,
+        "max_base_cap_hit_for_selection": config.max_base_cap_hit_for_selection,
+        "min_selection_prompt_variants": config.min_selection_prompt_variants,
+        "require_all_prompt_variants_valid": config.require_all_prompt_variants_valid,
+        "tensor_parallel_size": config.tensor_parallel_size,
+        "enable_chunked_prefill": config.enable_chunked_prefill,
+        "kv_cache_dtype": config.kv_cache_dtype,
+        "vllm_kwargs": config.vllm_kwargs,
+        "run_halving": config.run_halving,
+    }
+    if config.method == "subspace":
+        common.update(
+            {
+                "basis_rank": config.basis_rank,
+                "basis_prompts": config.basis_prompts,
+                "target_preset": config.target_preset,
+                "layers": config.layers,
+                "basis_centering": config.basis_centering,
+                "basis_token_source": config.basis_token_source,
+                "scale_mode": config.scale_mode,
+                "rho_grid": config.rho_grid,
+                "sigma_w_grid": config.sigma_w_grid,
+                "budget_policy": config.budget_policy,
+                "basis_kind": config.basis_kind,
+                "top_k_grid": config.top_k_grid,
+                "candidate_batch_size": config.candidate_batch_size,
+                "kernel": config.kernel,
+                "prefix_cache_policy": "disabled-for-search",
+                "match_screen_to_holdout_base_exact": config.match_screen_to_holdout_base_exact,
+                "screen_pool_prompts": config.screen_pool_prompts,
+            }
+        )
+    else:
+        common.update(
+            {
+                "rank": config.rank,
+                "sigma": config.sigma,
+                "targets": config.targets,
+                "chunk_adapters": config.chunk_adapters,
+                "max_loras": config.max_loras,
+                "max_cpu_loras": config.max_cpu_loras,
+                "keep_adapters": config.keep_adapters,
+                "bench_adapters": config.bench_adapters,
+                "enable_prefix_caching": config.enable_prefix_caching,
+            }
+        )
+    return common
+
+
 def plan_payload(config: GpuSuiteConfig) -> dict:
     return {
-        "config": {
-            key: str(value) if isinstance(value, Path) else value
-            for key, value in asdict(config).items()
-        },
+        "config": _config_payload(config),
         "runs": [
             {
                 "name": spec.name,
@@ -523,12 +631,19 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--basis-rank", type=int, default=128)
     parser.add_argument("--basis-prompts", type=int, default=32)
     parser.add_argument("--target-preset", default="transformer-linears")
+    parser.add_argument("--layers", default="all")
+    parser.add_argument("--basis-centering", choices=["none", "mean"], default="none")
+    parser.add_argument("--basis-token-source", choices=["prefill", "decode", "prefill+decode"], default="prefill")
     parser.add_argument("--scale-mode", choices=["relative-output-rms", "projected-dense"], default="relative-output-rms")
     parser.add_argument("--rho-grid", default="0.002,0.005,0.01,0.02")
     parser.add_argument("--sigma-w-grid", default="")
     parser.add_argument("--budget-policy", default="per-block-equal")
     parser.add_argument("--basis-kind", default="activation-svd")
     parser.add_argument("--top-k-grid", default="1,4,8,16")
+    parser.add_argument("--candidate-batch-size", default="auto")
+    parser.add_argument("--kernel", default="torch")
+    parser.add_argument("--match-screen-to-holdout-base-exact", action="store_true")
+    parser.add_argument("--screen-pool-prompts", type=int)
     parser.add_argument("--seed", type=int, default=2468)
     parser.add_argument("--targets", default=DEFAULT_TARGETS)
     parser.add_argument("--max-new-tokens", type=int, default=32)
@@ -573,12 +688,19 @@ def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:
         basis_rank=args.basis_rank,
         basis_prompts=args.basis_prompts,
         target_preset=args.target_preset,
+        layers=args.layers,
+        basis_centering=args.basis_centering,
+        basis_token_source=args.basis_token_source,
         scale_mode=args.scale_mode,
         rho_grid=args.rho_grid,
         sigma_w_grid=args.sigma_w_grid,
         budget_policy=args.budget_policy,
         basis_kind=args.basis_kind,
         top_k_grid=args.top_k_grid,
+        candidate_batch_size=args.candidate_batch_size,
+        kernel=args.kernel,
+        match_screen_to_holdout_base_exact=args.match_screen_to_holdout_base_exact,
+        screen_pool_prompts=args.screen_pool_prompts,
         seed=args.seed,
         targets=args.targets,
         max_new_tokens=args.max_new_tokens,

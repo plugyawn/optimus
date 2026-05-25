@@ -46,6 +46,9 @@ Deliverables:
   - `--backend`;
   - `--method`;
   - `--basis-rank`;
+  - `--layers`;
+  - `--basis-centering`;
+  - `--basis-token-source`;
   - `--scale-mode`;
   - `--rho-grid`;
   - `--sigma-w-grid`;
@@ -53,7 +56,9 @@ Deliverables:
   - `--basis-kind`;
   - `--basis-prompts`;
   - `--target-preset`;
-  - `--top-k-grid`.
+  - `--top-k-grid`;
+  - `--candidate-batch-size`;
+  - `--kernel`.
 - Remove or disable staged-search emission until a final public staged-search
   route exists. Do not generate `optimus vllm-halving`.
 - Update `scripts/run_optimus_gpu_suite.sh`, `scripts/README.md`, remote smoke

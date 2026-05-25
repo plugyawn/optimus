@@ -271,6 +271,47 @@ def test_subspace_and_backends_public_packages_import_lightweight():
     assert result.stderr == ""
 
 
+def test_gaussian_hash_v1_golden_vectors_and_antithetic_sign():
+    from optimus.subspace import gaussian_hash_v1
+
+    cases = [
+        (
+            {
+                "direction_seed": 1,
+                "target_id": "layer_0.self_attn.q_proj",
+                "output_index": 0,
+                "basis_index": 0,
+                "salt": "",
+            },
+            0.7526126230682176,
+        ),
+        (
+            {
+                "direction_seed": 12345,
+                "target_id": "Qwen/Qwen3-4B::model.layers.17.self_attn.v_proj",
+                "output_index": 4095,
+                "basis_index": 127,
+                "salt": "optimus",
+            },
+            0.5658260427363577,
+        ),
+        (
+            {
+                "direction_seed": 999,
+                "target_id": "layer_1.mlp.down_proj",
+                "output_index": 17,
+                "basis_index": 3,
+                "salt": "rho=0.01",
+            },
+            -0.6043795599522572,
+        ),
+    ]
+    for kwargs, expected in cases:
+        observed = gaussian_hash_v1(**kwargs)
+        assert observed == expected
+        assert gaussian_hash_v1(**kwargs, sign=-1) == -expected
+
+
 def test_vllm_serving_metadata_import_is_lightweight():
     result = subprocess.run(
         [sys.executable, "-c", "from optimus.serving.vllm import AdapterSpec, perturbation_panel; print(AdapterSpec.__name__, perturbation_panel.__name__)"],

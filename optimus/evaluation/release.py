@@ -8,7 +8,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from optimus.evaluation.validation import check_run, gpu_suite_contracts, summary_payload
+from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS, check_run, gpu_suite_contracts, summary_payload
 from optimus.runs.gpu_suite import GpuSuiteConfig, parse_int_tuple, plan_payload
 
 
@@ -177,7 +177,11 @@ def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
     }
     leaked: list[str] = []
     missing_final: list[str] = []
+    config_leaks: list[str] = []
+    adapter_config_keys = {"rank", "sigma", "targets", "chunk_adapters", "max_loras", "max_cpu_loras", "keep_adapters", "bench_adapters"}
     for label, payload in plans.items():
+        if label == "subspace":
+            config_leaks.extend(sorted(adapter_config_keys & set(payload.get("config", {}))))
         for run in payload["runs"]:
             command = run["command"]
             text = " ".join(command)
@@ -218,8 +222,8 @@ def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
     return [
         ReleaseCheck(
             "run_plan_emits_final_public_commands",
-            not leaked and not missing_final,
-            "search/bench routes only" if not leaked and not missing_final else f"legacy={leaked!r} nonfinal={missing_final!r}",
+            not leaked and not missing_final and not config_leaks,
+            "search/bench routes only" if not leaked and not missing_final and not config_leaks else f"legacy={leaked!r} nonfinal={missing_final!r} config_leaks={config_leaks!r}",
         ),
         ReleaseCheck(
             "supported_launchers_do_not_emit_removed_wrappers",
@@ -386,10 +390,33 @@ def remote_check(root: Path, url: str | None) -> ReleaseCheck:
     return ReleaseCheck("github_remote_is_optimus", passed, detail)
 
 
-def systems_report_checks(systems_out: Path | None) -> list[ReleaseCheck]:
+def systems_report_checks(systems_out: Path | None, *, method: str) -> list[ReleaseCheck]:
     if systems_out is None:
         return [ReleaseCheck("systems_report_checked", False, "pass --systems-out to validate report semantics")]
     report = systems_out / "report.md"
+    if method == "subspace":
+        systems_json = systems_out / "systems_report.json"
+        checks = [
+            ReleaseCheck("systems_report_present", report.exists(), str(report)),
+            ReleaseCheck("subspace_systems_report_json_present", systems_json.exists(), str(systems_json)),
+        ]
+        if not systems_json.exists():
+            checks.append(ReleaseCheck("subspace_systems_report_fields_present", False, "missing systems_report.json"))
+            return checks
+        try:
+            payload = json.loads(systems_json.read_text())
+        except json.JSONDecodeError:
+            checks.append(ReleaseCheck("subspace_systems_report_fields_present", False, "invalid systems_report.json"))
+            return checks
+        missing = sorted(set(SUBSPACE_SYSTEMS_FIELDS) - set(payload))
+        checks.append(
+            ReleaseCheck(
+                "subspace_systems_report_fields_present",
+                not missing and payload.get("prefix_cache_policy") == "disabled-for-search",
+                "subspace systems fields present" if not missing and payload.get("prefix_cache_policy") == "disabled-for-search" else f"missing={missing!r} prefix_cache_policy={payload.get('prefix_cache_policy')!r}",
+            )
+        )
+        return checks
     quality = systems_out / "quality_scaling.csv"
     checks = [
         ReleaseCheck("systems_report_present", report.exists(), str(report)),
@@ -456,12 +483,14 @@ def gpu_artifact_checks(
     populations: tuple[int, ...],
     bench_adapters: tuple[int, ...],
     run_halving: bool,
+    method: str = "subspace",
 ) -> list[ReleaseCheck]:
     if gpu_root is None or systems_out is None:
         return [ReleaseCheck("gpu_suite_artifacts_checked", False, "pass --gpu-root and --systems-out")]
     config = GpuSuiteConfig(
         output_root=gpu_root,
         systems_output_root=systems_out,
+        method=method,
         populations=populations,
         bench_adapters=bench_adapters,
         run_halving=run_halving,
@@ -511,6 +540,7 @@ def build_release_checks(
     populations: tuple[int, ...],
     bench_adapters: tuple[int, ...],
     run_halving: bool,
+    method: str = "subspace",
     remote: str | None,
 ) -> list[ReleaseCheck]:
     checks: list[ReleaseCheck] = []
@@ -522,8 +552,8 @@ def build_release_checks(
     checks.extend(repo_structure_checks(root))
     checks.extend(git_state_checks(root))
     checks.append(remote_check(root, remote))
-    checks.extend(systems_report_checks(systems_out))
-    checks.extend(gpu_artifact_checks(gpu_root, systems_out, populations, bench_adapters, run_halving))
+    checks.extend(systems_report_checks(systems_out, method=method))
+    checks.extend(gpu_artifact_checks(gpu_root, systems_out, populations, bench_adapters, run_halving, method))
     checks.append(ledger_check(root))
     return checks
 
@@ -540,6 +570,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--systems-out", type=Path)
     parser.add_argument("--gpu-root", type=Path)
+    parser.add_argument("--method", choices=["subspace", "lora"], default="subspace")
     parser.add_argument("--populations", default="1024,4096")
     parser.add_argument("--bench-adapters", default="8,16,32")
     parser.add_argument("--run-halving", action="store_true", help="Reserved until a final staged-search route exists.")
@@ -559,6 +590,7 @@ def main(argv: list[str] | None = None) -> int:
         populations=parse_int_tuple(args.populations),
         bench_adapters=parse_int_tuple(args.bench_adapters),
         run_halving=args.run_halving and not args.skip_halving,
+        method=args.method,
         remote=args.remote_url,
     )
     payload = summary(checks)

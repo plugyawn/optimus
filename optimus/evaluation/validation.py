@@ -10,6 +10,124 @@ from pathlib import Path
 from optimus.runs.gpu_suite import GpuSuiteConfig, gpu_suite_specs, parse_int_tuple
 
 
+SUBSPACE_REQUIRED_FILES = (
+    "summary.json",
+    "subspace_state.pt",
+    "subspace_state_summary.json",
+    "candidates.jsonl",
+    "candidate_scores.jsonl",
+    "top_k_ensemble.json",
+    "validation_report.json",
+    "systems_report.json",
+)
+SUBSPACE_REQUIRED_SUMMARY = (
+    "kind",
+    "backend",
+    "method",
+    "population",
+    "basis_hash",
+    "target_set_hash",
+    "scale_mode",
+    "budget_policy",
+    "rng_version",
+    "candidate_routing",
+    "prefix_cache_policy",
+    "scorer_version",
+    "prompt_ids_hash",
+    "decode_config_hash",
+    "candidates_per_sec",
+    "prompts_per_sec",
+    "output_tokens_per_sec",
+    "lazy_overhead_pct",
+)
+SUBSPACE_CANDIDATE_FIELDS = (
+    "candidate_id",
+    "direction_seed",
+    "sign",
+    "basis_hash",
+    "target_set_hash",
+    "scale_mode",
+    "rho_or_sigma_w",
+    "budget_policy",
+    "budget_hash",
+    "rng_version",
+    "runtime_dtype",
+    "radius_index",
+    "target_preset",
+    "basis_rank",
+)
+SUBSPACE_CANDIDATE_SCORE_FIELDS = (
+    "candidate_id",
+    "split",
+    "scorer_name",
+    "scorer_version",
+    "aggregate_metrics",
+    "sample_count",
+    "prompt_ids_hash",
+    "decode_config_hash",
+    "elapsed_s",
+    "output_tokens",
+)
+SUBSPACE_TOP_K_FIELDS = (
+    "ensemble_kind",
+    "schema_version",
+    "aggregation",
+    "tie_break_policy",
+    "selection_rule",
+    "K",
+    "candidates",
+    "basis_hash",
+    "scale_mode",
+    "rho_or_sigma_w",
+    "budget_policy",
+    "target_set_hash",
+    "scorer_version",
+    "prompt_ids_hash",
+    "runtime_config_hash",
+    "decode_config_hash",
+)
+SUBSPACE_VALIDATION_SECTIONS = (
+    "math_tests",
+    "rng_replay_tests",
+    "routing_cache_tests",
+    "selector_quality",
+    "holdout_quality",
+    "ensemble_quality",
+    "drift_diagnostics",
+    "random_shuffled_controls",
+    "throughput_gates",
+)
+SUBSPACE_SYSTEMS_FIELDS = (
+    "schema_version",
+    "warmup_policy",
+    "cuda_sync_policy",
+    "candidate_batch_size",
+    "candidate_shard_id",
+    "gpu_model",
+    "gpu_count",
+    "gpu_memory_allocated_bytes",
+    "gpu_memory_reserved_bytes",
+    "base_model_time_s",
+    "qx_time_s",
+    "lazy_delta_time_s",
+    "scoring_time_s",
+    "setup_time_s",
+    "candidates_per_sec",
+    "prompts_per_sec",
+    "output_tokens_per_sec",
+    "lazy_overhead_pct",
+    "prefix_cache_policy",
+    "top_k_ensemble_cost_multiplier",
+    "screen_score",
+    "holdout_score",
+    "screen_to_holdout_drop",
+    "diversity_metrics",
+    "random_q_control",
+    "shuffled_q_control",
+    "antithetic_odd_even",
+)
+
+
 @dataclass(frozen=True)
 class RunContract:
     name: str
@@ -28,6 +146,7 @@ class RunContract:
     required_bool_keys: tuple[str, ...] = ()
     required_json_fields: dict[str, tuple[str, ...]] | None = None
     required_json_nonempty_fields: dict[str, tuple[str, ...]] | None = None
+    expected_json_values: dict[str, dict[str, object]] | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +220,14 @@ def check_run(contract: RunContract) -> RunCheck:
                     for field in (contract.required_jsonl_fields or {}).get(rel, ()):
                         if field not in row:
                             invalid.append(f"{rel}: row {line_no} missing {field}")
+                    if rel == "candidates.jsonl":
+                        if row.get("scale_mode") not in {"relative-output-rms", "projected-dense"}:
+                            invalid.append(f"{rel}: row {line_no} invalid scale_mode")
+                        if row.get("budget_policy") not in {"raw-dense", "per-target-equal", "per-layer-equal", "per-block-equal", "custom-json"}:
+                            invalid.append(f"{rel}: row {line_no} invalid budget_policy")
+                    if rel == "candidate_scores.jsonl":
+                        if row.get("split") not in {"screen", "holdout", "validation", "test"}:
+                            invalid.append(f"{rel}: row {line_no} invalid split")
                     count += 1
             jsonl_counts[rel] = count
             if count == 0:
@@ -129,9 +256,21 @@ def check_run(contract: RunContract) -> RunCheck:
             value = payload.get(field)
             if not value:
                 invalid.append(f"{rel}.{field}: empty")
+        for field, expected in (contract.expected_json_values or {}).get(rel, {}).items():
+            observed = payload.get(field)
+            if observed != expected:
+                invalid.append(f"{rel}.{field}: expected {expected!r}, got {observed!r}")
         if rel == "top_k_ensemble.json" and "candidates" in fields:
+            if payload.get("aggregation") not in {"majority-vote", "mean-logprob", "score-sum"}:
+                invalid.append(f"{rel}.aggregation: invalid")
+            if payload.get("tie_break_policy") not in {"lowest_candidate_id"}:
+                invalid.append(f"{rel}.tie_break_policy: invalid")
+            if not isinstance(payload.get("K"), int) or payload.get("K") <= 0:
+                invalid.append(f"{rel}.K: not positive integer")
             candidates = payload.get("candidates")
             if isinstance(candidates, list) and candidates:
+                if payload.get("K") != len(candidates):
+                    invalid.append(f"{rel}.K: {payload.get('K')!r} != len(candidates) {len(candidates)}")
                 candidate_required = (
                     "candidate_id",
                     "direction_seed",
@@ -139,9 +278,14 @@ def check_run(contract: RunContract) -> RunCheck:
                     "basis_hash",
                     "target_set_hash",
                     "scale_mode",
+                    "rho_or_sigma_w",
                     "budget_policy",
+                    "budget_hash",
                     "rng_version",
                     "runtime_dtype",
+                    "radius_index",
+                    "target_preset",
+                    "basis_rank",
                 )
                 for index, candidate in enumerate(candidates, start=1):
                     if not isinstance(candidate, dict):
@@ -150,6 +294,20 @@ def check_run(contract: RunContract) -> RunCheck:
                     for field in candidate_required:
                         if field not in candidate:
                             invalid.append(f"{rel}.candidates[{index}].{field}: missing")
+                    if candidate.get("scale_mode") not in {"relative-output-rms", "projected-dense"}:
+                        invalid.append(f"{rel}.candidates[{index}].scale_mode: invalid")
+                    if candidate.get("budget_policy") not in {"raw-dense", "per-target-equal", "per-layer-equal", "per-block-equal", "custom-json"}:
+                        invalid.append(f"{rel}.candidates[{index}].budget_policy: invalid")
+        if rel == "validation_report.json":
+            required_sections = fields
+            for section in required_sections:
+                value = payload.get(section)
+                if not isinstance(value, dict) or not value:
+                    invalid.append(f"{rel}.{section}: empty")
+                    continue
+                for field in ("status", "evidence_paths", "failures"):
+                    if field not in value:
+                        invalid.append(f"{rel}.{section}.{field}: missing")
     for rel in contract.required_csv_nonempty:
         path = contract.root / rel
         if not path.exists():
@@ -206,86 +364,41 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
             required_bool_keys = ()
         elif spec.kind == "search":
             if spec.method == "subspace":
-                required = (
-                    "summary.json",
-                    "subspace_state.pt",
-                    "subspace_state_summary.json",
-                    "candidates.jsonl",
-                    "candidate_scores.jsonl",
-                    "top_k_ensemble.json",
-                    "validation_report.json",
-                    "systems_report.json",
-                )
-                required_summary = (
-                    "kind",
-                    "backend",
-                    "method",
-                    "population",
-                    "basis_hash",
-                    "target_set_hash",
-                    "scale_mode",
-                    "budget_policy",
-                    "rng_version",
-                    "candidate_routing",
-                    "prefix_cache_policy",
-                    "scorer_version",
-                    "prompt_ids_hash",
-                    "decode_config_hash",
-                    "candidates_per_sec",
-                    "prompts_per_sec",
-                    "output_tokens_per_sec",
-                    "lazy_overhead_pct",
-                )
+                required = SUBSPACE_REQUIRED_FILES
+                required_summary = SUBSPACE_REQUIRED_SUMMARY
                 required_positive = ("population", "candidates_per_sec", "prompts_per_sec", "output_tokens_per_sec")
                 required_finite = ("lazy_overhead_pct",)
                 required_nonempty = ("basis_hash", "target_set_hash", "scorer_version", "prompt_ids_hash", "decode_config_hash")
                 required_path_keys = ()
-                expected_summary_values = {"kind": f"subspace_{spec.backend}_search", "backend": spec.backend, "method": "subspace"}
+                expected_summary_values = {
+                    "kind": f"subspace_{spec.backend}_search",
+                    "backend": spec.backend,
+                    "method": "subspace",
+                    "scale_mode": config.scale_mode,
+                    "budget_policy": config.budget_policy,
+                    "candidate_routing": "row_candidate_id",
+                    "prefix_cache_policy": "disabled-for-search",
+                }
                 required_jsonl_nonempty = ("candidates.jsonl", "candidate_scores.jsonl")
                 required_jsonl_fields = {
-                    "candidates.jsonl": (
-                        "candidate_id",
-                        "direction_seed",
-                        "sign",
-                        "basis_hash",
-                        "target_set_hash",
-                        "scale_mode",
-                        "budget_policy",
-                        "rng_version",
-                    ),
-                    "candidate_scores.jsonl": ("candidate_id", "screen_score", "scorer_version", "prompt_ids_hash"),
+                    "candidates.jsonl": SUBSPACE_CANDIDATE_FIELDS,
+                    "candidate_scores.jsonl": SUBSPACE_CANDIDATE_SCORE_FIELDS,
                 }
                 expected_jsonl_counts = {"candidates.jsonl": "population"}
                 required_bool_keys = ()
                 required_json_fields = {
                     "subspace_state_summary.json": ("schema_version", "basis_hash", "activation_sites", "targets"),
-                    "top_k_ensemble.json": (
-                        "ensemble_kind",
-                        "schema_version",
-                        "aggregation",
-                        "tie_break_policy",
-                        "selection_rule",
-                        "K",
-                        "candidates",
-                        "basis_hash",
-                        "target_set_hash",
-                        "scorer_version",
-                        "prompt_ids_hash",
-                        "runtime_config_hash",
-                        "decode_config_hash",
-                    ),
-                    "validation_report.json": ("schema_version", "scientific_gate", "drift_diagnostics", "diversity_metrics"),
-                    "systems_report.json": (
-                        "schema_version",
-                        "candidates_per_sec",
-                        "prompts_per_sec",
-                        "output_tokens_per_sec",
-                        "lazy_overhead_pct",
-                    ),
+                    "top_k_ensemble.json": SUBSPACE_TOP_K_FIELDS,
+                    "validation_report.json": SUBSPACE_VALIDATION_SECTIONS,
+                    "systems_report.json": SUBSPACE_SYSTEMS_FIELDS,
                 }
                 required_json_nonempty_fields = {
                     "subspace_state_summary.json": ("basis_hash", "activation_sites", "targets"),
                     "top_k_ensemble.json": ("candidates", "basis_hash", "target_set_hash", "scorer_version", "prompt_ids_hash"),
+                    "systems_report.json": ("gpu_model", "candidate_batch_size", "diversity_metrics"),
+                }
+                expected_json_values = {
+                    "systems_report.json": {"prefix_cache_policy": "disabled-for-search"},
                 }
             else:
                 required = ("summary.json", "candidate_summary.jsonl", "per_prompt.jsonl", "holdout_per_prompt.jsonl")
@@ -327,6 +440,7 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
                 required_bool_keys = ()
                 required_json_fields = {}
                 required_json_nonempty_fields = {}
+                expected_json_values = {}
         else:
             continue
         contracts.append(
@@ -346,27 +460,14 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
                 required_bool_keys=required_bool_keys,
                 required_json_fields=required_json_fields if spec.kind == "search" else None,
                 required_json_nonempty_fields=required_json_nonempty_fields if spec.kind == "search" else None,
+                expected_json_values=expected_json_values if spec.kind == "search" else None,
             )
         )
     if config.method == "subspace":
         systems_csvs = []
         systems_files = ["report.md", "systems_report.json"]
-        systems_json_fields = {
-            "systems_report.json": (
-                "schema_version",
-                "candidates_per_sec",
-                "prompts_per_sec",
-                "output_tokens_per_sec",
-                "base_model_time_s",
-                "qx_time_s",
-                "lazy_delta_time_s",
-                "scoring_time_s",
-                "setup_time_s",
-                "lazy_overhead_pct",
-                "gpu_memory_allocated_bytes",
-                "candidate_batch_size",
-            )
-        }
+        systems_json_fields = {"systems_report.json": SUBSPACE_SYSTEMS_FIELDS}
+        systems_expected_json_values = {"systems_report.json": {"prefix_cache_policy": "disabled-for-search"}}
     else:
         systems_csvs = ["bench.csv", "full_search.csv", "best_of_n.csv", "quality_scaling.csv", "parity.csv"]
         systems_files = [
@@ -383,6 +484,7 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
             "parity.csv",
         ]
         systems_json_fields = {}
+        systems_expected_json_values = {}
         if config.run_halving:
             systems_csvs.append("halving.csv")
             systems_files.append("halving_tradeoff.png")
@@ -393,6 +495,7 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
             tuple(systems_files),
             required_csv_nonempty=tuple(systems_csvs),
             required_json_fields=systems_json_fields,
+            expected_json_values=systems_expected_json_values,
         )
     )
     return contracts

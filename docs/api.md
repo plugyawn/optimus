@@ -26,9 +26,9 @@ packages are implementation details.
 
 | command | purpose |
 | --- | --- |
-| `optimus perturbation-panel` | Write a deterministic dense, LoRA, or subspace perturbation panel. |
+| `optimus perturbation-panel` | Write deterministic dense or LoRA perturbation panels. Subspace panels are produced by the subspace candidate schema and `run-plan`; this command fails closed for `--method subspace`. |
 | `optimus search` | Run perturbation search with `--backend vllm|transformers` and `--method dense|lora|subspace`. |
-| `optimus bench` | Measure backend throughput for dense, LoRA, or subspace search paths. |
+| `optimus bench` | Measure implemented backend throughput paths. `--backend vllm --method subspace` is reserved for the Phase 6 speed gate and fails closed until that backend lands. |
 | `optimus make-countdown-data` | Generate deterministic Countdown evaluation data. |
 | `optimus backend-parity-gate` | Gate vLLM selector trust against trusted outputs and adapter tensor checks. |
 | `optimus lighteval` | Plan or run a LightEval job for standard or custom-task confirmation. |

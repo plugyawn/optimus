@@ -71,11 +71,16 @@ METHOD=subspace \
 BASIS_RANK=128 \
 BASIS_PROMPTS=32 \
 TARGET_PRESET=transformer-linears \
+LAYERS=all \
+BASIS_CENTERING=none \
+BASIS_TOKEN_SOURCE=prefill \
 SCALE_MODE=relative-output-rms \
 RHO_GRID=0.002,0.005,0.01,0.02 \
 BUDGET_POLICY=per-block-equal \
 BASIS_KIND=activation-svd \
 TOP_K_GRID=1,4,8,16 \
+CANDIDATE_BATCH_SIZE=auto \
+KERNEL=torch \
 RUN_HALVING=0 \
 scripts/run_optimus_gpu_suite.sh
 ```
@@ -94,11 +99,16 @@ optimus run-plan \
   --basis-prompts 32 \
   --basis-rank 128 \
   --target-preset transformer-linears \
+  --layers all \
+  --basis-centering none \
+  --basis-token-source prefill \
   --scale-mode relative-output-rms \
   --rho-grid 0.002,0.005,0.01,0.02 \
   --budget-policy per-block-equal \
   --basis-kind activation-svd \
   --top-k-grid 1,4,8,16 \
+  --candidate-batch-size auto \
+  --kernel torch \
   --skip-halving
 ```
 
