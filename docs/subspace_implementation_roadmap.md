@@ -55,6 +55,69 @@ Current saved state, 2026-05-25:
   subspace runs, removing public legacy subspace alias normalization, and adding
   shard metadata to the public `SubspaceCandidate` schema. Phase 1 still
   requires independent re-review before runtime basis capture starts.
+- The latest pre-implementation checkpoint is commit `aadc7a4`
+  (`Close subspace review contract gaps`). This roadmap update records the
+  remaining review queue only; it does not authorize runtime implementation.
+
+## Next Pre-Implementation Review Queue
+
+Before Phase 1 starts, resolve and re-review the remaining Phase 0 contract
+gaps. These are roadmap blockers, not permission to start basis capture, vLLM
+hooks, lazy kernels, or optimized kernels.
+
+1. Artifact provenance:
+   - `subspace_state_summary.json`, `top_k_ensemble.json`,
+     `validation_report.json`, and `systems_report.json` must all carry the
+     common provenance envelope: schema version, creation time, Optimus
+     version, git commit/dirty state, command, environment, model revision,
+     tokenizer hash, task config hash, prompt contract hash, screen split hash,
+     holdout split hash, and decode config hash.
+   - Artifacts that inherit provenance only through a parent summary hash must
+     declare that parent explicitly; otherwise they must include the envelope
+     directly.
+2. Scientific gate metadata:
+   - `validation_report.json` must distinguish the selected basis from
+     controls with `basis_kind`, `control_basis_kinds`, `comparison`,
+     `gate_type`, `epsilon`, confidence interval, locked config hash,
+     selection-rule hash, primary metric, and multiple-comparison correction.
+   - The reference smoke gate uses non-inferiority against random controls;
+     the production gate requires a positive paired-bootstrap lower bound
+     unless explicitly labeled as an engineering proceed/no-scientific-win
+     exception.
+3. Candidate and score uniqueness:
+   - `candidates.jsonl` must reject any duplicate `candidate_id`, even if the
+     duplicate row is byte-identical.
+   - `candidate_scores.jsonl` must reject duplicate score rows for the same
+     candidate, split, scorer, prompt/sample-set hash, and decode config hash.
+4. Systems metrics:
+   - `systems_report.json` numeric fields must be actual JSON numbers, not
+     string-coercible values.
+   - Aggregation must preserve measured fields only; missing subspace systems
+     evidence is a release blocker, not a pass.
+5. Public surface guards:
+   - `optimus search` must reject hidden adapter-era passthrough flags such as
+     activation-state prompts, family-state files, staged prompts, survivor
+     counts, batch-size grids, and prompt-count grids.
+   - `optimus run-plan` and `optimus run-suite` with `--method subspace` must
+     reject LoRA-only knobs including `--rank`, `--sigma`, `--targets`,
+     `--chunk-adapters`, `--max-loras`, `--max-cpu-loras`,
+     `--keep-adapters`, and `--bench-adapters`.
+6. Release checks:
+   - Public-doc leakage scans must include every core source-of-truth doc:
+     `README.md`, `api.md`, `optimus_design.md`,
+     `full_model_lazy_kernel_design.md`, `subspace_implementation_roadmap.md`,
+     `gpu_suite.md`, `prime_gpu_runbook.md`, `release_checklist.md`, and
+     `evaluation.md`.
+   - Prime GPU cleanup must be checked per ledger entry. A terminated entry is
+     not complete unless that same entry records zero active pods or an
+     equivalent cleanup verification.
+7. Documentation wording:
+   - Docs may list vLLM subspace search and bench as planned fail-closed
+     routes, but not as implemented supported workflows until Phase 5/6 gates
+     pass.
+   - Any mention of adapter serving in the subspace path must be framed as a
+     legacy baseline or optional materialized-export/debug path, never as the
+     search hot path.
 
 ## Implementation Restart Plan
 
