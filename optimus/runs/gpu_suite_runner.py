@@ -54,8 +54,13 @@ def main(argv: list[str] | None = None) -> int:
             args.execution_log.write_text(json.dumps({"dry_run": args.dry_run, "runs": rows}, indent=2, sort_keys=True) + "\n")
 
     try:
+        specs = gpu_suite_specs(config)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from None
+
+    try:
         rows = execute_specs(
-            gpu_suite_specs(config),
+            specs,
             dry_run=args.dry_run,
             skip_existing=not args.no_skip_existing,
             on_update=write_log,

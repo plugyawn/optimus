@@ -8,9 +8,11 @@ Current saved state, 2026-05-25:
 
 - This roadmap is planning-only. It authorizes documentation, test planning,
   and compatibility audits, but not lazy-kernel implementation work.
-- The next implementation pass must start by removing legacy public surface from
-  the runnable suite and validation gates. It must not start with vLLM hooks,
-  basis capture, or optimized kernels.
+- The first implementation checkpoint after this roadmap removed the known
+  generated-plan legacy wrappers, added subspace-specific validation contracts,
+  and made staged search fail closed until a final public route exists. Future
+  implementation must keep those gates intact before touching vLLM hooks, basis
+  capture, or optimized kernels.
 - `optimus search` and `optimus bench` are the final public command families.
   Any runnable plan, launcher, release gate, or validation contract that still
   depends on `peft-search`, `vllm-search`, `vllm-bench`, `vllm-halving`,

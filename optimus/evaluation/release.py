@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from optimus.evaluation.validation import check_run, gpu_suite_contracts, summary_payload
-from optimus.runs.gpu_suite import GpuSuiteConfig, parse_int_tuple
+from optimus.runs.gpu_suite import GpuSuiteConfig, parse_int_tuple, plan_payload
 
 
 FORBIDDEN_PACKAGE = "randopt_" + "lora_lab"
@@ -165,6 +165,72 @@ def public_api_surface_checks(root: Path) -> list[ReleaseCheck]:
             "no legacy public names" if not leaks else f"matches={leaks!r}",
         ),
         ReleaseCheck("public_cli_uses_search_and_bench_surface", cli_ok, cli_detail),
+    ]
+
+
+def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
+    checks: list[ReleaseCheck] = []
+    legacy_tokens = {"peft-search", "vllm-search", "vllm-halving", "vllm-bench"}
+    plans = {
+        "lora": plan_payload(GpuSuiteConfig(output_root=Path("results/tmp"), systems_output_root=Path("results/tmp_systems"), populations=(16,), bench_adapters=(4,))),
+        "subspace": plan_payload(GpuSuiteConfig(output_root=Path("results/tmp"), systems_output_root=Path("results/tmp_systems"), populations=(16,), bench_adapters=(), method="subspace")),
+    }
+    leaked: list[str] = []
+    missing_final: list[str] = []
+    for label, payload in plans.items():
+        for run in payload["runs"]:
+            command = run["command"]
+            text = " ".join(command)
+            for token in legacy_tokens:
+                if token in command or token in text:
+                    leaked.append(f"{label}:{run['name']}:{token}")
+            if run["kind"] == "search" and command[:2] != ["optimus", "search"]:
+                missing_final.append(f"{label}:{run['name']}:{command[:2]!r}")
+            if run["kind"] == "bench" and command[:2] != ["optimus", "bench"]:
+                missing_final.append(f"{label}:{run['name']}:{command[:2]!r}")
+    script_paths = [
+        root / "scripts" / "run_optimus_gpu_suite.sh",
+        root / "scripts" / "run_backend_parity_gate.sh",
+        root / "scripts" / "remote" / "optimus_prime_smoke.sh",
+        root / "scripts" / "README.md",
+    ]
+    script_leaks: list[str] = []
+    for path in script_paths:
+        if not path.exists():
+            continue
+        text = path.read_text()
+        for command in LEGACY_PUBLIC_COMMANDS:
+            if re.search(rf"\boptimus\s+{re.escape(command)}\b", text):
+                script_leaks.append(f"{path.relative_to(root)}:{command}")
+
+    subspace_contracts = gpu_suite_contracts(
+        GpuSuiteConfig(output_root=Path("results/tmp"), systems_output_root=Path("results/tmp_systems"), populations=(16,), bench_adapters=(), method="subspace")
+    )
+    search_contract = next((contract for contract in subspace_contracts if contract.name == "search_p16_subspace_r128"), None)
+    required = {
+        "subspace_state.pt",
+        "candidate_scores.jsonl",
+        "top_k_ensemble.json",
+        "validation_report.json",
+        "systems_report.json",
+    }
+    missing_contract = sorted(required - set(search_contract.required_files if search_contract else ()))
+    return [
+        ReleaseCheck(
+            "run_plan_emits_final_public_commands",
+            not leaked and not missing_final,
+            "search/bench routes only" if not leaked and not missing_final else f"legacy={leaked!r} nonfinal={missing_final!r}",
+        ),
+        ReleaseCheck(
+            "supported_launchers_do_not_emit_removed_wrappers",
+            not script_leaks,
+            "no removed wrappers in supported launchers" if not script_leaks else f"matches={script_leaks!r}",
+        ),
+        ReleaseCheck(
+            "subspace_validation_contract_requires_subspace_artifacts",
+            search_contract is not None and not missing_contract,
+            "subspace artifacts required" if search_contract is not None and not missing_contract else f"missing={missing_contract!r}",
+        ),
     ]
 
 
@@ -400,7 +466,11 @@ def gpu_artifact_checks(
         bench_adapters=bench_adapters,
         run_halving=run_halving,
     )
-    payload = summary_payload([check_run(contract) for contract in gpu_suite_contracts(config)])
+    try:
+        contracts = gpu_suite_contracts(config)
+    except RuntimeError as exc:
+        return [ReleaseCheck("gpu_suite_artifacts_complete", False, str(exc))]
+    payload = summary_payload([check_run(contract) for contract in contracts])
     missing = [
         f"{check['name']}:{','.join(check['missing'])}"
         for check in payload["checks"]
@@ -447,6 +517,7 @@ def build_release_checks(
     checks.extend(pyproject_checks(root))
     checks.extend(public_doc_checks(root))
     checks.extend(public_api_surface_checks(root))
+    checks.extend(run_plan_surface_checks(root))
     checks.extend(package_code_checks(root))
     checks.extend(repo_structure_checks(root))
     checks.extend(git_state_checks(root))
@@ -471,7 +542,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gpu-root", type=Path)
     parser.add_argument("--populations", default="1024,4096")
     parser.add_argument("--bench-adapters", default="8,16,32")
-    parser.add_argument("--skip-halving", action="store_true")
+    parser.add_argument("--run-halving", action="store_true", help="Reserved until a final staged-search route exists.")
+    parser.add_argument("--skip-halving", action="store_true", help="Compatibility no-op; staged search is disabled by default.")
     parser.add_argument("--remote-url")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--strict", action="store_true")
@@ -486,7 +558,7 @@ def main(argv: list[str] | None = None) -> int:
         gpu_root=args.gpu_root,
         populations=parse_int_tuple(args.populations),
         bench_adapters=parse_int_tuple(args.bench_adapters),
-        run_halving=not args.skip_halving,
+        run_halving=args.run_halving and not args.skip_halving,
         remote=args.remote_url,
     )
     payload = summary(checks)

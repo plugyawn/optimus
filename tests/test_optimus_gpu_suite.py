@@ -104,6 +104,26 @@ def write_contract_outputs(contract) -> None:
             path.parent.mkdir(parents=True, exist_ok=True)
             if path.suffix == ".png":
                 path.write_bytes(PNG_1X1)
+            elif path.name == "systems_report.json":
+                path.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "subspace_systems_report_v1",
+                            "candidates_per_sec": 1.0,
+                            "prompts_per_sec": 2.0,
+                            "output_tokens_per_sec": 3.0,
+                            "base_model_time_s": 1.0,
+                            "qx_time_s": 0.1,
+                            "lazy_delta_time_s": 0.2,
+                            "scoring_time_s": 0.3,
+                            "setup_time_s": 0.4,
+                            "lazy_overhead_pct": 10.0,
+                            "gpu_memory_allocated_bytes": 1024,
+                            "candidate_batch_size": 4,
+                        }
+                    )
+                    + "\n"
+                )
             else:
                 path.write_text(csv_rows.get(rel, "placeholder\n"))
         return
@@ -142,6 +162,98 @@ def write_completed_spec(spec) -> None:
     (spec.output_path / "summary.json").write_text(json.dumps(_summary_for_kind(kind, **spec.identity)) + "\n")
 
 
+def write_subspace_contract_outputs(contract) -> None:
+    contract.root.mkdir(parents=True, exist_ok=True)
+    candidate = {
+        "candidate_id": "seed1:+:rho0.01",
+        "direction_seed": 1,
+        "sign": "+",
+        "basis_hash": "basis123",
+        "target_set_hash": "target123",
+        "scale_mode": "relative-output-rms",
+        "budget_policy": "per-block-equal",
+        "rng_version": "gaussian_hash_v1",
+        "runtime_dtype": "bf16",
+    }
+    summary = {
+        "kind": "subspace_vllm_search",
+        "backend": "vllm",
+        "method": "subspace",
+        "population": 16,
+        "basis_hash": "basis123",
+        "target_set_hash": "target123",
+        "scale_mode": "relative-output-rms",
+        "budget_policy": "per-block-equal",
+        "rng_version": "gaussian_hash_v1",
+        "candidate_routing": "row_candidate_id",
+        "prefix_cache_policy": "disabled-for-search",
+        "scorer_version": "countdown_v1",
+        "prompt_ids_hash": "prompts123",
+        "decode_config_hash": "decode123",
+        "candidates_per_sec": 1.0,
+        "prompts_per_sec": 2.0,
+        "output_tokens_per_sec": 3.0,
+        "lazy_overhead_pct": 10.0,
+    }
+    json_files = {
+        "summary.json": summary,
+        "subspace_state_summary.json": {
+            "schema_version": "subspace_state_v1",
+            "basis_hash": "basis123",
+            "activation_sites": [{"site_id": "layer_0.attn_in"}],
+            "targets": [{"target_id": "layer_0.self_attn.q_proj"}],
+        },
+        "top_k_ensemble.json": {
+            "ensemble_kind": "lazy_top_k",
+            "schema_version": "top_k_ensemble_v1",
+            "aggregation": "majority-vote",
+            "tie_break_policy": "lowest_candidate_id",
+            "selection_rule": "screen_top_k_fixed_config",
+            "K": 1,
+            "candidates": [candidate],
+            "basis_hash": "basis123",
+            "target_set_hash": "target123",
+            "scorer_version": "countdown_v1",
+            "prompt_ids_hash": "prompts123",
+            "runtime_config_hash": "runtime123",
+            "decode_config_hash": "decode123",
+        },
+        "validation_report.json": {
+            "schema_version": "subspace_validation_report_v1",
+            "scientific_gate": {},
+            "drift_diagnostics": {},
+            "diversity_metrics": {},
+        },
+        "systems_report.json": {
+            "schema_version": "subspace_systems_report_v1",
+            "candidates_per_sec": 1.0,
+            "prompts_per_sec": 2.0,
+            "output_tokens_per_sec": 3.0,
+            "base_model_time_s": 1.0,
+            "qx_time_s": 0.1,
+            "lazy_delta_time_s": 0.2,
+            "scoring_time_s": 0.3,
+            "setup_time_s": 0.4,
+            "lazy_overhead_pct": 10.0,
+            "gpu_memory_allocated_bytes": 1024,
+            "candidate_batch_size": 4,
+        },
+    }
+    for rel in contract.required_files:
+        path = contract.root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if rel == "subspace_state.pt":
+            path.write_bytes(b"subspace-state")
+        elif rel == "candidates.jsonl":
+            path.write_text("".join(json.dumps(candidate | {"candidate_id": f"seed{idx}:+:rho0.01", "direction_seed": idx}) + "\n" for idx in range(1, 17)))
+        elif rel == "candidate_scores.jsonl":
+            path.write_text("".join(json.dumps({"candidate_id": f"seed{idx}:+:rho0.01", "screen_score": 0.1, "scorer_version": "countdown_v1", "prompt_ids_hash": "prompts123"}) + "\n" for idx in range(1, 17)))
+        elif rel in json_files:
+            path.write_text(json.dumps(json_files[rel]) + "\n")
+        else:
+            path.write_text("placeholder\n")
+
+
 def test_gpu_suite_specs_include_p1024_and_p4096_searches(tmp_path: Path):
     config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems")
 
@@ -150,7 +262,7 @@ def test_gpu_suite_specs_include_p1024_and_p4096_searches(tmp_path: Path):
 
     assert "search_p1024_chunk32" in names
     assert "search_p4096_chunk32" in names
-    assert "halving_p1024_stage8_surv64" in names
+    assert "halving_p1024_stage8_surv64" not in names
     assert "systems_report" in names
 
 
@@ -161,7 +273,7 @@ def test_plan_payload_serializes_commands(tmp_path: Path):
     search = next(run for run in payload["runs"] if run["name"] == "search_p4096_chunk32")
 
     assert search["kind"] == "search"
-    assert search["command"][:2] == ["optimus", "vllm-search"]
+    assert search["command"][:6] == ["optimus", "search", "--backend", "vllm", "--method", "lora"]
     assert "--population" in search["command"]
     assert "4096" in search["command"]
     assert "--tensor-parallel-size" in search["command"]
@@ -217,12 +329,44 @@ def test_plan_payload_can_keep_search_adapters_for_external_eval(tmp_path: Path)
     assert "--keep-adapters" in search["command"]
 
 
-def test_halving_plan_uses_full_search_reference_for_regret_metrics(tmp_path: Path):
-    config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems")
-    halving = next(run for run in plan_payload(config)["runs"] if run["kind"] == "halving")
+def test_subspace_plan_uses_final_public_surface(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(128,),
+        basis_rank=256,
+        basis_prompts=64,
+        target_preset="transformer-linears",
+        rho_grid="0.002,0.005",
+    )
 
-    assert "--full-search-reference" in halving["command"]
-    assert str(tmp_path / "runs" / "search_p1024_chunk32") in halving["command"]
+    payload = plan_payload(config)
+    search = next(run for run in payload["runs"] if run["kind"] == "search")
+    commands = [" ".join(run["command"]) for run in payload["runs"]]
+
+    assert search["command"][:6] == ["optimus", "search", "--backend", "vllm", "--method", "subspace"]
+    assert search["name"] == "search_p128_subspace_r256"
+    assert "--basis-rank" in search["command"]
+    assert "256" in search["command"]
+    assert "--basis-prompts" in search["command"]
+    assert "--target-preset" in search["command"]
+    assert "--rho-grid" in search["command"]
+    assert "--rank" not in search["command"]
+    assert "--sigma" not in search["command"]
+    assert "--max-loras" not in search["command"]
+    assert not any("vllm-search" in command or "vllm-bench" in command or "vllm-halving" in command for command in commands)
+
+
+def test_halving_plan_uses_full_search_reference_for_regret_metrics(tmp_path: Path):
+    config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems", run_halving=True)
+
+    try:
+        plan_payload(config)
+    except RuntimeError as exc:
+        assert "staged search is disabled" in str(exc)
+    else:
+        raise AssertionError("run-plan must not emit removed vllm-halving commands")
 
 
 def test_run_contract_checks_missing_and_present_files(tmp_path: Path):
@@ -240,6 +384,66 @@ def test_run_contract_checks_missing_and_present_files(tmp_path: Path):
     assert summary_payload([final])["pass"] is True
 
 
+def test_subspace_contract_requires_subspace_artifacts_and_candidate_identities(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+
+    write_subspace_contract_outputs(contract)
+    passed = check_run(contract)
+    assert passed.passed
+
+    (contract.root / "top_k_ensemble.json").write_text(
+        json.dumps(
+            {
+                "ensemble_kind": "lazy_top_k",
+                "schema_version": "top_k_ensemble_v1",
+                "aggregation": "majority-vote",
+                "tie_break_policy": "lowest_candidate_id",
+                "selection_rule": "screen_top_k_fixed_config",
+                "K": 1,
+                "candidate_ids": ["seed1:+:rho0.01"],
+                "basis_hash": "basis123",
+                "target_set_hash": "target123",
+                "scorer_version": "countdown_v1",
+                "prompt_ids_hash": "prompts123",
+                "runtime_config_hash": "runtime123",
+                "decode_config_hash": "decode123",
+            }
+        )
+        + "\n"
+    )
+
+    failed = check_run(contract)
+    assert not failed.passed
+    assert any("top_k_ensemble.json.candidates" in item for item in failed.invalid)
+
+
+def test_lora_artifacts_cannot_pass_as_subspace_run(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    contract.root.mkdir(parents=True)
+    (contract.root / "summary.json").write_text(json.dumps(_summary_for_kind("search", population=16)) + "\n")
+    (contract.root / "candidate_summary.jsonl").write_text(json.dumps({"candidate": CANDIDATE, "exact_mean": 0.2}) + "\n")
+    (contract.root / "per_prompt.jsonl").write_text(json.dumps({"mode": "screen", "candidate": CANDIDATE}) + "\n")
+    (contract.root / "holdout_per_prompt.jsonl").write_text(json.dumps({"mode": "holdout", "candidate": CANDIDATE}) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert "subspace_state.pt" in result.missing
+    assert any("summary.kind" in item for item in result.invalid)
+
+
 def test_run_contract_rejects_placeholder_pngs(tmp_path: Path):
     config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems", run_halving=False)
     contract = next(item for item in gpu_suite_contracts(config) if item.name == "systems_report")
@@ -252,9 +456,9 @@ def test_run_contract_rejects_placeholder_pngs(tmp_path: Path):
     assert any("invalid PNG signature" in item for item in final.invalid)
 
 
-def test_run_contract_checks_every_jsonl_row_and_halving_reference(tmp_path: Path):
-    config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems")
-    contract = next(item for item in gpu_suite_contracts(config) if item.name == "halving_p1024_stage8_surv64")
+def test_run_contract_checks_every_jsonl_row(tmp_path: Path):
+    config = GpuSuiteConfig(output_root=tmp_path / "runs", systems_output_root=tmp_path / "systems", populations=(1024,))
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p1024_chunk32")
     write_contract_outputs(contract)
     (contract.root / "candidate_summary.jsonl").write_text(
         json.dumps({"candidate": CANDIDATE, "exact_mean": 0.2}) + "\n{}\n"
@@ -263,15 +467,6 @@ def test_run_contract_checks_every_jsonl_row_and_halving_reference(tmp_path: Pat
     broken_rows = check_run(contract)
     assert not broken_rows.passed
     assert any("row 2 missing candidate" in item for item in broken_rows.invalid)
-
-    write_contract_outputs(contract)
-    summary = json.loads((contract.root / "summary.json").read_text())
-    summary.pop("full_search_reference")
-    (contract.root / "summary.json").write_text(json.dumps(summary) + "\n")
-
-    broken_reference = check_run(contract)
-    assert not broken_reference.passed
-    assert any("summary.full_search_reference: missing" in item for item in broken_reference.invalid)
 
 
 def test_failure_summary_is_not_a_completion_marker(tmp_path: Path):

@@ -79,6 +79,8 @@ def test_pyproject_declares_serving_and_dev_extras():
     pyproject = tomllib.loads(Path("pyproject.toml").read_text())
     extras = pyproject["project"]["optional-dependencies"]
     assert any(dep.startswith("vllm") for dep in extras["serving"])
+    assert any(dep.startswith("vllm") and "<" in dep for dep in extras["serving"])
+    assert any(dep.startswith("vllm") and "<" in dep for dep in extras["all"])
     assert any(dep.startswith("lighteval") for dep in extras["eval"])
     assert "pytest" in extras["dev"]
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"

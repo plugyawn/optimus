@@ -17,11 +17,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--method", choices=["dense", "lora", "subspace"], required=True)
     parser.add_argument("--family", required=True)
     parser.add_argument("--population", type=int, required=True)
-    parser.add_argument("--sigma", type=float, required=True)
+    parser.add_argument("--sigma", type=float)
     parser.add_argument("--sigma-values", default="")
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--antithetic", action="store_true")
     parser.add_argument("--rank", type=int)
+    parser.add_argument("--basis-rank", type=int)
+    parser.add_argument("--rho-grid", default="")
+    parser.add_argument("--sigma-w-grid", default="")
     parser.add_argument("--targets", default="")
     parser.add_argument("--summary-out", type=Path)
     return parser
@@ -29,6 +32,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.method == "subspace":
+        raise SystemExit(
+            "perturbation-panel does not generate subspace panels. Use optimus run-plan "
+            "--method subspace or the Phase 1 subspace candidate schema; subspace uses "
+            "--basis-rank with --rho-grid/--sigma-w-grid, not --rank/--sigma."
+        )
+    if args.sigma is None:
+        raise SystemExit("--sigma is required for dense and lora perturbation panels")
     sigma_values = parse_float_list(args.sigma_values) if args.sigma_values else None
     perturbations = perturbation_panel(
         args.method,

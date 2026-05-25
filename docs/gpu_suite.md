@@ -56,6 +56,30 @@ TENSOR_PARALLEL_SIZE=1 \
 scripts/run_optimus_gpu_suite.sh
 ```
 
+The default launcher mode is the explicit LoRA baseline:
+
+```text
+BACKEND=vllm
+METHOD=lora
+```
+
+Subspace planning uses the same launcher, but it must use the final subspace
+flags rather than adapter-only `rank`/`sigma`/`max_loras` controls:
+
+```bash
+METHOD=subspace \
+BASIS_RANK=128 \
+BASIS_PROMPTS=32 \
+TARGET_PRESET=transformer-linears \
+SCALE_MODE=relative-output-rms \
+RHO_GRID=0.002,0.005,0.01,0.02 \
+BUDGET_POLICY=per-block-equal \
+BASIS_KIND=activation-svd \
+TOP_K_GRID=1,4,8,16 \
+RUN_HALVING=0 \
+scripts/run_optimus_gpu_suite.sh
+```
+
 For a p128/p256/p512/p1024 subspace validation plan:
 
 ```bash
@@ -86,7 +110,11 @@ for larger models that do not fit or run efficiently on one GPU.
 
 The generated evidence is not enough by itself. A final claim requires:
 
-1. `summary.json` and per-prompt rows for each full search.
+1. For subspace runs: `subspace_state.pt`, `subspace_state_summary.json`,
+   `candidates.jsonl`, `candidate_scores.jsonl`, `top_k_ensemble.json`,
+   `validation_report.json`, `systems_report.json`, and `summary.json`.
+   Legacy LoRA baselines keep their adapter rows and candidate summaries under
+   an explicitly LoRA-labelled run.
 2. Candidate/sec, prompts/sec, token/sec, load time, and eval elapsed time.
 3. Heldout evaluation for promoted candidates.
 4. Backend parity or trusted confirmation before using any fast backend ranking
@@ -118,7 +146,8 @@ not a selector claim. Concrete numbers should come from the local generated
 
 Remaining publication-grade gaps:
 
-- run staged P1024 search for prompt-eval savings and selected-regret plots;
+- add a final public staged-search route before reintroducing staged P1024
+  prompt-eval savings and selected-regret plots;
 - add trusted Transformers, dense-reference, or LightEval confirmation for the
   selected materialized model state;
 - broaden selector confirmation across more than one matched panel.

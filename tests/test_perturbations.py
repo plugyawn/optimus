@@ -188,3 +188,32 @@ def test_perturbation_panel_cli_writes_jsonl(tmp_path: Path):
     assert summary["method"] == "dense"
     assert len(rows) == 2
     assert rows[0]["key"].startswith("dense:")
+
+
+def test_perturbation_panel_cli_fails_closed_for_subspace(tmp_path: Path):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "optimus.cli",
+            "perturbation-panel",
+            "--out",
+            str(tmp_path / "panel.jsonl"),
+            "--method",
+            "subspace",
+            "--family",
+            "subspace_gaussian_rank_r",
+            "--population",
+            "2",
+            "--basis-rank",
+            "128",
+            "--rho-grid",
+            "0.01",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "--basis-rank with --rho-grid/--sigma-w-grid" in result.stderr

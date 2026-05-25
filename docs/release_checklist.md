@@ -31,8 +31,12 @@ experiment-lab repository.
 - `optimus validate-run` passes for the referenced GPU suite.
 - `optimus systems-report` separates screen-selected heldout transfer from
   promoted holdout-oracle quality.
-- P1024 and P4096 reports include per-prompt rows, candidate summaries, token
-  throughput, candidate/sec, and best-of-N data.
+- Subspace P1024 and P4096 reports include `subspace_state.pt`,
+  `candidate_scores.jsonl`, `top_k_ensemble.json`, sample-level scorer details,
+  token throughput, candidate/sec, and top-K/best-of-N data.
+- Legacy LoRA baseline reports may include adapter rows and
+  `candidate_summary.jsonl`, but those artifacts are not accepted as subspace
+  evidence.
 - Any selector-quality claim uses screen-selected heldout metrics.
 - Any candidate-generation claim using holdout-oracle metrics is labeled as
   post-hoc promoted-candidate evidence.

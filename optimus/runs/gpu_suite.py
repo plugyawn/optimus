@@ -19,12 +19,23 @@ class GpuSuiteConfig:
     systems_output_root: Path = Path("results/report/optimus_systems")
     data: Path = Path("data/countdown_generated_1200_seed20260507.json")
     model: str = DEFAULT_MODEL
+    backend: str = "vllm"
+    method: str = "lora"
     populations: tuple[int, ...] = DEFAULT_SEARCH_POPULATIONS
     prompts: int = 64
     holdout_prompts: int = 256
     promote: int = 64
     rank: int = 8
     sigma: float = 0.0075
+    basis_rank: int = 128
+    basis_prompts: int = 32
+    target_preset: str = "transformer-linears"
+    scale_mode: str = "relative-output-rms"
+    rho_grid: str = "0.002,0.005,0.01,0.02"
+    sigma_w_grid: str = ""
+    budget_policy: str = "per-block-equal"
+    basis_kind: str = "activation-svd"
+    top_k_grid: str = "1,4,8,16"
     seed: int = 2468
     targets: str = DEFAULT_TARGETS
     max_new_tokens: int = 32
@@ -48,7 +59,7 @@ class GpuSuiteConfig:
     halving_population: int = 1024
     halving_stage_prompts: int = 8
     halving_survivors: int = 64
-    run_halving: bool = True
+    run_halving: bool = False
 
 
 @dataclass(frozen=True)
@@ -80,9 +91,13 @@ class RunSpec:
 
 
 def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int) -> list[str]:
-    return [
+    args = [
         "optimus",
-        "vllm-search",
+        "search",
+        "--backend",
+        config.backend,
+        "--method",
+        config.method,
         "--out",
         str(output_path),
         "--model",
@@ -97,22 +112,10 @@ def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int
         str(population),
         "--promote",
         str(config.promote),
-        "--rank",
-        str(config.rank),
-        "--sigma",
-        f"{config.sigma:g}",
         "--seed",
         str(config.seed),
-        "--targets",
-        config.targets,
-        "--max-loras",
-        str(config.max_loras),
         "--tensor-parallel-size",
         str(config.tensor_parallel_size),
-        "--chunk-adapters",
-        str(config.chunk_adapters),
-        "--max-cpu-loras",
-        str(config.max_cpu_loras),
         "--max-new-tokens",
         str(config.max_new_tokens),
         "--prompt-variants",
@@ -127,7 +130,51 @@ def _base_search_args(config: GpuSuiteConfig, output_path: Path, population: int
         str(config.min_selection_prompt_variants),
         "--stop-at-answer",
         "--antithetic",
-    ] + _search_prompt_args(config) + _vllm_runtime_args(config) + _search_artifact_args(config)
+    ] + _search_prompt_args(config) + _vllm_runtime_args(config)
+    if config.method == "subspace":
+        return args + _subspace_args(config)
+    return args + _lora_search_args(config) + _search_artifact_args(config)
+
+
+def _lora_search_args(config: GpuSuiteConfig) -> list[str]:
+    return [
+        "--rank",
+        str(config.rank),
+        "--sigma",
+        f"{config.sigma:g}",
+        "--targets",
+        config.targets,
+        "--max-loras",
+        str(config.max_loras),
+        "--chunk-adapters",
+        str(config.chunk_adapters),
+        "--max-cpu-loras",
+        str(config.max_cpu_loras),
+    ]
+
+
+def _subspace_args(config: GpuSuiteConfig) -> list[str]:
+    args = [
+        "--basis-rank",
+        str(config.basis_rank),
+        "--basis-prompts",
+        str(config.basis_prompts),
+        "--target-preset",
+        config.target_preset,
+        "--scale-mode",
+        config.scale_mode,
+        "--budget-policy",
+        config.budget_policy,
+        "--basis-kind",
+        config.basis_kind,
+        "--top-k-grid",
+        config.top_k_grid,
+    ]
+    if config.scale_mode == "projected-dense":
+        args.extend(["--sigma-w-grid", config.sigma_w_grid or "1e-5,3e-5,1e-4"])
+    else:
+        args.extend(["--rho-grid", config.rho_grid])
+    return args
 
 
 def _search_prompt_args(config: GpuSuiteConfig) -> list[str]:
@@ -157,18 +204,16 @@ def _search_artifact_args(config: GpuSuiteConfig) -> list[str]:
 
 
 def search_identity(config: GpuSuiteConfig, population: int) -> dict[str, Any]:
-    return {
+    identity = {
         "model": config.model,
         "data": str(config.data),
-        "family": "isotropic",
+        "backend": config.backend,
+        "method": config.method,
         "population": population,
         "screen_prompts": config.prompts,
         "holdout_prompts": config.holdout_prompts,
         "promote": config.promote,
-        "rank": config.rank,
-        "sigma": config.sigma,
         "seed": config.seed,
-        "targets": config.targets,
         "max_new_tokens": config.max_new_tokens,
         "prompt_variants": config.prompt_variants,
         "prompt_input": config.prompt_input,
@@ -177,18 +222,44 @@ def search_identity(config: GpuSuiteConfig, population: int) -> dict[str, Any]:
         "max_base_cap_hit_for_selection": config.max_base_cap_hit_for_selection,
         "min_selection_prompt_variants": config.min_selection_prompt_variants,
         "require_all_prompt_variants_valid": config.require_all_prompt_variants_valid,
-        "chunk_adapters": config.chunk_adapters,
-        "max_loras": config.max_loras,
-        "max_cpu_loras": config.max_cpu_loras,
         "tensor_parallel_size": config.tensor_parallel_size,
         "antithetic": True,
     }
+    if config.method == "subspace":
+        identity.update(
+            {
+                "basis_rank": config.basis_rank,
+                "basis_prompts": config.basis_prompts,
+                "target_preset": config.target_preset,
+                "scale_mode": config.scale_mode,
+                "rho_grid": config.rho_grid,
+                "sigma_w_grid": config.sigma_w_grid,
+                "budget_policy": config.budget_policy,
+                "basis_kind": config.basis_kind,
+                "top_k_grid": config.top_k_grid,
+            }
+        )
+    else:
+        identity.update(
+            {
+                "family": "isotropic",
+                "rank": config.rank,
+                "sigma": config.sigma,
+                "targets": config.targets,
+                "chunk_adapters": config.chunk_adapters,
+                "max_loras": config.max_loras,
+                "max_cpu_loras": config.max_cpu_loras,
+            }
+        )
+    return identity
 
 
 def bench_identity(config: GpuSuiteConfig, adapters: int) -> dict[str, Any]:
     return {
         "model": config.model,
         "data": str(config.data),
+        "backend": config.backend,
+        "method": config.method,
         "family": "isotropic",
         "adapters": adapters,
         "prompts": config.prompts,
@@ -203,18 +274,9 @@ def bench_identity(config: GpuSuiteConfig, adapters: int) -> dict[str, Any]:
     }
 
 
-def halving_identity(config: GpuSuiteConfig) -> dict[str, Any]:
-    identity = search_identity(config, config.halving_population)
-    identity.update(
-        {
-            "stage_prompts": config.halving_stage_prompts,
-            "survivors": config.halving_survivors,
-        }
-    )
-    return identity
-
-
 def bench_specs(config: GpuSuiteConfig) -> list[RunSpec]:
+    if config.method == "subspace":
+        return []
     specs = []
     for adapters in config.bench_adapters:
         out = config.output_root / f"bench_a{adapters}_p{config.prompts}"
@@ -224,10 +286,16 @@ def bench_specs(config: GpuSuiteConfig) -> list[RunSpec]:
                 kind="bench",
                 output_path=out,
                 population=adapters,
+                backend=config.backend,
+                method=config.method,
                 identity=bench_identity(config, adapters),
                 command=(
                     "optimus",
-                    "vllm-bench",
+                    "bench",
+                    "--backend",
+                    config.backend,
+                    "--method",
+                    config.method,
                     "--out",
                     str(out),
                     "--model",
@@ -269,80 +337,21 @@ def bench_specs(config: GpuSuiteConfig) -> list[RunSpec]:
 def search_specs(config: GpuSuiteConfig) -> list[RunSpec]:
     specs = []
     for population in config.populations:
-        out = config.output_root / f"search_p{population}_chunk{config.chunk_adapters}"
+        suffix = f"subspace_r{config.basis_rank}" if config.method == "subspace" else f"chunk{config.chunk_adapters}"
+        out = config.output_root / f"search_p{population}_{suffix}"
         specs.append(
             RunSpec(
-                name=f"search_p{population}_chunk{config.chunk_adapters}",
+                name=out.name,
                 kind="search",
                 output_path=out,
+                backend=config.backend,
+                method=config.method,
                 population=population,
                 identity=search_identity(config, population),
                 command=tuple(_base_search_args(config, out, population)),
             )
         )
     return specs
-
-
-def halving_specs(config: GpuSuiteConfig) -> list[RunSpec]:
-    out = (
-        config.output_root
-        / f"halving_p{config.halving_population}_stage{config.halving_stage_prompts}_surv{config.halving_survivors}"
-    )
-    reference = config.output_root / f"search_p{config.halving_population}_chunk{config.chunk_adapters}"
-    return [
-        RunSpec(
-            name=out.name,
-            kind="halving",
-            output_path=out,
-            population=config.halving_population,
-            identity=halving_identity(config),
-            command=(
-                "optimus",
-                "vllm-halving",
-                "--out",
-                str(out),
-                "--model",
-                config.model,
-                "--data",
-                str(config.data),
-                "--prompts",
-                str(config.prompts),
-                "--stage-prompts",
-                str(config.halving_stage_prompts),
-                "--holdout-prompts",
-                str(config.holdout_prompts),
-                "--population",
-                str(config.halving_population),
-                "--survivors",
-                str(config.halving_survivors),
-                "--promote",
-                str(config.promote),
-                "--rank",
-                str(config.rank),
-                "--sigma",
-                f"{config.sigma:g}",
-                "--seed",
-                str(config.seed),
-                "--targets",
-                config.targets,
-                "--max-loras",
-                str(config.max_loras),
-                "--tensor-parallel-size",
-                str(config.tensor_parallel_size),
-                "--chunk-adapters",
-                str(config.chunk_adapters),
-                "--max-cpu-loras",
-                str(config.max_cpu_loras),
-                "--max-new-tokens",
-                str(config.max_new_tokens),
-                "--stop-at-answer",
-                "--antithetic",
-                "--full-search-reference",
-                str(reference),
-                *_vllm_runtime_args(config),
-            ),
-        )
-    ]
 
 
 def report_specs(config: GpuSuiteConfig) -> list[RunSpec]:
@@ -361,8 +370,9 @@ def report_specs(config: GpuSuiteConfig) -> list[RunSpec]:
 
 
 def gpu_suite_specs(config: GpuSuiteConfig) -> list[RunSpec]:
-    halving = halving_specs(config) if config.run_halving else []
-    return [*bench_specs(config), *search_specs(config), *halving, *report_specs(config)]
+    if config.run_halving:
+        raise RuntimeError("staged search is disabled until it has a final public route")
+    return [*bench_specs(config), *search_specs(config), *report_specs(config)]
 
 
 def completion_marker(spec: RunSpec) -> Path:
@@ -502,12 +512,23 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--systems-out", type=Path, default=Path("results/report/optimus_systems"))
     parser.add_argument("--data", type=Path, default=Path("data/countdown_generated_1200_seed20260507.json"))
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--backend", choices=["vllm"], default="vllm")
+    parser.add_argument("--method", choices=["lora", "subspace"], default="lora")
     parser.add_argument("--populations", default="1024,4096")
     parser.add_argument("--prompts", type=int, default=64)
     parser.add_argument("--holdout-prompts", type=int, default=256)
     parser.add_argument("--promote", type=int, default=64)
     parser.add_argument("--rank", type=int, default=8)
     parser.add_argument("--sigma", type=float, default=0.0075)
+    parser.add_argument("--basis-rank", type=int, default=128)
+    parser.add_argument("--basis-prompts", type=int, default=32)
+    parser.add_argument("--target-preset", default="transformer-linears")
+    parser.add_argument("--scale-mode", choices=["relative-output-rms", "projected-dense"], default="relative-output-rms")
+    parser.add_argument("--rho-grid", default="0.002,0.005,0.01,0.02")
+    parser.add_argument("--sigma-w-grid", default="")
+    parser.add_argument("--budget-policy", default="per-block-equal")
+    parser.add_argument("--basis-kind", default="activation-svd")
+    parser.add_argument("--top-k-grid", default="1,4,8,16")
     parser.add_argument("--seed", type=int, default=2468)
     parser.add_argument("--targets", default=DEFAULT_TARGETS)
     parser.add_argument("--max-new-tokens", type=int, default=32)
@@ -531,7 +552,8 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--halving-population", type=int, default=1024)
     parser.add_argument("--halving-stage-prompts", type=int, default=8)
     parser.add_argument("--halving-survivors", type=int, default=64)
-    parser.add_argument("--skip-halving", action="store_true")
+    parser.add_argument("--run-halving", action="store_true", help="Reserved until a final staged-search route exists.")
+    parser.add_argument("--skip-halving", action="store_true", help="Compatibility no-op; staged search is disabled by default.")
 
 
 def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:
@@ -540,12 +562,23 @@ def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:
         systems_output_root=args.systems_out,
         data=args.data,
         model=args.model,
+        backend=args.backend,
+        method=args.method,
         populations=parse_int_tuple(args.populations),
         prompts=args.prompts,
         holdout_prompts=args.holdout_prompts,
         promote=args.promote,
         rank=args.rank,
         sigma=args.sigma,
+        basis_rank=args.basis_rank,
+        basis_prompts=args.basis_prompts,
+        target_preset=args.target_preset,
+        scale_mode=args.scale_mode,
+        rho_grid=args.rho_grid,
+        sigma_w_grid=args.sigma_w_grid,
+        budget_policy=args.budget_policy,
+        basis_kind=args.basis_kind,
+        top_k_grid=args.top_k_grid,
         seed=args.seed,
         targets=args.targets,
         max_new_tokens=args.max_new_tokens,
@@ -569,7 +602,7 @@ def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:
         halving_population=args.halving_population,
         halving_stage_prompts=args.halving_stage_prompts,
         halving_survivors=args.halving_survivors,
-        run_halving=not args.skip_halving,
+        run_halving=args.run_halving and not args.skip_halving,
     )
 
 
@@ -598,7 +631,10 @@ def markdown_plan(payload: dict) -> str:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     config = config_from_args(args)
-    payload = plan_payload(config)
+    try:
+        payload = plan_payload(config)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from None
     text = (
         json.dumps(payload, indent=2, sort_keys=True) + "\n"
         if args.format == "json"

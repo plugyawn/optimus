@@ -118,7 +118,8 @@ Quality claims require:
 
 | evidence | gate |
 | --- | --- |
-| P1024/P4096 search | `summary.json`, `candidate_summary.jsonl`, per-prompt rows, heldout rows, and throughput fields. |
+| Subspace P1024/P4096 search | `subspace_state.pt`, `subspace_state_summary.json`, `candidates.jsonl`, `candidate_scores.jsonl`, `top_k_ensemble.json`, `validation_report.json`, `systems_report.json`, `summary.json`, sample-level scorer details, and throughput fields. |
+| Legacy LoRA baseline search | Explicitly LoRA-labelled `summary.json`, `candidate_summary.jsonl`, per-prompt rows, heldout rows, adapter metadata, and throughput fields. |
 | Backend parity | Protocol match, base-row checks, ranking agreement, output-diff checks, and adapter tensor checks where applicable. |
 | Dense/LoRA distinction | Rank-`r` LoRA is not claimed as dense parity unless a dense reference run actually passes. |
 | LightEval confirmation | Standard-harness results and saved details for externally materialized final models; lazy top-K ensembles use Optimus-native sample-level evaluation until a direct LightEval runtime adapter exists. |
