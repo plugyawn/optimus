@@ -55,12 +55,14 @@ Current saved state, 2026-05-25:
   subspace runs, removing public legacy subspace alias normalization, and adding
   shard metadata to the public `SubspaceCandidate` schema. Phase 1 still
   requires independent re-review before runtime basis capture starts.
-- The latest pre-implementation enforcement checkpoint is commit `90f920d`
-  (`Seal subspace public contracts`). It turns the previous review queue into
-  executable validation/release gates for artifact provenance, scientific-gate
-  metadata, duplicate candidate/score rejection, strict systems numerics,
-  subspace public-surface guards, source-of-truth doc scans, and per-entry
-  Prime ledger cleanup.
+- The latest pre-implementation enforcement checkpoint is commit `2ebd197`
+  (`Harden subspace fail-closed gates`). It turns the previous review queue into
+  executable validation/release gates for artifact provenance, exact schema
+  versions, scientific-gate metadata and thresholds, activation-site
+  provenance, holdout selector provenance, duplicate candidate/score rejection,
+  strict systems numerics, subspace public-surface guards, fail-closed
+  `run-suite`, source-of-truth doc scans, adapter-hot-path import guards, and
+  per-entry Prime ledger cleanup.
 
 ## Phase 0 Enforcement Queue
 
@@ -78,26 +80,36 @@ start basis capture, vLLM hooks, lazy kernels, or optimized kernels.
    - Artifacts that inherit provenance only through a parent summary hash must
      declare that parent explicitly; otherwise they must include the envelope
      directly.
+   - `schema_version` values must match the exact versioned schema ids. Unknown
+     schema strings are invalid, not forward-compatible by default.
 2. Scientific gate metadata:
    - `validation_report.json` must distinguish the selected basis from
      controls with `basis_kind`, `control_basis_kinds`, `comparison`,
      `gate_type`, `epsilon`, confidence interval, locked config hash,
      selection-rule hash, primary metric, and multiple-comparison correction.
-   - The reference smoke gate uses non-inferiority against random controls;
-     the production gate requires a positive paired-bootstrap lower bound
-     unless explicitly labeled as an engineering proceed/no-scientific-win
-     exception.
-3. Candidate and score uniqueness:
+   - The reference smoke gate uses non-inferiority against random controls.
+     The production gate requires a positive paired-bootstrap lower bound unless
+     explicitly labeled as an engineering proceed/no-scientific-win exception.
+     Validators must distinguish these with `gate_stage`.
+3. Activation-site and selector provenance:
+   - Activation-site summaries must include architecture family, layer/block
+     path, read tensor path, hook point, norm position, dtype/shape/sharding
+     metadata, target module ids, calibration prompt/decode hashes, control
+     seed, and transductive status.
+   - `candidate_scores.jsonl` rows must include selection-stage metadata. Any
+     selected holdout row must include the selector/candidate that promoted it,
+     so holdout confirmation cannot be confused with holdout tuning.
+4. Candidate and score uniqueness:
    - `candidates.jsonl` must reject any duplicate `candidate_id`, even if the
      duplicate row is byte-identical.
    - `candidate_scores.jsonl` must reject duplicate score rows for the same
      candidate, split, scorer, prompt/sample-set hash, and decode config hash.
-4. Systems metrics:
+5. Systems metrics:
    - `systems_report.json` numeric fields must be actual JSON numbers, not
      string-coercible values.
    - Aggregation must preserve measured fields only; missing subspace systems
      evidence is a release blocker, not a pass.
-5. Public surface guards:
+6. Public surface guards:
    - `optimus search` must reject hidden adapter-era passthrough flags such as
      activation-state prompts, family-state files, staged prompts, survivor
      counts, batch-size grids, and prompt-count grids.
@@ -105,7 +117,10 @@ start basis capture, vLLM hooks, lazy kernels, or optimized kernels.
      reject LoRA-only knobs including `--rank`, `--sigma`, `--targets`,
      `--chunk-adapters`, `--max-loras`, `--max-cpu-loras`,
      `--keep-adapters`, and `--bench-adapters`.
-6. Release checks:
+   - `optimus run-plan` may emit planned subspace specs only when the specs are
+     marked `planned_fail_closed`; `optimus run-suite --method subspace` must
+     stop at the suite boundary until Phase 5 lands.
+7. Release checks:
    - Public-doc leakage scans must include every core source-of-truth doc:
      `README.md`, `api.md`, `optimus_design.md`,
      `full_model_lazy_kernel_design.md`, `subspace_implementation_roadmap.md`,
@@ -114,7 +129,7 @@ start basis capture, vLLM hooks, lazy kernels, or optimized kernels.
    - Prime GPU cleanup must be checked per ledger entry. A terminated entry is
      not complete unless that same entry records zero active pods or an
      equivalent cleanup verification.
-7. Documentation wording:
+8. Documentation wording:
    - Docs may list vLLM subspace search and bench as planned fail-closed
      routes, but not as implemented supported workflows until Phase 5/6 gates
      pass.
@@ -129,7 +144,7 @@ commit after each coherent slice.
 
 Current closure status:
 
-- Steps 1-6 below are enforced by code and tests as of `90f920d`.
+- Steps 1-6 below are enforced by code and tests as of `2ebd197`.
 - Step 7 remains the active gate for declaring Phase 0 satisfactory: independent
   reviewers must confirm the design doc and roadmap are complete and that the
   implementation substrate has not drifted back toward adapter-era shortcuts.
