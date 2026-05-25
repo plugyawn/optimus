@@ -300,6 +300,10 @@ Deliverables:
 - Add `run-plan` fields for the final subspace surface:
   - `--backend`;
   - `--method`;
+  - `--prompts`;
+  - `--holdout-prompts`;
+  - `--match-screen-to-holdout-base-exact`;
+  - `--screen-pool-prompts`;
   - `--basis-rank`;
   - `--layers`;
   - `--basis-centering`;
@@ -323,6 +327,11 @@ Deliverables:
 - Make `perturbation-panel --method subspace` use the new subspace scale names
   or fail closed. It must not expose subspace through old `--rank` and `--sigma`
   semantics.
+- Treat `--match-screen-to-holdout-base-exact` and `--screen-pool-prompts` as
+  screen-construction knobs only. They are public because they affect split
+  difficulty and screen/holdout comparability, but they must be resolved before
+  candidate scoring, recorded in split/prompt hashes, and must never allow
+  holdout overlap or holdout-tuned candidate selection.
 - Update release checks so they scan:
   - public docs;
   - `optimus/cli.py`;

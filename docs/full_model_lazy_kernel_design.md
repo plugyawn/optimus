@@ -681,6 +681,11 @@ optimus search \
   --data DATA \
   --out OUT \
   --population 1024 \
+  --prompts 64 \
+  --holdout-prompts 256 \
+  --match-screen-to-holdout-base-exact \
+  --screen-pool-prompts 512 \
+  --basis-prompts 32 \
   --basis-rank 128 \
   --target-preset transformer-linears \
   --layers all \
@@ -707,6 +712,9 @@ optimus search \
   --data DATA \
   --out OUT \
   --population 1024 \
+  --prompts 64 \
+  --holdout-prompts 256 \
+  --basis-prompts 32 \
   --basis-rank 128 \
   --target-preset transformer-linears \
   --layers all \
@@ -719,6 +727,21 @@ optimus search \
   --candidate-batch-size auto \
   --kernel torch
 ```
+
+Screen/holdout public knobs:
+
+- `--prompts` sets the screen split size.
+- `--holdout-prompts` sets the confirmation split size.
+- `--screen-pool-prompts` sets the candidate pool used by screen construction
+  before filtering or matching.
+- `--match-screen-to-holdout-base-exact` is a screen-construction policy. It
+  may be used only before candidate scoring, uses base-model unlabeled/exact
+  metadata rather than candidate outcomes, and must be reported in
+  `prompt_contract_hash`, `screen_split_hash`, and `holdout_split_hash`. It
+  does not relax the strict `screen_holdout_overlap == 0` rule and cannot be
+  used to tune K/rank/radius/target choices on holdout.
+- `--basis-prompts` sets the calibration prompt count for basis construction
+  and must be reflected in the basis collection config hash.
 
 Deprecated terms to remove:
 
