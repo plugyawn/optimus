@@ -1019,7 +1019,12 @@ control families.
 entered the confidence interval. At minimum, it must cover both control
 families on the locked `primary_metric`; each contrast records its own
 `artifact_path` / `artifact_hash` and the matching `control_artifact_path` /
-`control_artifact_hash` from the control artifact maps.
+`control_artifact_hash` from the control artifact maps. Each contrast also
+records K, basis rank, radius, target preset, scale mode, and aggregation. When
+a multi-value K/rank/radius grid uses a family-wise correction such as
+Holm-Bonferroni, Bonferroni, or Benjamini-Hochberg, `tested_contrasts` must
+cover every activation-SVD versus control-family contrast implied by the
+observed gate-family configs, not only the locked winning config.
 
 `drift_diagnostics` has a fixed v1 metric contract. The probe split is an
 immutable unlabeled prompt/token-row set identified by `probe_split_hash`, and

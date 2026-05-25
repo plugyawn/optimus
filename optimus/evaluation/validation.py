@@ -806,6 +806,7 @@ def _check_scientific_gate_contract(
                 invalid.append(f"{rel}.scientific_gate_contract.validation_selection_artifact.selection_split_hash: does not match contract")
             if validation_artifact.get("selection_rule_hash") != section.get("selection_rule_hash"):
                 invalid.append(f"{rel}.scientific_gate_contract.validation_selection_artifact.selection_rule_hash: does not match contract")
+    observed_corrected_contrast_keys: set[tuple[object, ...]] = set()
     gate_family_artifact = _read_hashed_json_artifact(
         invalid,
         rel,
@@ -843,6 +844,27 @@ def _check_scientific_gate_contract(
             required_basis = {"activation-svd", "random-orthonormal", "shuffled-activation-svd"}
             if required_basis - observed_basis:
                 invalid.append(f"{rel}.scientific_gate_contract.gate_family_artifact.observed_configs: missing basis families {sorted(required_basis - observed_basis)!r}")
+            observed_basis_by_config: dict[tuple[object, ...], set[str]] = {}
+            for config in observed_configs:
+                if not isinstance(config, dict) or not _is_positive_int(config.get("K")) or not _is_positive_int(config.get("basis_rank")):
+                    continue
+                if not _is_json_number(config.get("radius")):
+                    continue
+                key = (
+                    config.get("K"),
+                    config.get("basis_rank"),
+                    float(config.get("radius")),
+                    config.get("target_preset"),
+                    config.get("scale_mode"),
+                    config.get("aggregation"),
+                )
+                observed_basis_by_config.setdefault(key, set()).add(str(config.get("basis_kind")))
+            for key, basis_kinds in observed_basis_by_config.items():
+                if "activation-svd" not in basis_kinds:
+                    continue
+                for control_basis_kind in ("random-orthonormal", "shuffled-activation-svd"):
+                    if control_basis_kind in basis_kinds:
+                        observed_corrected_contrast_keys.add((control_basis_kind, *key))
             locked_seen = any(
                 isinstance(config, dict)
                 and config.get("basis_kind") == section.get("basis_kind")
@@ -966,14 +988,31 @@ def _check_scientific_gate_contract(
         invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts: empty")
     else:
         covered_controls: set[str] = set()
+        covered_corrected_contrast_keys: set[tuple[object, ...]] = set()
         primary_metric = section.get("primary_metric")
         for index, contrast in enumerate(contrasts, start=1):
             if not isinstance(contrast, dict):
                 invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}]: not object")
                 continue
-            for field in ("basis_kind", "control_basis_kind", "metric", "artifact_path", "artifact_hash", "control_artifact_path", "control_artifact_hash"):
+            for field in (
+                "basis_kind",
+                "control_basis_kind",
+                "metric",
+                "artifact_path",
+                "artifact_hash",
+                "control_artifact_path",
+                "control_artifact_hash",
+                "target_preset",
+                "scale_mode",
+                "aggregation",
+            ):
                 if not isinstance(contrast.get(field), str) or not contrast.get(field):
                     invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].{field}: empty")
+            for field in ("K", "basis_rank"):
+                if not _is_positive_int(contrast.get(field)):
+                    invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].{field}: not positive integer")
+            if not _is_json_number(contrast.get("radius")):
+                invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].radius: not JSON number")
             if contrast.get("basis_kind") != "activation-svd":
                 invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].basis_kind: expected activation-svd")
             control_basis_kind = contrast.get("control_basis_kind")
@@ -1002,9 +1041,24 @@ def _check_scientific_gate_contract(
             if contrast_payload is not None:
                 if contrast_payload.get("schema_version") != "scientific_gate_contrast_v1":
                     invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].artifact_path: invalid schema_version")
-                for field in ("basis_kind", "control_basis_kind", "metric", "control_artifact_hash"):
+                for field in (
+                    "basis_kind",
+                    "control_basis_kind",
+                    "metric",
+                    "control_artifact_hash",
+                    "K",
+                    "basis_rank",
+                    "target_preset",
+                    "scale_mode",
+                    "aggregation",
+                ):
                     if contrast_payload.get(field) != contrast.get(field):
                         invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].artifact.{field}: does not match contrast")
+                if _is_json_number(contrast_payload.get("radius")) and _is_json_number(contrast.get("radius")):
+                    if abs(float(contrast_payload["radius"]) - float(contrast["radius"])) > 1e-12:
+                        invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].artifact.radius: does not match contrast")
+                else:
+                    invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts[{index}].artifact.radius: does not match contrast")
             _read_hashed_json_artifact(
                 invalid,
                 rel,
@@ -1018,9 +1072,25 @@ def _check_scientific_gate_contract(
                 "shuffled-activation-svd",
             }:
                 covered_controls.add(str(control_basis_kind))
+                if _is_positive_int(contrast.get("K")) and _is_positive_int(contrast.get("basis_rank")) and _is_json_number(contrast.get("radius")):
+                    covered_corrected_contrast_keys.add(
+                        (
+                            str(control_basis_kind),
+                            contrast.get("K"),
+                            contrast.get("basis_rank"),
+                            float(contrast.get("radius")),
+                            contrast.get("target_preset"),
+                            contrast.get("scale_mode"),
+                            contrast.get("aggregation"),
+                        )
+                    )
         missing_contrasts = sorted({"random-orthonormal", "shuffled-activation-svd"} - covered_controls)
         if missing_contrasts:
             invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts: missing primary_metric controls {missing_contrasts!r}")
+        if multi_config_grid and correction in {"holm_bonferroni", "bonferroni", "benjamini_hochberg"}:
+            missing_corrected = sorted(observed_corrected_contrast_keys - covered_corrected_contrast_keys, key=str)
+            if missing_corrected:
+                invalid.append(f"{rel}.scientific_gate_contract.tested_contrasts: missing corrected-family contrasts {missing_corrected!r}")
     if section.get("gate_type") not in {"non-inferiority", "paired-bootstrap-positive", "engineering-proceed-no-scientific-win"}:
         invalid.append(f"{rel}.scientific_gate_contract.gate_type: invalid {section.get('gate_type')!r}")
     if section.get("comparison") != "activation_svd_minus_best_control":

@@ -483,7 +483,10 @@ Deliverables:
   `shuffled-activation-svd` controls on the locked primary metric, and that
   each contrast's run-local artifact hash is verified and its
   `control_artifact_path` / `control_artifact_hash` matches the compared
-  control artifact maps.
+  control artifact maps. For family-wise corrected multi-value K/rank/radius
+  grids, validate `tested_contrasts` covers every activation-SVD versus control
+  contrast implied by the observed gate-family configs, not only the locked
+  config.
 - Validate `top_k_ensemble.json` contains full candidate identities, not only
   candidate ids. Every top-K candidate, not just the first, must match the
   locked basis rank, target preset, scale mode, and radius.

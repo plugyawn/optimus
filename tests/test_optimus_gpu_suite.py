@@ -555,6 +555,12 @@ def write_subspace_contract_outputs(contract) -> None:
         "control_basis_kind": "random-orthonormal",
         "metric": "top_k_holdout_exact",
         "control_artifact_hash": random_control_hash,
+        "K": 1,
+        "basis_rank": 128,
+        "radius": 0.01,
+        "target_preset": "transformer-linears",
+        "scale_mode": "relative-output-rms",
+        "aggregation": "majority-vote",
     }
     shuffled_contrast_artifact = {
         "schema_version": "scientific_gate_contrast_v1",
@@ -562,6 +568,12 @@ def write_subspace_contract_outputs(contract) -> None:
         "control_basis_kind": "shuffled-activation-svd",
         "metric": "top_k_holdout_exact",
         "control_artifact_hash": shuffled_control_hash,
+        "K": 1,
+        "basis_rank": 128,
+        "radius": 0.01,
+        "target_preset": "transformer-linears",
+        "scale_mode": "relative-output-rms",
+        "aggregation": "majority-vote",
     }
     gate_artifacts = {
         "gate/gate_family.json": gate_family_artifact,
@@ -599,6 +611,12 @@ def write_subspace_contract_outputs(contract) -> None:
                     "artifact_hash": _json_sha256(random_contrast_artifact),
                     "control_artifact_path": "gate/control_random.json",
                     "control_artifact_hash": random_control_hash,
+                    "K": 1,
+                    "basis_rank": 128,
+                    "radius": 0.01,
+                    "target_preset": "transformer-linears",
+                    "scale_mode": "relative-output-rms",
+                    "aggregation": "majority-vote",
                 },
                 {
                     "basis_kind": "activation-svd",
@@ -608,6 +626,12 @@ def write_subspace_contract_outputs(contract) -> None:
                     "artifact_hash": _json_sha256(shuffled_contrast_artifact),
                     "control_artifact_path": "gate/control_shuffled.json",
                     "control_artifact_hash": shuffled_control_hash,
+                    "K": 1,
+                    "basis_rank": 128,
+                    "radius": 0.01,
+                    "target_preset": "transformer-linears",
+                    "scale_mode": "relative-output-rms",
+                    "aggregation": "majority-vote",
                 },
             ],
             "locked_K": 1,
@@ -1543,6 +1567,63 @@ def test_subspace_contract_rejects_unbacked_gate_family_observed_config(tmp_path
 
     assert not result.passed
     assert any("observed_configs[1].artifact.basis_rank" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_partial_corrected_multigrid_contrast_family(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    gate = report["scientific_gate_contract"]
+    gate["multiple_comparison_correction"] = "holm_bonferroni"
+    gate["K_grid"] = [1, 4]
+    family = json.loads((contract.root / gate["gate_family_artifact_path"]).read_text())
+    family["multiple_comparison_correction"] = "holm_bonferroni"
+    family["K_grid"] = [1, 4]
+    for basis_kind, artifact_path in [
+        ("activation-svd", "gate/config_activation_svd_k4.json"),
+        ("random-orthonormal", "gate/config_random_k4.json"),
+        ("shuffled-activation-svd", "gate/config_shuffled_k4.json"),
+    ]:
+        config_artifact = {
+            "schema_version": "scientific_gate_config_v1",
+            "basis_kind": basis_kind,
+            "K": 4,
+            "basis_rank": 128,
+            "radius": 0.01,
+            "target_preset": "transformer-linears",
+            "scale_mode": "relative-output-rms",
+            "aggregation": "majority-vote",
+            "primary_metric": "top_k_holdout_exact",
+            "selection_rule_hash": "select123",
+        }
+        (contract.root / artifact_path).write_bytes(_json_bytes(config_artifact))
+        family["observed_configs"].append(
+            {
+                "basis_kind": basis_kind,
+                "K": 4,
+                "basis_rank": 128,
+                "radius": 0.01,
+                "target_preset": "transformer-linears",
+                "scale_mode": "relative-output-rms",
+                "aggregation": "majority-vote",
+                "artifact_path": artifact_path,
+                "artifact_hash": _json_sha256(config_artifact),
+            }
+        )
+    (contract.root / gate["gate_family_artifact_path"]).write_bytes(_json_bytes(family))
+    gate["gate_family_artifact_hash"] = _json_sha256(family)
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("missing corrected-family contrasts" in item for item in result.invalid)
 
 
 def test_subspace_contract_rejects_mixed_config_top_k_candidates(tmp_path: Path):
