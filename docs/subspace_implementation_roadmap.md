@@ -10,15 +10,18 @@ Current saved state, 2026-05-25:
   compatibility audits, and review-driven contract cleanup, but not basis
   capture, vLLM hook work, lazy-kernel implementation, optimized kernels, or
   new search experiments.
-- Implementation is paused until Phase 0 is independently accepted. Any
-  worktree-local validation or systems patches made while closing review
-  findings are draft substrate work; they are not accepted implementation
-  milestones until committed, tested, and re-reviewed.
-- The first implementation checkpoint after this roadmap removed the known
-  generated-plan legacy wrappers, added subspace-specific validation contracts,
-  and made staged search fail closed until a final public route exists. Future
-  implementation must keep those gates intact before touching vLLM hooks, basis
-  capture, or optimized kernels.
+- Implementation is paused until Phase 0 is independently accepted. This file
+  is the saved implementation roadmap to reference when implementation starts;
+  it is not itself permission to start runtime work.
+- Repository state entering this roadmap refresh: commit `69d7212`
+  (`Enforce subspace evidence gates`). That checkpoint removes the stale staged
+  serving files from the public package, hardens subspace replay/evidence
+  validation, and adds release gates for public-surface drift, state/hash
+  replay, scientific-gate locking, synchronized p128 timing evidence, and
+  target-preset throughput comparisons.
+- The public substrate must stay fail-closed until the named phase gates land.
+  Future implementation must preserve these checks before touching vLLM hooks,
+  basis capture, lazy kernels, optimized kernels, or new search experiments.
 - `optimus search` and `optimus bench` are the final public command families.
   Any runnable plan, launcher, release gate, or validation contract that still
   depends on `peft-search`, `vllm-search`, `vllm-bench`, `vllm-halving`,
@@ -27,81 +30,29 @@ Current saved state, 2026-05-25:
   Public API and artifacts must not use `activation_subspace`,
   `lazy-subspace`, `engine`, `family_state`, or LoRA adapter terminology for
   the lazy-kernel path.
-- Independent review at commit `54837a2` did not accept the current
-  implementation substrate. Treat the findings below as the implementation
-  restart queue. Do not start basis capture, vLLM hooks, or lazy kernels until
-  these Phase 0 blockers are resolved and independently re-reviewed:
-  - `optimus search --help` and `optimus bench --help` do not expose the final
-    subspace flags, even though generated plans and docs already depend on
-    them.
-  - `optimus search --backend vllm --method subspace` is generated and
-    documented as the production route, but still fails closed as
-    unimplemented. That is acceptable only while the plan labels it explicitly
-    as a planned route, not as runnable production behavior.
-  - The executable validation contract is weaker than the artifact contract:
-    common provenance fields, scale grids, replay hashes, candidate identity
-    consistency, top-K replay fields, and validation-report pass/failure
-    semantics must be enforced.
-  - `optimus systems-report` is still LoRA-shaped and does not produce a
-    subspace `systems_report.json`, while release and validation gates require
-    one.
-  - GPU-suite launchers must call `validate-run --strict` for production
-    validation; a validation JSON with `"pass": false` must make the launcher
-    fail.
-  - vLLM compatibility must be pinned or guarded tightly enough that a resolver
-    drift cannot silently change the runtime substrate.
-  - Legacy subspace aliases and compatibility parsers must be quarantined under
-    private `legacy_` names or deleted; they must not remain public core API.
-  - Stable subspace schemas must include the shard metadata needed for later
-    one-worker-per-GPU scaling before Phase 1 is considered complete.
-- The next checkpoint addressed this restart queue by exposing the final
-  subspace flags in `search`/`bench` help, hardening the executable artifact
-  validator, making suite validation strict from the launcher, pinning the
-  default vLLM dependency, failing `systems-report` closed for unmeasured
-  subspace runs, removing public legacy subspace alias normalization, and adding
-  shard metadata to the public `SubspaceCandidate` schema. Phase 1 still
-  requires independent re-review before runtime basis capture starts.
-- The latest pre-implementation enforcement checkpoint is commit `2ebd197`
-  (`Harden subspace fail-closed gates`). It turns the previous review queue into
-  executable validation/release gates for artifact provenance, exact schema
-  versions, scientific-gate metadata and thresholds, activation-site
-  provenance, holdout selector provenance, duplicate candidate/score rejection,
-  strict systems numerics, subspace public-surface guards, fail-closed
-  `run-suite`, source-of-truth doc scans, adapter-hot-path import guards, and
-  per-entry Prime ledger cleanup.
-- The latest saved roadmap checkpoint is commit `099d159` (`Refresh subspace
-  roadmap gates`). Independent review of that checkpoint did not accept Phase 0
-  as complete. Treat the findings below as the current implementation-start
-  blockers:
-  - Subspace systems reports must use the full subspace schema in both per-run
-    and suite-level validation. Exact schema versions, JSON-number numerics,
-    timing evidence paths, source report/run provenance, and axis fields
-    (`population`, `target_preset`, `basis_rank`, `kernel`) are mandatory.
-    Suite aggregation must not hide slow target bands behind a fastest-row
-    summary; the CSV or selected report must preserve the conservative gate.
-  - Candidate identity must be nonempty everywhere it appears:
-    `candidates.jsonl`, `candidate_scores.jsonl`, and
-    `top_k_ensemble.json`.
-  - `subspace_state_summary.json` is the validated metadata contract for basis
-    provenance. `subspace_state.pt` is the tensor payload referenced by that
-    summary and must not be documented as a self-validating JSON schema until a
-    real writer/reader validates it.
-  - Basis metadata must enforce the declared enums for basis kind, centering,
-    token source, and split policy.
-  - Scientific gates must require the exact controls
-    `random-orthonormal` and `shuffled-activation-svd`. Production acceptance
-    requires a positive paired-bootstrap gate, or the explicit
-    `engineering_proceed_no_scientific_win` label with a measured operational
-    advantage at equal quality.
-  - Public docs must not say the Transformers backend is a trusted subspace
-    execution path until the reference evaluator exists. Current subspace
-    routes are planned/fail-closed except for schema and planning checks.
-  - Public package exports must not expose adapter-era serving internals,
-    LoRA-shaped search helpers, or legacy perturbation keys as the subspace API.
-    Any compatibility reader must be private or explicitly legacy-scoped.
-  - Release checks must inspect the package public surface, source-of-truth
-    docs, generated plans, launchers, artifact schemas, systems evidence, and
-    adapter-hot-path import boundaries.
+- Phase 0 is the current gate. It is complete only after the refreshed docs,
+  executable validation gates, release checks, package surface, and
+  implementation plan pass independent review on the current head. Until then,
+  every subspace runtime path remains planned/fail-closed.
+- The saved implementation sequence is:
+  1. keep Phase 0 gates green and reviewed;
+  2. add the core `optimus.subspace` data model and deterministic candidate
+     random fields;
+  3. add basis construction and scale resolution;
+  4. add the pure PyTorch reference lazy evaluator and sample-level evaluation
+     contracts;
+  5. run the reference smoke gate against activation-SVD and mandatory random
+     controls;
+  6. integrate the vLLM eager wrapper with explicit row-candidate routing and
+     disabled/candidate-keyed cache policy;
+  7. run the production scientific gate;
+  8. run the p128 speed/search gate before p1024;
+  9. harden top-K lazy ensemble serving;
+  10. add optional single-candidate export and distillation artifacts;
+  11. add optimized kernels only if the scientific and p128 systems gates
+      justify them;
+  12. add multi-GPU candidate sharding in a later PR without changing artifact
+      identity.
 
 ## Phase 0 Enforcement Queue
 
@@ -183,13 +134,16 @@ commit after each coherent slice.
 
 Current closure status:
 
-- Steps 1-6 below are partially enforced by code and tests as of `099d159`, but
-  Phase 0 is not accepted. The review findings in the current saved state are
-  the active closure queue.
-- Step 7 remains the active gate for declaring Phase 0 satisfactory:
+- Steps 1-6 below are represented in the current pre-implementation substrate
+  and must remain green. They are gates and compatibility boundaries, not
+  runtime implementation milestones.
+- Step 7 is still the active gate for declaring Phase 0 satisfactory:
   independent reviewers must confirm the design doc and roadmap are complete,
   all executable gates match the documented contract, and the public substrate
   has not drifted back toward adapter-era shortcuts.
+- The next implementation session must begin by re-checking the current git
+  head, strict tests, release-check output, and package contents. Do not assume
+  the substrate is accepted from this roadmap alone.
 
 1. Public surface reconciliation:
    - add final subspace options to `optimus search --help` and
@@ -231,41 +185,46 @@ Current closure status:
 
 ## Active Pre-Implementation Closure Plan
 
-This is the work to do before any Phase 1 runtime code begins.
+This is the checklist to verify before any Phase 1 runtime code begins. Do not
+start basis capture, vLLM hooks, lazy kernels, optimized kernels, or new search
+experiments while working through it.
 
 1. Reconcile documentation:
-   - mark vLLM subspace and Transformers subspace execution as planned or
-     fail-closed until their roadmap phases land;
-   - state that `subspace_state_summary.json` is the validated metadata
-     contract and `subspace_state.pt` is the tensor payload;
-   - keep `docs/full_model_lazy_kernel_design.md` as the ground source of
-     truth for the math, artifact, and runtime contracts.
+   - verify vLLM subspace and Transformers subspace execution are marked as
+     planned or fail-closed until their roadmap phases land;
+   - verify `subspace_state_summary.json` is the validated metadata contract
+     and `subspace_state.pt` is the tensor payload;
+   - verify `docs/full_model_lazy_kernel_design.md` remains the ground source
+     of truth for the math, artifact, and runtime contracts.
 2. Harden public API boundaries:
-   - remove adapter-era internals from package-level public exports;
-   - quarantine legacy perturbation-key parsing under private or explicitly
-     legacy names;
-   - add release/package tests that fail when legacy LoRA search or serving
-     names become part of the subspace public surface.
-3. Finish executable artifact gates:
-   - require nonempty candidate ids in all candidate-bearing artifacts;
-   - recompute replay hashes for `subspace_state.pt` and
+   - verify adapter-era internals are absent from package-level public exports;
+   - verify legacy perturbation-key parsing is private or explicitly
+     legacy-scoped;
+   - verify release/package tests fail when legacy LoRA search or serving names
+     become part of the subspace public surface.
+3. Verify executable artifact gates:
+   - verify nonempty candidate ids are required in all candidate-bearing
+     artifacts;
+   - verify replay hashes are recomputed for `subspace_state.pt` and
      `candidate_scores.jsonl` instead of trusting copied hash strings;
-   - require `subspace_state.pt` to be loadable and to contain the
-     `basis_tensors` referenced by `subspace_state_summary.json`;
-   - require validation evidence paths to be section-specific JSON evidence,
+   - verify `subspace_state.pt` must be loadable and contain the `basis_tensors`
+     referenced by `subspace_state_summary.json`;
+   - verify validation evidence paths must be section-specific JSON evidence,
      not self-links back to `summary.json` or `validation_report.json`;
-   - require exact schema ids, provenance, numeric JSON types, timing evidence,
-     source paths, and axis fields for subspace systems reports;
-   - require enum validation for basis kind, centering, token source, and split;
-   - make suite-level systems aggregation preserve conservative evidence rather
-     than only the fastest row.
-4. Finish scientific gate enforcement:
-   - require activation-SVD versus both mandatory controls at fixed rank,
-     radius, target preset, scorer, prompts, population, seed panel, and K;
-   - separate reference smoke non-inferiority from production positive-gate
-     acceptance;
-   - allow engineering proceed only with the explicit no-scientific-win label
-     and measured operational advantage at equal quality.
+   - verify exact schema ids, provenance, numeric JSON types, timing evidence,
+     source paths, and axis fields are required for subspace systems reports;
+   - verify enum validation for basis kind, centering, token source, and split;
+   - verify suite-level systems aggregation preserves conservative evidence
+     rather than only the fastest row.
+4. Verify scientific gate enforcement:
+   - verify activation-SVD versus both mandatory controls is required at fixed
+     rank, radius, target preset, scorer, prompts, population, seed panel, and
+     K;
+   - verify reference smoke non-inferiority is separate from production
+     positive-gate acceptance;
+   - verify engineering proceed is allowed only with the explicit
+     no-scientific-win label and measured operational advantage at equal
+     quality.
 5. Re-run validation:
    - focused tests for GPU-suite contracts, systems reports, package exports,
      release checks, and perturbation keys;
@@ -276,6 +235,25 @@ This is the work to do before any Phase 1 runtime code begins.
    - run the independent review axes again: schema/artifacts, systems,
      scientific validity, public API, and integration/runtime planning;
    - Phase 1 may start only after all axes pass.
+
+## First Implementation Session Rules
+
+When implementation starts, follow these rules before writing runtime code:
+
+1. Confirm the active branch, current head, and worktree status.
+2. Re-run the focused Phase 0 validation suite or a stricter replacement.
+3. Run the release check and record any expected external blockers separately
+   from source/schema/doc failures.
+4. Rebuild a clean wheel when public package surface changed, and verify deleted
+   legacy serving modules are absent from the artifact.
+5. Start at Phase 1 with data models and deterministic random fields. Do not
+   skip directly to basis capture, vLLM integration, or kernels.
+6. Keep every unsupported runtime route fail-closed with a roadmap pointer until
+   its acceptance gate lands.
+7. Commit each coherent implementation slice with tests that prove the slice
+   and preserve earlier gates.
+8. If a new public CLI flag, artifact field, or runtime mode becomes necessary,
+   update this roadmap and the design doc before adding the implementation.
 
 ## Implementation Kickoff Checklist
 
