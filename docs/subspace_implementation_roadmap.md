@@ -21,6 +21,76 @@ Current saved state, 2026-05-25:
   Public API and artifacts must not use `activation_subspace`,
   `lazy-subspace`, `engine`, `family_state`, or LoRA adapter terminology for
   the lazy-kernel path.
+- Independent review at commit `54837a2` did not accept the current
+  implementation substrate. Treat the findings below as the implementation
+  restart queue. Do not start basis capture, vLLM hooks, or lazy kernels until
+  these Phase 0 blockers are resolved and independently re-reviewed:
+  - `optimus search --help` and `optimus bench --help` do not expose the final
+    subspace flags, even though generated plans and docs already depend on
+    them.
+  - `optimus search --backend vllm --method subspace` is generated and
+    documented as the production route, but still fails closed as
+    unimplemented. That is acceptable only while the plan labels it explicitly
+    as a planned route, not as runnable production behavior.
+  - The executable validation contract is weaker than the artifact contract:
+    common provenance fields, scale grids, replay hashes, candidate identity
+    consistency, top-K replay fields, and validation-report pass/failure
+    semantics must be enforced.
+  - `optimus systems-report` is still LoRA-shaped and does not produce a
+    subspace `systems_report.json`, while release and validation gates require
+    one.
+  - GPU-suite launchers must call `validate-run --strict` for production
+    validation; a validation JSON with `"pass": false` must make the launcher
+    fail.
+  - vLLM compatibility must be pinned or guarded tightly enough that a resolver
+    drift cannot silently change the runtime substrate.
+  - Legacy subspace aliases and compatibility parsers must be quarantined under
+    private `legacy_` names or deleted; they must not remain public core API.
+  - Stable subspace schemas must include the shard metadata needed for later
+    one-worker-per-GPU scaling before Phase 1 is considered complete.
+
+## Implementation Restart Plan
+
+This is the saved plan for the next implementation pass. Execute in order, and
+commit after each coherent slice.
+
+1. Public surface reconciliation:
+   - add final subspace options to `optimus search --help` and
+     `optimus bench --help`;
+   - keep unsupported runtime routes fail-closed with a roadmap pointer;
+   - make generated plans label `--backend vllm --method subspace` as a planned
+     route until Phase 5 lands.
+2. Validation hardening:
+   - require common provenance in all subspace JSON artifacts;
+   - require `rho_grid` or `sigma_w_grid`, scorer/sample hashes, decode config
+     hash, and deterministic RNG version;
+   - require `top_k_ensemble.json` replay hashes for `subspace_state.pt`,
+     `candidate_scores.jsonl`, and basis collection config;
+   - validate candidate signs, radius fields, shard fields, and identity
+     consistency against summary-level hashes;
+   - require every validation-report section to be a real pass with nonempty
+     existing evidence paths and empty failures.
+3. Launcher and release fail-closed behavior:
+   - make supported launchers invoke strict validation;
+   - make release checks distinguish missing planned artifacts from passing
+     artifacts;
+   - reject subspace runs that emit LoRA-shaped systems or scoring artifacts.
+4. Systems-report boundary:
+   - either implement subspace `systems_report.json` aggregation from real
+     subspace run artifacts, or fail closed with a clear Phase 6 blocker;
+   - do not synthesize throughput metrics that were not measured.
+5. Legacy quarantine:
+   - delete public `activation_subspace` and `lazy_subspace` normalization for
+     new code paths, or move it to explicitly private compatibility readers;
+   - update tests so compatibility behavior is not mistaken for public API.
+6. Schema completion:
+   - add candidate shard metadata to `SubspaceCandidate` and artifacts:
+     shard id, population range, worker id, device id, and immutable
+     prompt/scoring config hash;
+   - keep candidate identity stable before multi-GPU launch code exists.
+7. Independent review gate:
+   - rerun the same subagent review axes after the above changes;
+   - only then start Phase 1/2 runtime implementation work.
 
 ## Phase 0: Stop-The-Line Legacy Surface Cleanup
 
