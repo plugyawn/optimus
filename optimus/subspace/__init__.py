@@ -23,6 +23,21 @@ CandidateSign = Literal["+", "-"]
 @dataclass(frozen=True)
 class ActivationSite:
     site_id: str
+    architecture_family: str
+    layer_index: int
+    block_path: str
+    read_tensor_path: str
+    hook_point: str
+    norm_position: str
+    shape_convention: str
+    runtime_dtype: str
+    accumulation_dtype: str
+    tensor_parallel_sharding_policy: str
+    target_module_ids: tuple[str, ...]
+    calibration_prompt_ids_hash: str
+    calibration_decode_config_hash: str
+    basis_control_seed: int | None
+    transductive: bool
     input_dim: int
     basis_kind: BasisKind
     requested_rank: int

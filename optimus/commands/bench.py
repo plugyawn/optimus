@@ -10,11 +10,32 @@ def build_parser() -> argparse.ArgumentParser:
         prog="optimus bench",
         description="Measure Optimus backend throughput through an explicit backend and method.",
     )
-    parser.add_argument("--backend", required=True, choices=["transformers", "vllm"])
-    parser.add_argument("--method", required=True, choices=["dense", "lora", "subspace"])
+    parser.add_argument("--backend", required=True, choices=["vllm"])
+    parser.add_argument("--method", required=True, choices=["lora", "subspace"])
+    common = parser.add_argument_group("common bench options")
+    common.add_argument("--out")
+    common.add_argument("--model")
+    common.add_argument("--data")
+    common.add_argument("--tensor-parallel-size", type=int)
+    common.add_argument("--max-new-tokens", type=int)
+    common.add_argument("--prompt-input", choices=["text", "token_ids"])
+    common.add_argument("--stop-at-answer", action="store_true")
+    common.add_argument("--enable-prefix-caching", action=argparse.BooleanOptionalAction, default=None)
+    common.add_argument("--enable-chunked-prefill", action=argparse.BooleanOptionalAction, default=None)
+    common.add_argument("--kv-cache-dtype")
+    common.add_argument("--vllm-kwarg", action="append")
     lora = parser.add_argument_group("legacy LoRA bench options")
     lora.add_argument("--adapters", type=int, help="Number of LoRA adapters for explicit legacy adapter throughput baselines.")
     lora.add_argument("--prompts", type=int, help="Prompt count for throughput measurement.")
+    lora.add_argument("--rank", type=int, help="LoRA rank for explicit legacy LoRA baselines.")
+    lora.add_argument("--sigma", type=float, help="LoRA or dense perturbation scale for explicit legacy baselines.")
+    lora.add_argument("--targets", help="Comma-separated LoRA target modules for explicit legacy baselines.")
+    lora.add_argument("--max-loras", type=int, help="Maximum active LoRA adapters for explicit legacy LoRA baselines.")
+    lora.add_argument("--max-cpu-loras", type=int, help="CPU LoRA cache size for explicit legacy LoRA baselines.")
+    lora.add_argument("--preload", action="store_true", help="Preload LoRA adapters for explicit legacy baselines.")
+    lora.add_argument("--mixed-batch", action="store_true", help="Run mixed-adapter batch for explicit legacy baselines.")
+    lora.add_argument("--skip-sequential", action="store_true", help="Skip sequential adapter loop for explicit legacy baselines.")
+    lora.add_argument("--no-include-base", action="store_true", help="Exclude base requests for explicit legacy baselines.")
     subspace = parser.add_argument_group("subspace bench options")
     subspace.add_argument("--basis-rank", type=int, help="Activation-site basis rank.")
     subspace.add_argument("--basis-prompts", type=int, help="Number of prompts used for basis calibration.")
@@ -35,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     subspace.add_argument("--kernel", choices=["torch", "triton", "custom-op"], help="Lazy delta kernel backend.")
     subspace.add_argument(
         "--prefix-cache-policy",
-        choices=["disabled-for-search", "candidate-keyed"],
+        choices=["disabled-for-search"],
         help="Prefix-cache behavior for candidate-specific KV state.",
     )
     return parser
@@ -59,7 +80,7 @@ def _without_route_args(argv: Sequence[str]) -> list[str]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    ns, _unknown = build_parser().parse_known_args(args)
+    ns = build_parser().parse_args(args)
     passthrough = _without_route_args(args)
 
     if ns.backend == "vllm" and ns.method == "lora":

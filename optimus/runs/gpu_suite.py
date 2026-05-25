@@ -411,7 +411,7 @@ def search_specs(config: GpuSuiteConfig) -> list[RunSpec]:
 
 
 def report_specs(config: GpuSuiteConfig) -> list[RunSpec]:
-    report_root = config.output_root.parent
+    report_root = config.output_root
     return [
         RunSpec(
             name="systems_report",
@@ -614,6 +614,7 @@ def plan_payload(config: GpuSuiteConfig) -> dict:
                 "population": spec.population,
                 "output_path": str(spec.output_path),
                 "command": list(spec.command),
+                "planned_fail_closed": spec.method == "subspace" and spec.kind == "search",
             }
             for spec in gpu_suite_specs(config)
         ],
@@ -638,8 +639,8 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--prompts", type=int, default=64)
     parser.add_argument("--holdout-prompts", type=int, default=256)
     parser.add_argument("--promote", type=int, default=64)
-    parser.add_argument("--rank", type=int, default=8)
-    parser.add_argument("--sigma", type=float, default=0.0075)
+    parser.add_argument("--rank", type=int, default=8, help=argparse.SUPPRESS)
+    parser.add_argument("--sigma", type=float, default=0.0075, help=argparse.SUPPRESS)
     parser.add_argument("--basis-rank", type=int, default=128)
     parser.add_argument("--basis-prompts", type=int, default=32)
     parser.add_argument("--target-preset", default="transformer-linears")
@@ -657,7 +658,7 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--match-screen-to-holdout-base-exact", action="store_true")
     parser.add_argument("--screen-pool-prompts", type=int)
     parser.add_argument("--seed", type=int, default=2468)
-    parser.add_argument("--targets", default=DEFAULT_TARGETS)
+    parser.add_argument("--targets", default=DEFAULT_TARGETS, help=argparse.SUPPRESS)
     parser.add_argument("--max-new-tokens", type=int, default=32)
     parser.add_argument("--prompt-variants", default="default")
     parser.add_argument("--prompt-input", default="text", choices=["text", "token_ids"])
@@ -666,16 +667,16 @@ def add_config_args(parser: argparse.ArgumentParser, *, include_out: bool = True
     parser.add_argument("--max-base-cap-hit-for-selection", type=float, default=0.05)
     parser.add_argument("--min-selection-prompt-variants", type=int, default=1)
     parser.add_argument("--require-all-prompt-variants-valid", action="store_true")
-    parser.add_argument("--chunk-adapters", type=int, default=32)
-    parser.add_argument("--max-loras", type=int, default=32)
-    parser.add_argument("--max-cpu-loras", type=int, default=8192)
+    parser.add_argument("--chunk-adapters", type=int, default=32, help=argparse.SUPPRESS)
+    parser.add_argument("--max-loras", type=int, default=32, help=argparse.SUPPRESS)
+    parser.add_argument("--max-cpu-loras", type=int, default=8192, help=argparse.SUPPRESS)
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
     parser.add_argument("--enable-prefix-caching", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--enable-chunked-prefill", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--kv-cache-dtype", default="")
     parser.add_argument("--vllm-kwarg", action="append", default=[], help="Extra vLLM LLM() kwarg as KEY=VALUE.")
-    parser.add_argument("--keep-adapters", action="store_true")
-    parser.add_argument("--bench-adapters", default="8,16,32")
+    parser.add_argument("--keep-adapters", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--bench-adapters", default="8,16,32", help=argparse.SUPPRESS)
 
 
 def config_from_args(args: argparse.Namespace) -> GpuSuiteConfig:

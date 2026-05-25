@@ -113,6 +113,7 @@ def test_search_help_is_lightweight_and_optimus_owned():
         assert flag in result.stdout
     assert "PyTorch" not in result.stderr
     assert "NumPy" not in result.stderr
+    assert "candidate-keyed" not in result.stdout
 
 
 def test_bench_help_is_lightweight_and_optimus_owned():
@@ -140,6 +141,7 @@ def test_bench_help_is_lightweight_and_optimus_owned():
         assert flag in result.stdout
     assert "PyTorch" not in result.stderr
     assert "NumPy" not in result.stderr
+    assert "candidate-keyed" not in result.stdout
 
 
 def test_backend_parity_help_is_lightweight_and_optimus_owned():
@@ -165,6 +167,16 @@ def test_public_validation_and_release_help_exclude_dead_staged_flags():
         )
         assert "--run-halving" not in result.stdout
         assert "--skip-halving" not in result.stdout
+    run_plan = subprocess.run(
+        [sys.executable, "-m", "optimus.cli", "run-plan", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for flag in ["--rank", "--sigma", "--targets", "--chunk-adapters", "--max-loras", "--max-cpu-loras", "--bench-adapters"]:
+        assert f"{flag} " not in run_plan.stdout
+        assert f"{flag}," not in run_plan.stdout
+        assert f"{flag}]" not in run_plan.stdout
 
 
 def test_legacy_search_wrappers_are_not_public_commands():
@@ -307,9 +319,11 @@ def test_serving_namespace_import_is_lightweight():
         text=True,
     )
 
-    assert "run_vllm_search" in result.stdout
     assert "backend_contract" in result.stdout
     assert "score_rows" in result.stdout
+    assert "run_vllm_search" not in result.stdout
+    assert "run_halving" not in result.stdout
+    assert "import_vllm_lora_request" not in result.stdout
     assert result.stderr == ""
 
 

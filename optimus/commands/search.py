@@ -23,10 +23,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--backend", required=True, choices=["transformers", "vllm"])
     parser.add_argument("--method", required=True, choices=["dense", "lora", "subspace"])
+    common = parser.add_argument_group("common search options")
+    common.add_argument("--out")
+    common.add_argument("--model")
+    common.add_argument("--data")
+    common.add_argument("--prompts", type=int)
+    common.add_argument("--holdout-prompts", type=int)
+    common.add_argument("--population", type=int)
+    common.add_argument("--promote", type=int)
+    common.add_argument("--seed", type=int)
+    common.add_argument("--tensor-parallel-size", type=int)
+    common.add_argument("--max-new-tokens", type=int)
+    common.add_argument("--prompt-variants")
+    common.add_argument("--prompt-input", choices=["text", "token_ids"])
+    common.add_argument("--use-chat-template", action="store_true")
+    common.add_argument("--require-all-prompt-variants-valid", action="store_true")
+    common.add_argument("--max-base-malformed-for-selection", type=float)
+    common.add_argument("--max-base-cap-hit-for-selection", type=float)
+    common.add_argument("--min-selection-prompt-variants", type=int)
+    common.add_argument("--stop-at-answer", action="store_true")
+    common.add_argument("--antithetic", action="store_true")
+    common.add_argument("--enable-prefix-caching", action=argparse.BooleanOptionalAction, default=None)
+    common.add_argument("--enable-chunked-prefill", action=argparse.BooleanOptionalAction, default=None)
+    common.add_argument("--kv-cache-dtype")
+    common.add_argument("--vllm-kwarg", action="append")
     lora = parser.add_argument_group("legacy LoRA search options")
     lora.add_argument("--rank", type=int, help="LoRA rank for explicit legacy LoRA baselines.")
     lora.add_argument("--sigma", type=float, help="LoRA or dense perturbation scale for legacy baselines.")
     lora.add_argument("--targets", help="Comma-separated LoRA target modules for explicit legacy baselines.")
+    lora.add_argument("--max-loras", type=int, help="Maximum active LoRA adapters for explicit legacy LoRA baselines.")
+    lora.add_argument("--chunk-adapters", type=int, help="Adapter chunk size for explicit legacy LoRA baselines.")
+    lora.add_argument("--max-cpu-loras", type=int, help="CPU LoRA cache size for explicit legacy LoRA baselines.")
+    lora.add_argument("--keep-adapters", action="store_true", help="Keep exported adapters for explicit legacy LoRA baselines.")
     subspace = parser.add_argument_group("subspace search options")
     subspace.add_argument("--basis-rank", type=int, help="Activation-site basis rank.")
     subspace.add_argument("--basis-prompts", type=int, help="Number of prompts used for basis calibration.")
@@ -47,7 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     subspace.add_argument("--kernel", choices=["torch", "triton", "custom-op"], help="Lazy delta kernel backend.")
     subspace.add_argument(
         "--prefix-cache-policy",
-        choices=["disabled-for-search", "candidate-keyed"],
+        choices=["disabled-for-search"],
         help="Prefix-cache behavior for candidate-specific KV state.",
     )
     subspace.add_argument("--match-screen-to-holdout-base-exact", action="store_true")
@@ -81,7 +109,7 @@ def _reject_forbidden_passthrough(argv: Sequence[str]) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     _reject_forbidden_passthrough(args)
-    ns, _unknown = build_parser().parse_known_args(args)
+    ns = build_parser().parse_args(args)
     passthrough = _without_route_args(args)
 
     if ns.backend == "transformers":

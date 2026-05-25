@@ -98,6 +98,7 @@ def write_contract_outputs(contract) -> None:
             "quality_scaling.csv": "suite,run,screen_selected_holdout_exact,screen_selected_holdout_delta_vs_base,promoted_holdout_oracle_exact,promoted_holdout_oracle_delta_vs_base\noptimus_gpu_suite,search_p1024_chunk32,0.2,0.1,0.3,0.2\n",
             "parity.csv": "suite,run,trusted_name,candidate_name,n_common,pass,pass_protocol,pass_base_rows,pass_adapter_tensors,pass_output_diff\nbackend_parity_gate,gate,peft,vllm,1,true,true,true,true,true\n",
             "halving.csv": "suite,run,stage_prompts,survivors,prompt_eval_savings\noptimus_gpu_suite,halving_p1024_stage8_surv64,8,64,0.5\n",
+            "subspace_systems.csv": "source_run_dir,gpu_model,candidate_batch_size,candidates_per_sec,top_k_ensemble_cost_multiplier\nrun,test-gpu,4,1.0,1.0\n",
         }
         for rel in contract.required_files:
             path = contract.root / rel
@@ -313,6 +314,21 @@ def write_subspace_contract_outputs(contract) -> None:
             "activation_sites": [
                 {
                     "site_id": "layer_0.attn_in",
+                    "architecture_family": "qwen3_text",
+                    "layer_index": 0,
+                    "block_path": "model.layers.0",
+                    "read_tensor_path": "model.layers.0.input_layernorm.output",
+                    "hook_point": "pre_linear",
+                    "norm_position": "post_rmsnorm",
+                    "shape_convention": "tokens_hidden",
+                    "runtime_dtype": "bf16",
+                    "accumulation_dtype": "fp32",
+                    "tensor_parallel_sharding_policy": "replicated",
+                    "target_module_ids": ["layer_0.self_attn.q_proj"],
+                    "calibration_prompt_ids_hash": "prompts123",
+                    "calibration_decode_config_hash": "decode123",
+                    "basis_control_seed": 123,
+                    "transductive": False,
                     "input_dim": 16,
                     "requested_rank": 8,
                     "effective_rank": 8,
@@ -398,12 +414,13 @@ def write_subspace_contract_outputs(contract) -> None:
             "selection_rule_hash": "select123",
             "primary_metric": "top_k_holdout_exact",
             "multiple_comparison_correction": "none_predeclared_single_config",
+            "gate_stage": "production",
             "basis_kind": "activation-svd",
             "control_basis_kinds": ["random-orthonormal", "shuffled-activation-svd"],
             "comparison": "activation_svd_minus_best_control",
-            "gate_type": "non-inferiority",
+            "gate_type": "paired-bootstrap-positive",
             "epsilon": 0.0,
-            "confidence_interval": {"lower": 0.0, "upper": 0.1},
+            "confidence_interval": {"lower": 0.01, "upper": 0.1},
         }
     )
     for rel in contract.required_files:
@@ -420,6 +437,9 @@ def write_subspace_contract_outputs(contract) -> None:
                         {
                             "candidate_id": f"seed{idx}:+:rho0.01",
                             "split": "screen",
+                            "selection_stage": "screen",
+                            "selection_rule_hash": "select123",
+                            "promoted_by_candidate_id": None,
                             "scorer_name": "countdown",
                             "scorer_version": "countdown_v1",
                             "aggregate_metrics": {"exact": 0.1},
@@ -534,6 +554,7 @@ def test_subspace_plan_uses_final_public_surface(tmp_path: Path):
 
     assert search["command"][:6] == ["optimus", "search", "--backend", "vllm", "--method", "subspace"]
     assert search["name"] == "search_p128_subspace_r256"
+    assert search["planned_fail_closed"] is True
     assert "--basis-rank" in search["command"]
     assert "256" in search["command"]
     assert "--basis-prompts" in search["command"]
@@ -613,6 +634,31 @@ def test_subspace_run_suite_cli_rejects_explicit_lora_only_options(tmp_path: Pat
     assert result.returncode != 0
     assert "does not accept LoRA-only options" in result.stderr
     assert "--chunk-adapters" in result.stderr
+
+
+def test_subspace_run_suite_fails_closed_before_execution(tmp_path: Path):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "optimus.cli",
+            "run-suite",
+            "--no-ensure-data",
+            "--method",
+            "subspace",
+            "--root",
+            str(tmp_path / "runs"),
+            "--systems-out",
+            str(tmp_path / "systems"),
+            "--populations",
+            "16",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "planned fail-closed" in result.stderr
 
 
 def test_subspace_plan_accepts_documented_screen_matching_flags(tmp_path: Path):
@@ -792,6 +838,68 @@ def test_subspace_contract_rejects_replay_identity_gaps(tmp_path: Path):
     assert any("top_k_ensemble.json.basis_collection_config_hash" in item for item in result.invalid)
     assert any("top_k_ensemble.json.candidates[1].sign" in item for item in result.invalid)
     assert any("top_k_ensemble.json.candidates[1].basis_hash" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_bad_schema_versions(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    for rel in ["summary.json", "subspace_state_summary.json", "top_k_ensemble.json", "validation_report.json", "systems_report.json"]:
+        payload = json.loads((contract.root / rel).read_text())
+        payload["schema_version"] = "bogus_schema_v999"
+        (contract.root / rel).write_text(json.dumps(payload) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("summary.schema_version" in item for item in result.invalid)
+    assert any("top_k_ensemble.json.schema_version" in item for item in result.invalid)
+    assert any("validation_report.json.schema_version" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_holdout_scores_without_selector_provenance(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    rows = [json.loads(line) for line in (contract.root / "candidate_scores.jsonl").read_text().splitlines()]
+    rows[0]["split"] = "holdout"
+    rows[0]["selection_stage"] = "selected_holdout"
+    rows[0]["promoted_by_candidate_id"] = ""
+    (contract.root / "candidate_scores.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows))
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("promoted_by_candidate_id" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_weak_production_scientific_gate(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    report["scientific_gate_contract"]["confidence_interval"]["lower"] = 0.0
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("production gate requires lower > 0" in item for item in result.invalid)
 
 
 def test_subspace_contract_rejects_nonpassing_validation_report(tmp_path: Path):

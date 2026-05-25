@@ -213,6 +213,7 @@ def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
     leaked: list[str] = []
     missing_final: list[str] = []
     config_leaks: list[str] = []
+    planned_missing: list[str] = []
     adapter_config_keys = {"rank", "sigma", "targets", "chunk_adapters", "max_loras", "max_cpu_loras", "keep_adapters", "bench_adapters"}
     for label, payload in plans.items():
         if label == "subspace":
@@ -227,6 +228,8 @@ def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
                 missing_final.append(f"{label}:{run['name']}:{command[:2]!r}")
             if run["kind"] == "bench" and command[:2] != ["optimus", "bench"]:
                 missing_final.append(f"{label}:{run['name']}:{command[:2]!r}")
+            if label == "subspace" and run["kind"] == "search" and run.get("planned_fail_closed") is not True:
+                planned_missing.append(f"{label}:{run['name']}")
     script_paths = [
         root / "scripts" / "run_optimus_gpu_suite.sh",
         root / "scripts" / "run_backend_parity_gate.sh",
@@ -257,8 +260,10 @@ def run_plan_surface_checks(root: Path) -> list[ReleaseCheck]:
     return [
         ReleaseCheck(
             "run_plan_emits_final_public_commands",
-            not leaked and not missing_final and not config_leaks,
-            "search/bench routes only" if not leaked and not missing_final and not config_leaks else f"legacy={leaked!r} nonfinal={missing_final!r} config_leaks={config_leaks!r}",
+            not leaked and not missing_final and not config_leaks and not planned_missing,
+            "search/bench routes only"
+            if not leaked and not missing_final and not config_leaks and not planned_missing
+            else f"legacy={leaked!r} nonfinal={missing_final!r} config_leaks={config_leaks!r} planned_missing={planned_missing!r}",
         ),
         ReleaseCheck(
             "supported_launchers_do_not_emit_removed_wrappers",
@@ -282,12 +287,28 @@ def package_code_checks(root: Path) -> list[ReleaseCheck]:
         text = path.read_text()
         if FORBIDDEN_PACKAGE in text or FORBIDDEN_REPO in text:
             leaked.append(str(path.relative_to(root)))
+    subspace_hot_path_files = [*sorted((package_root / "subspace").rglob("*.py"))]
+    backend_subspace = package_root / "backends" / "vllm_subspace.py"
+    if backend_subspace.exists():
+        subspace_hot_path_files.append(backend_subspace)
+    forbidden_hot_path_tokens = ("LoRARequest", "save_seed_adapter", "lora_noise_tensors", "build_adapter_specs", "import_vllm_lora_request")
+    hot_path_leaks: list[str] = []
+    for path in subspace_hot_path_files:
+        text = path.read_text()
+        for token in forbidden_hot_path_tokens:
+            if token in text:
+                hot_path_leaks.append(f"{path.relative_to(root)}:{token}")
     return [
         ReleaseCheck("optimus_package_source_present", True, str(package_root)),
         ReleaseCheck(
             "optimus_package_does_not_reference_old_namespace",
             not leaked,
             "no old namespace references" if not leaked else f"files={leaked!r}",
+        ),
+        ReleaseCheck(
+            "subspace_hot_path_has_no_adapter_imports",
+            not hot_path_leaks,
+            "no adapter hot-path imports in subspace modules" if not hot_path_leaks else f"matches={hot_path_leaks!r}",
         ),
     ]
 
@@ -431,9 +452,11 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
     report = systems_out / "report.md"
     if method == "subspace":
         systems_json = systems_out / "systems_report.json"
+        systems_csv = systems_out / "subspace_systems.csv"
         checks = [
             ReleaseCheck("systems_report_present", report.exists(), str(report)),
             ReleaseCheck("subspace_systems_report_json_present", systems_json.exists(), str(systems_json)),
+            ReleaseCheck("subspace_systems_csv_present", systems_csv.exists(), str(systems_csv)),
         ]
         if not systems_json.exists():
             checks.append(ReleaseCheck("subspace_systems_report_fields_present", False, "missing systems_report.json"))
@@ -456,6 +479,32 @@ def systems_report_checks(systems_out: Path | None, *, method: str) -> list[Rele
                 "subspace systems fields present" if not missing and not bad_numeric and payload.get("prefix_cache_policy") == "disabled-for-search" else f"missing={missing!r} bad_numeric={bad_numeric!r} prefix_cache_policy={payload.get('prefix_cache_policy')!r}",
             )
         )
+        if systems_csv.exists():
+            with systems_csv.open(newline="") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+                columns = set(reader.fieldnames or [])
+            required_columns = {
+                "source_run_dir",
+                "candidate_batch_size",
+                "candidates_per_sec",
+                "top_k_ensemble_cost_multiplier",
+                "screen_score",
+                "holdout_score",
+                "screen_to_holdout_drop",
+                "diversity_metrics",
+                "random_q_control",
+                "shuffled_q_control",
+                "antithetic_odd_even",
+            }
+            missing_columns = sorted(required_columns - columns)
+            checks.append(
+                ReleaseCheck(
+                    "subspace_systems_csv_has_comparison_axes",
+                    bool(rows) and not missing_columns,
+                    "subspace comparison axes present" if rows and not missing_columns else f"rows={len(rows)} missing={missing_columns!r}",
+                )
+            )
         return checks
     quality = systems_out / "quality_scaling.csv"
     checks = [

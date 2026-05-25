@@ -12,8 +12,6 @@ __all__ = [
     "TransformersDenseGaussianBackend",
     "TransformersLoraBackend",
     "backend_contract",
-    "build_adapter_specs",
-    "import_vllm_lora_request",
     "make_vllm_prompt_inputs",
     "make_sampling_params",
     "perturbation_panel",
@@ -22,10 +20,6 @@ __all__ = [
     "score_rows",
     "timed_generate",
     "tokenizer_contract",
-    "run_benchmark",
-    "run_halving",
-    "run_search",
-    "run_vllm_search",
     "vllm_tokenizer_contract",
     "visible_token_count",
 ]
@@ -42,9 +36,6 @@ _EXPORT_MODULES = {
     "TransformersDenseGaussianBackend": "optimus.serving.transformers",
     "TransformersLoraBackend": "optimus.serving.transformers",
     "visible_token_count": "optimus.serving.transformers",
-    "run_benchmark": "optimus.serving.benchmark",
-    "run_halving": "optimus.serving.halving",
-    "run_search": "optimus.serving.search",
     "vllm_tokenizer_contract": "optimus.serving.contracts",
 }
 

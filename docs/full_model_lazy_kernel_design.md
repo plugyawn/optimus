@@ -2,11 +2,17 @@
 
 ## Status And Scope
 
-This document is the implementation source of truth for Optimus
-transformer-linear subspace RandOpt over vLLM. The public method name is
+This document is the implementation source of truth for the planned Optimus
+transformer-linear subspace RandOpt backend over vLLM. The public method name is
 `subspace`. The precise mechanism is activation-site projected RandOpt: random
 perturbations are applied to transformer block linear modules through activation
 bases captured at the sites those modules read from.
+
+Current repository status: this is a design and artifact contract. The
+production vLLM subspace backend is not implemented yet, and public vLLM
+subspace search/bench routes must fail closed until the roadmap Phase 5/6 gates
+land. Existing LoRA adapter serving code is legacy baseline infrastructure and
+is not the subspace search hot path.
 
 The search-time operation for target module `t` and candidate `c` is:
 
@@ -25,9 +31,10 @@ Where:
 - `c` is the candidate identity.
 
 Algebraically, each candidate induces a low-rank perturbation
-`Delta W_t,c = beta_t G_t,c Q_s(t)`, but search-time execution is lazy:
-Optimus injects `beta_t G_t,c Q_s(t) x` inside vLLM model execution and never
-loads, swaps, or materializes per-candidate adapters in the hot path.
+`Delta W_t,c = beta_t G_t,c Q_s(t)`, but the planned search-time execution is
+lazy: the vLLM backend will inject `beta_t G_t,c Q_s(t) x` inside model
+execution and must never load, swap, or materialize per-candidate adapters in
+the hot path.
 
 The primary serving artifact is a lazy top-K candidate ensemble. Single-winner
 materialized exports remain useful for replay, debugging, distillation, and
@@ -647,7 +654,9 @@ equivalent to materializing and quantizing `W + Delta W`.
 
 ## Public CLI
 
-Canonical search command:
+Planned canonical search command. In the current repository this route is
+fail-closed and exits with a roadmap pointer; it becomes runnable only after the
+Phase 5 vLLM backend gate passes.
 
 ```bash
 optimus search \
@@ -672,7 +681,8 @@ optimus search \
   --kernel torch
 ```
 
-Projected-dense science command:
+Projected-dense science command. This has the same current fail-closed status
+for the vLLM backend.
 
 ```bash
 optimus search \
@@ -833,11 +843,13 @@ by hash.
 and `prompt_scoring_config_hash`. `sign` is serialized as `"+"` or `"-"` in
 artifacts; kernels may resolve that to `+1` or `-1` internally.
 
-`candidate_scores.jsonl` rows contain `candidate_id`, split, scorer name and
-version, aggregate metrics, sample count, prompt ids hash, sample-set hash,
-decode config hash, elapsed time, token counts, and optional path to per-sample
-rows. Selected holdout rows must include the selector that promoted the
-candidate.
+`candidate_scores.jsonl` rows contain `candidate_id`, split,
+`selection_stage`, `selection_rule_hash`, `promoted_by_candidate_id`, scorer
+name and version, aggregate metrics, sample count, prompt ids hash, sample-set
+hash, decode config hash, elapsed time, token counts, and optional path to
+per-sample rows. Selected holdout rows must include the selector that promoted
+the candidate through `selection_rule_hash` and `promoted_by_candidate_id`; a
+holdout score row without this provenance is invalid.
 
 `top_k_ensemble.json` contains the full candidate identities, not only ids, plus
 `aggregation`, `tie_break_policy`, `selection_rule`, `K`, `scorer_version`,

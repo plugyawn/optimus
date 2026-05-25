@@ -153,6 +153,14 @@ def subspace_system_rows(reports: list[dict]) -> list[dict]:
                 "qx_time_s": row.get("qx_time_s"),
                 "lazy_delta_time_s": row.get("lazy_delta_time_s"),
                 "prefix_cache_policy": row.get("prefix_cache_policy"),
+                "top_k_ensemble_cost_multiplier": row.get("top_k_ensemble_cost_multiplier"),
+                "screen_score": row.get("screen_score"),
+                "holdout_score": row.get("holdout_score"),
+                "screen_to_holdout_drop": row.get("screen_to_holdout_drop"),
+                "diversity_metrics": json.dumps(row.get("diversity_metrics", {}), sort_keys=True),
+                "random_q_control": json.dumps(row.get("random_q_control", {}), sort_keys=True),
+                "shuffled_q_control": json.dumps(row.get("shuffled_q_control", {}), sort_keys=True),
+                "antithetic_odd_even": json.dumps(row.get("antithetic_odd_even", {}), sort_keys=True),
             }
             for row in reports
         ],
@@ -178,6 +186,10 @@ def append_subspace_systems_report(path: Path, rows: list[dict]) -> None:
                     "prompts_per_sec",
                     "output_tokens_per_sec",
                     "lazy_overhead_pct",
+                    "top_k_ensemble_cost_multiplier",
+                    "screen_score",
+                    "holdout_score",
+                    "screen_to_holdout_drop",
                     "prefix_cache_policy",
                 ],
             )
@@ -852,6 +864,14 @@ def main(argv: list[str] | None = None) -> int:
                 "qx_time_s",
                 "lazy_delta_time_s",
                 "prefix_cache_policy",
+                "top_k_ensemble_cost_multiplier",
+                "screen_score",
+                "holdout_score",
+                "screen_to_holdout_drop",
+                "diversity_metrics",
+                "random_q_control",
+                "shuffled_q_control",
+                "antithetic_odd_even",
             ],
         )
     full = full_search_rows(rows)

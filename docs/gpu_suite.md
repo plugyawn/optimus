@@ -1,9 +1,12 @@
 # Optimus GPU Suite
 
-This runbook defines the P1024/P4096 GPU workloads used to validate Optimus
-search quality and GPU throughput. Staged-search artifacts can still be parsed
-for historical reports, but staged search is not a supported public GPU-suite
-route until a final command is added.
+This runbook defines the GPU workloads used to validate Optimus search quality
+and throughput. The default implemented suite remains the explicit LoRA
+baseline. Subspace entries are planning artifacts until the roadmap Phase 5 vLLM
+backend lands; `run-suite --method subspace` must fail closed before launching
+model execution. Staged-search artifacts can still be parsed for historical
+reports, but staged search is not a supported public GPU-suite route until a
+final command is added.
 
 ## Required Runs
 
@@ -64,8 +67,10 @@ BACKEND=vllm
 METHOD=lora
 ```
 
-Subspace planning uses the same launcher, but it must use the final subspace
-flags rather than adapter-only `rank`/`sigma`/`max_loras` controls:
+Subspace planning uses the same launcher, but it is currently plan-only. The
+launcher may write `plan.json`; execution must stop at the suite boundary until
+Phase 5 lands. It must use the final subspace flags rather than adapter-only
+`rank`/`sigma`/`max_loras` controls:
 
 ```bash
 METHOD=subspace \
@@ -85,7 +90,7 @@ KERNEL=torch \
 scripts/run_optimus_gpu_suite.sh
 ```
 
-For a p128/p256/p512/p1024 subspace validation plan:
+For the required p128 speed-gate and p256/p512/p1024 scaling validation plan:
 
 ```bash
 optimus run-plan \
@@ -128,12 +133,17 @@ The generated evidence is not enough by itself. A final claim requires:
 3. Heldout evaluation for promoted candidates.
 4. Backend parity or trusted confirmation before using any fast backend ranking
    as the selector of record.
-5. P1024/P4096 best-of-N curves from saved candidate summaries.
-6. Systems outputs from `optimus systems-report`: LoRA/dense plots for backend
+5. For LoRA/dense baselines, P1024/P4096 best-of-N curves from saved candidate
+   summaries.
+6. For subspace, the p128 speed gate must pass before p1024/p4096 scaling runs:
+   the systems report must include per-run `subspace_systems.csv` rows for the
+   compared target presets and must not reduce the claim to the fastest sibling
+   run.
+7. Systems outputs from `optimus systems-report`: LoRA/dense plots for backend
    throughput, token throughput, best-of-N, and quality scaling; subspace
    runtime summaries in `systems_report.json` and `subspace_systems.csv`.
-7. `optimus validate-run` passes for the run root and systems report.
-8. Active GPU pods stopped or explicitly reported after the run.
+8. `optimus validate-run` passes for the run root and systems report.
+9. Active GPU pods stopped or explicitly reported after the run.
 
 ## Validation State
 

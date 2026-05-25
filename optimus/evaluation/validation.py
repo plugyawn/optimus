@@ -89,6 +89,9 @@ SUBSPACE_CANDIDATE_FIELDS = (
 SUBSPACE_CANDIDATE_SCORE_FIELDS = (
     "candidate_id",
     "split",
+    "selection_stage",
+    "selection_rule_hash",
+    "promoted_by_candidate_id",
     "scorer_name",
     "scorer_version",
     "aggregate_metrics",
@@ -195,6 +198,21 @@ SUBSPACE_STATE_SUMMARY_FIELDS = (
 )
 SUBSPACE_ACTIVATION_SITE_FIELDS = (
     "site_id",
+    "architecture_family",
+    "layer_index",
+    "block_path",
+    "read_tensor_path",
+    "hook_point",
+    "norm_position",
+    "shape_convention",
+    "runtime_dtype",
+    "accumulation_dtype",
+    "tensor_parallel_sharding_policy",
+    "target_module_ids",
+    "calibration_prompt_ids_hash",
+    "calibration_decode_config_hash",
+    "basis_control_seed",
+    "transductive",
     "input_dim",
     "requested_rank",
     "effective_rank",
@@ -213,6 +231,13 @@ SUBSPACE_TARGET_FIELDS = (
     "output_dim",
     "base_output_power_P_t",
 )
+SUBSPACE_EXPECTED_SCHEMAS = {
+    "summary.json": "subspace_run_summary_v1",
+    "subspace_state_summary.json": "subspace_state_v1",
+    "top_k_ensemble.json": "top_k_ensemble_v1",
+    "validation_report.json": "validation_report_v1",
+    "systems_report.json": "subspace_systems_report_v1",
+}
 
 
 @dataclass(frozen=True)
@@ -360,6 +385,12 @@ def _check_subspace_candidate(invalid: list[str], prefix: str, row: dict, summar
 def _check_subspace_score(invalid: list[str], prefix: str, row: dict, summary: dict) -> None:
     if row.get("split") not in {"screen", "holdout", "validation", "test"}:
         invalid.append(f"{prefix}.split: invalid")
+    if not isinstance(row.get("selection_stage"), str) or not row.get("selection_stage"):
+        invalid.append(f"{prefix}.selection_stage: empty")
+    if not isinstance(row.get("selection_rule_hash"), str) or not row.get("selection_rule_hash"):
+        invalid.append(f"{prefix}.selection_rule_hash: empty")
+    if row.get("split") == "holdout" and not row.get("promoted_by_candidate_id"):
+        invalid.append(f"{prefix}.promoted_by_candidate_id: required for selected holdout rows")
     if not isinstance(row.get("aggregate_metrics"), dict) or not row.get("aggregate_metrics"):
         invalid.append(f"{prefix}.aggregate_metrics: empty")
     if not _is_positive_int(row.get("sample_count")):
@@ -391,9 +422,16 @@ def _check_subspace_state_summary(invalid: list[str], rel: str, payload: dict) -
             for field in ("input_dim", "requested_rank", "effective_rank", "num_calibration_tokens"):
                 if field in site and not _is_positive_int(site.get(field)):
                     invalid.append(f"{rel}.activation_sites[{index}].{field}: not positive integer")
+            if "layer_index" in site and not _is_nonnegative_int(site.get("layer_index")):
+                invalid.append(f"{rel}.activation_sites[{index}].layer_index: not nonnegative integer")
             for field in ("captured_energy", "H_s", "A_s", "orthonormality_error", "gram_error"):
                 if field in site and not _is_finite_number(site.get(field)):
                     invalid.append(f"{rel}.activation_sites[{index}].{field}: not finite")
+            for field in ("target_module_ids",):
+                if field in site and (not isinstance(site.get(field), list) or not site.get(field)):
+                    invalid.append(f"{rel}.activation_sites[{index}].{field}: empty")
+            if "transductive" in site and not isinstance(site.get("transductive"), bool):
+                invalid.append(f"{rel}.activation_sites[{index}].transductive: not boolean")
     targets = payload.get("targets")
     if isinstance(targets, list) and targets:
         for index, target in enumerate(targets, start=1):
@@ -422,6 +460,7 @@ def _check_subspace_systems(invalid: list[str], rel: str, payload: dict) -> None
 
 def _check_scientific_gate_contract(invalid: list[str], rel: str, section: dict) -> None:
     for field in (
+        "gate_stage",
         "locked_config_hash",
         "selection_rule_hash",
         "primary_metric",
@@ -432,8 +471,10 @@ def _check_scientific_gate_contract(invalid: list[str], rel: str, section: dict)
     ):
         if not isinstance(section.get(field), str) or not section.get(field):
             invalid.append(f"{rel}.scientific_gate_contract.{field}: empty")
-    if section.get("gate_type") != "non-inferiority":
-        invalid.append(f"{rel}.scientific_gate_contract.gate_type: expected 'non-inferiority', got {section.get('gate_type')!r}")
+    if section.get("gate_stage") not in {"reference_smoke", "production"}:
+        invalid.append(f"{rel}.scientific_gate_contract.gate_stage: invalid {section.get('gate_stage')!r}")
+    if section.get("gate_type") not in {"non-inferiority", "paired-bootstrap-positive", "engineering-proceed-no-scientific-win"}:
+        invalid.append(f"{rel}.scientific_gate_contract.gate_type: invalid {section.get('gate_type')!r}")
     if not _is_json_number(section.get("epsilon")) or float(section.get("epsilon", -1.0)) < 0:
         invalid.append(f"{rel}.scientific_gate_contract.epsilon: not nonnegative JSON number")
     controls = section.get("control_basis_kinds")
@@ -446,6 +487,19 @@ def _check_scientific_gate_contract(invalid: list[str], rel: str, section: dict)
     for field in ("lower", "upper"):
         if not _is_json_number(ci.get(field)):
             invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.{field}: not JSON number")
+    lower = ci.get("lower")
+    if _is_json_number(lower):
+        gate_stage = section.get("gate_stage")
+        gate_type = section.get("gate_type")
+        epsilon = float(section.get("epsilon", 0.0)) if _is_json_number(section.get("epsilon")) else 0.0
+        if gate_stage == "reference_smoke" and gate_type == "non-inferiority" and float(lower) < -epsilon:
+            invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.lower: below non-inferiority bound")
+        if gate_stage == "production" and gate_type == "paired-bootstrap-positive" and float(lower) <= 0.0:
+            invalid.append(f"{rel}.scientific_gate_contract.confidence_interval.lower: production gate requires lower > 0")
+        if gate_stage == "production" and gate_type == "engineering-proceed-no-scientific-win":
+            exception = section.get("engineering_exception")
+            if not isinstance(exception, dict) or not exception.get("accepted_label") == "engineering_proceed_no_scientific_win":
+                invalid.append(f"{rel}.scientific_gate_contract.engineering_exception: missing accepted label")
 
 
 def _candidate_identity_projection(row: dict) -> dict:
@@ -496,6 +550,9 @@ def check_run(contract: RunContract) -> RunCheck:
         if not value:
             invalid.append(f"summary.{key}: empty")
     if is_subspace_contract:
+        expected_schema = SUBSPACE_EXPECTED_SCHEMAS["summary.json"]
+        if summary.get("schema_version") != expected_schema:
+            invalid.append(f"summary.schema_version: expected {expected_schema!r}, got {summary.get('schema_version')!r}")
         if not isinstance(summary.get("git_dirty"), bool):
             invalid.append("summary.git_dirty: not boolean")
         if not summary.get("command"):
@@ -594,6 +651,10 @@ def check_run(contract: RunContract) -> RunCheck:
         for field in fields:
             if field not in payload:
                 invalid.append(f"{rel}.{field}: missing")
+        if is_subspace_contract and rel in SUBSPACE_EXPECTED_SCHEMAS:
+            expected_schema = SUBSPACE_EXPECTED_SCHEMAS[rel]
+            if payload.get("schema_version") != expected_schema:
+                invalid.append(f"{rel}.schema_version: expected {expected_schema!r}, got {payload.get('schema_version')!r}")
         for field in (contract.required_json_nonempty_fields or {}).get(rel, ()):
             value = payload.get(field)
             if not value:
@@ -845,8 +906,8 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
             )
         )
     if config.method == "subspace":
-        systems_csvs = []
-        systems_files = ["report.md", "systems_report.json"]
+        systems_csvs = ["subspace_systems.csv"]
+        systems_files = ["report.md", "systems_report.json", "subspace_systems.csv"]
         systems_json_fields = {"systems_report.json": (*SUBSPACE_JSON_PROVENANCE_FIELDS, *SUBSPACE_SYSTEMS_FIELDS)}
         systems_expected_json_values = {"systems_report.json": {"prefix_cache_policy": "disabled-for-search"}}
     else:
