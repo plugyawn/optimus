@@ -79,8 +79,8 @@ def test_pyproject_declares_serving_and_dev_extras():
     pyproject = tomllib.loads(Path("pyproject.toml").read_text())
     extras = pyproject["project"]["optional-dependencies"]
     assert any(dep.startswith("vllm") for dep in extras["serving"])
-    assert any(dep.startswith("vllm") and "<" in dep for dep in extras["serving"])
-    assert any(dep.startswith("vllm") and "<" in dep for dep in extras["all"])
+    assert any(dep.startswith("vllm==") for dep in extras["serving"])
+    assert any(dep.startswith("vllm==") for dep in extras["all"])
     assert any(dep.startswith("lighteval") for dep in extras["eval"])
     assert "pytest" in extras["dev"]
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
@@ -98,6 +98,18 @@ def test_search_help_is_lightweight_and_optimus_owned():
     assert "usage: optimus search" in result.stdout
     assert "--backend" in result.stdout
     assert "--method" in result.stdout
+    for flag in [
+        "--basis-rank",
+        "--target-preset",
+        "--scale-mode",
+        "--rho-grid",
+        "--budget-policy",
+        "--basis-kind",
+        "--top-k-grid",
+        "--candidate-batch-size",
+        "--kernel",
+    ]:
+        assert flag in result.stdout
     assert "PyTorch" not in result.stderr
     assert "NumPy" not in result.stderr
 
@@ -113,6 +125,18 @@ def test_bench_help_is_lightweight_and_optimus_owned():
     assert "usage: optimus bench" in result.stdout
     assert "--backend" in result.stdout
     assert "--method" in result.stdout
+    for flag in [
+        "--basis-rank",
+        "--target-preset",
+        "--scale-mode",
+        "--rho-grid",
+        "--budget-policy",
+        "--basis-kind",
+        "--top-k-grid",
+        "--candidate-batch-size",
+        "--kernel",
+    ]:
+        assert flag in result.stdout
     assert "PyTorch" not in result.stderr
     assert "NumPy" not in result.stderr
 
@@ -310,6 +334,7 @@ def test_gaussian_hash_v1_golden_vectors_and_antithetic_sign():
         observed = gaussian_hash_v1(**kwargs)
         assert observed == expected
         assert gaussian_hash_v1(**kwargs, sign=-1) == -expected
+        assert gaussian_hash_v1(**kwargs, sign="-") == -expected
 
 
 def test_vllm_serving_metadata_import_is_lightweight():

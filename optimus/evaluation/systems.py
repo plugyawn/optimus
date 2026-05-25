@@ -5,6 +5,8 @@ import csv
 import json
 from pathlib import Path
 
+from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS
+
 
 def as_float(value, default: float = 0.0) -> float:
     if value is None:
@@ -88,6 +90,55 @@ def run_method(row: dict) -> str:
 
 def is_search_summary(row: dict) -> bool:
     return row.get("kind") in {"vllm_lora_search", "search"}
+
+
+def is_subspace_summary(row: dict) -> bool:
+    return row.get("method") == "subspace" or str(row.get("kind", "")).startswith("subspace_")
+
+
+def subspace_system_reports(rows: list[dict]) -> tuple[list[dict], list[str], list[str]]:
+    reports: list[dict] = []
+    missing: list[str] = []
+    invalid: list[str] = []
+    for row in rows:
+        if not is_subspace_summary(row):
+            continue
+        path = Path(row["run_dir"]) / "systems_report.json"
+        if not path.exists():
+            missing.append(str(path))
+            continue
+        try:
+            payload = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            invalid.append(f"{path}: invalid JSON")
+            continue
+        absent = [field for field in SUBSPACE_SYSTEMS_FIELDS if field not in payload]
+        if absent:
+            invalid.append(f"{path}: missing fields {', '.join(absent)}")
+            continue
+        reports.append(payload | {"source_report": str(path), "source_run_dir": row["run_dir"]})
+    return reports, missing, invalid
+
+
+def selected_subspace_system_report(reports: list[dict]) -> dict:
+    if not reports:
+        return {}
+    return max(reports, key=lambda row: as_float(row.get("candidates_per_sec"), float("-inf")))
+
+
+def write_subspace_fail_closed_report(path: Path, *, missing: list[str], invalid: list[str]) -> None:
+    lines = [
+        "# Optimus Systems Report",
+        "",
+        "Subspace systems reporting failed closed. Every subspace search summary must have a measured",
+        "`systems_report.json` with the required subspace runtime fields before the suite-level report can pass.",
+        "",
+    ]
+    if missing:
+        lines.extend(["## Missing", "", *[f"- `{item}`" for item in missing], ""])
+    if invalid:
+        lines.extend(["## Invalid", "", *[f"- {item}" for item in invalid], ""])
+    path.write_text("\n".join(lines))
 
 
 def md_table(rows: list[dict], columns: list[str], *, limit: int | None = None) -> str:
@@ -707,6 +758,25 @@ def main(argv: list[str] | None = None) -> int:
 
     args.out.mkdir(parents=True, exist_ok=True)
     rows = systems_summaries(args.root)
+    subspace_rows = [row for row in rows if is_subspace_summary(row)]
+    subspace_reports, missing_subspace_reports, invalid_subspace_reports = subspace_system_reports(rows)
+    if subspace_rows:
+        if missing_subspace_reports or invalid_subspace_reports:
+            write_subspace_fail_closed_report(
+                args.out / "report.md",
+                missing=missing_subspace_reports,
+                invalid=invalid_subspace_reports,
+            )
+            return 1
+        selected_subspace = selected_subspace_system_report(subspace_reports)
+        if not selected_subspace:
+            write_subspace_fail_closed_report(
+                args.out / "report.md",
+                missing=["no valid subspace systems_report.json files found"],
+                invalid=[],
+            )
+            return 1
+        (args.out / "systems_report.json").write_text(json.dumps(selected_subspace, indent=2, sort_keys=True) + "\n")
     full = full_search_rows(rows)
     bench = bench_rows(rows)
     quality = quality_rows(rows)

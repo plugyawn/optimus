@@ -109,18 +109,16 @@ def test_subspace_panel_roundtrips_as_subspace_method():
     )
 
 
-def test_legacy_activation_subspace_keys_normalize_to_subspace():
-    spec = PerturbationSpec(
-        "activation_subspace_gaussian_rank_r",
-        1,
-        0.1,
-        method="activation_subspace",
-        rank=8,
-        targets="q_proj",
-    )
-
-    assert spec.method == "subspace"
-    assert spec.family == "subspace_gaussian_rank_r"
+def test_legacy_activation_subspace_names_are_not_public_api():
+    with pytest.raises(ValueError, match="method"):
+        PerturbationSpec(
+            "activation_subspace_gaussian_rank_r",
+            1,
+            0.1,
+            method="activation_subspace",
+            rank=8,
+            targets="q_proj",
+        )
 
 
 def test_subspace_family_still_supports_lora_export_contract():

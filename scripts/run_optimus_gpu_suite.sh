@@ -192,4 +192,5 @@ optimus validate-run \
   --populations "$(echo "$POPULATIONS" | tr ' ' ',')" \
   --bench-adapters "$BENCH_ADAPTERS" \
   "${validate_halving_arg[@]}" \
-  --out "$OUT_ROOT/validation.json"
+  --out "$OUT_ROOT/validation.json" \
+  --strict

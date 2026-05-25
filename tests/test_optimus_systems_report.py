@@ -12,6 +12,41 @@ from optimus.evaluation.systems import (
     quality_rows,
     systems_summaries,
 )
+from optimus.evaluation.validation import SUBSPACE_SYSTEMS_FIELDS
+
+
+def _subspace_systems_payload() -> dict:
+    payload = {
+        "schema_version": "subspace_systems_report_v1",
+        "warmup_policy": "one_warmup_batch",
+        "cuda_sync_policy": "sync_timed_regions",
+        "candidate_batch_size": 4,
+        "candidate_shard_id": "single",
+        "gpu_model": "test-gpu",
+        "gpu_count": 1,
+        "gpu_memory_allocated_bytes": 1024,
+        "gpu_memory_reserved_bytes": 2048,
+        "base_model_time_s": 1.0,
+        "qx_time_s": 0.1,
+        "lazy_delta_time_s": 0.2,
+        "scoring_time_s": 0.3,
+        "setup_time_s": 0.4,
+        "candidates_per_sec": 1.0,
+        "prompts_per_sec": 2.0,
+        "output_tokens_per_sec": 3.0,
+        "lazy_overhead_pct": 10.0,
+        "prefix_cache_policy": "disabled-for-search",
+        "top_k_ensemble_cost_multiplier": 1.0,
+        "screen_score": 0.1,
+        "holdout_score": 0.2,
+        "screen_to_holdout_drop": -0.1,
+        "diversity_metrics": {"distinct_answers": 1},
+        "random_q_control": {"score": 0.1},
+        "shuffled_q_control": {"score": 0.1},
+        "antithetic_odd_even": {"odd": 0.0, "even": 0.0},
+    }
+    assert not [field for field in SUBSPACE_SYSTEMS_FIELDS if field not in payload]
+    return payload
 
 
 def test_systems_report_discovers_optimus_p4096_runs(tmp_path: Path):
@@ -151,6 +186,38 @@ def test_systems_report_writes_best_of_n_and_scaling_outputs(tmp_path: Path):
     report = (out / "report.md").read_text()
     assert "parity_gates.png" not in report
     assert "screen_selected_holdout_exact" in report
+
+
+def test_systems_report_writes_subspace_systems_json_from_measured_runs(tmp_path: Path):
+    run = tmp_path / "optimus_gpu_suite" / "search_p128_subspace_r128"
+    run.mkdir(parents=True)
+    (run / "summary.json").write_text(
+        json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128}) + "\n"
+    )
+    (run / "systems_report.json").write_text(json.dumps(_subspace_systems_payload()) + "\n")
+
+    out = tmp_path / "report"
+    assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 0
+
+    payload = json.loads((out / "systems_report.json").read_text())
+    assert payload["schema_version"] == "subspace_systems_report_v1"
+    assert payload["prefix_cache_policy"] == "disabled-for-search"
+    assert payload["source_run_dir"] == str(run)
+
+
+def test_systems_report_fails_closed_for_subspace_without_measured_report(tmp_path: Path):
+    run = tmp_path / "optimus_gpu_suite" / "search_p128_subspace_r128"
+    run.mkdir(parents=True)
+    (run / "summary.json").write_text(
+        json.dumps({"kind": "subspace_vllm_search", "method": "subspace", "population": 128}) + "\n"
+    )
+
+    out = tmp_path / "report"
+    assert systems_report_main(["--root", str(tmp_path), "--out", str(out)]) == 1
+
+    report = (out / "report.md").read_text()
+    assert "failed closed" in report
+    assert "systems_report.json" in report
 
 
 def test_quality_rows_separate_selected_transfer_from_holdout_oracle(tmp_path: Path):

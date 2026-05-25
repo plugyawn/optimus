@@ -786,13 +786,25 @@ by hash.
 
 ```json
 {
-  "kind": "subspace_search",
+  "schema_version": "subspace_run_summary_v1",
+  "kind": "subspace_vllm_search",
   "backend": "vllm",
   "method": "subspace",
+  "created_at": "...",
+  "optimus_version": "...",
+  "git_commit": "...",
+  "git_dirty": false,
+  "command": ["optimus", "search", "..."],
+  "environment": {"python": "...", "cuda": "..."},
   "scale_mode": "relative-output-rms",
   "rho_grid": [0.002, 0.005, 0.01, 0.02],
   "sigma_w_grid": null,
   "budget_policy": "per-block-equal",
+  "basis_hash": "...",
+  "target_set_hash": "...",
+  "basis_collection_config_hash": "...",
+  "subspace_state_hash": "...",
+  "candidate_scores_hash": "...",
   "resolved_target_scales": [
     {
       "target_id": "layer_17.self_attn.q_proj",
@@ -803,6 +815,12 @@ by hash.
   "rng_version": "gaussian_hash_v1",
   "candidate_routing": "row_candidate_id",
   "prefix_cache_policy": "disabled-for-search",
+  "scorer_name": "...",
+  "scorer_version": "...",
+  "prompt_ids_hash": "...",
+  "sample_set_hash": "...",
+  "prompt_scoring_config_hash": "...",
+  "decode_config_hash": "...",
   "kernel": "torch"
 }
 ```
@@ -810,23 +828,32 @@ by hash.
 `candidates.jsonl` rows contain the complete `SubspaceCandidate` identity:
 `candidate_id`, `direction_seed`, `sign`, `basis_hash`, `target_set_hash`,
 `scale_mode`, `rho_or_sigma_w`, `budget_policy`, `budget_hash`, `rng_version`,
-`runtime_dtype`, `radius_index`, `target_preset`, and `basis_rank`.
+`runtime_dtype`, `radius_index`, `target_preset`, `basis_rank`, `shard_id`,
+`shard_population_start`, `shard_population_end`, `worker_id`, `device_id`,
+and `prompt_scoring_config_hash`. `sign` is serialized as `"+"` or `"-"` in
+artifacts; kernels may resolve that to `+1` or `-1` internally.
 
 `candidate_scores.jsonl` rows contain `candidate_id`, split, scorer name and
-version, aggregate metrics, sample count, prompt ids hash, decode config hash,
-elapsed time, token counts, and optional path to per-sample rows. Selected
-holdout rows must include the selector that promoted the candidate.
+version, aggregate metrics, sample count, prompt ids hash, sample-set hash,
+decode config hash, elapsed time, token counts, and optional path to per-sample
+rows. Selected holdout rows must include the selector that promoted the
+candidate.
 
 `top_k_ensemble.json` contains the full candidate identities, not only ids, plus
 `aggregation`, `tie_break_policy`, `selection_rule`, `K`, `scorer_version`,
-`prompt_ids_hash`, `basis_collection_config_hash`, `runtime_config_hash`,
-`decode_config_hash`, and replay hashes for `subspace_state.pt` and
-`candidate_scores.jsonl`.
+`prompt_ids_hash`, `sample_set_hash`, `prompt_scoring_config_hash`,
+`basis_collection_config_hash`, `runtime_config_hash`, `decode_config_hash`,
+`rng_version`, and replay hashes for `subspace_state.pt` and
+`candidate_scores.jsonl`. The top-level replay hashes must match the
+corresponding run-summary hashes.
 
 `validation_report.json` has separate sections for math tests, RNG/replay tests,
 routing/cache tests, selector quality, holdout quality, ensemble quality, drift
 diagnostics, random/shuffled controls, and throughput gates. Each section has
-`status`, `evidence_paths`, and a machine-readable failure list.
+`status`, `evidence_paths`, and a machine-readable failure list. A completed
+run passes validation only when every required section has `status: "pass"`,
+nonempty evidence paths that exist in the run directory, and an empty failure
+list.
 
 `systems_report.json` records warmup policy, CUDA synchronization policy,
 candidate batch size, candidate shard id, GPU model, GPU count, memory

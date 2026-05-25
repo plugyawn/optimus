@@ -21,19 +21,34 @@ SUBSPACE_REQUIRED_FILES = (
     "systems_report.json",
 )
 SUBSPACE_REQUIRED_SUMMARY = (
+    "schema_version",
     "kind",
     "backend",
     "method",
+    "created_at",
+    "optimus_version",
+    "git_commit",
+    "git_dirty",
+    "command",
+    "environment",
     "population",
     "basis_hash",
     "target_set_hash",
+    "basis_collection_config_hash",
+    "subspace_state_hash",
+    "candidate_scores_hash",
     "scale_mode",
+    "rho_grid",
+    "sigma_w_grid",
     "budget_policy",
     "rng_version",
     "candidate_routing",
     "prefix_cache_policy",
+    "scorer_name",
     "scorer_version",
     "prompt_ids_hash",
+    "sample_set_hash",
+    "prompt_scoring_config_hash",
     "decode_config_hash",
     "candidates_per_sec",
     "prompts_per_sec",
@@ -55,6 +70,12 @@ SUBSPACE_CANDIDATE_FIELDS = (
     "radius_index",
     "target_preset",
     "basis_rank",
+    "shard_id",
+    "shard_population_start",
+    "shard_population_end",
+    "worker_id",
+    "device_id",
+    "prompt_scoring_config_hash",
 )
 SUBSPACE_CANDIDATE_SCORE_FIELDS = (
     "candidate_id",
@@ -64,6 +85,7 @@ SUBSPACE_CANDIDATE_SCORE_FIELDS = (
     "aggregate_metrics",
     "sample_count",
     "prompt_ids_hash",
+    "sample_set_hash",
     "decode_config_hash",
     "elapsed_s",
     "output_tokens",
@@ -77,12 +99,18 @@ SUBSPACE_TOP_K_FIELDS = (
     "K",
     "candidates",
     "basis_hash",
+    "basis_collection_config_hash",
+    "subspace_state_hash",
     "scale_mode",
     "rho_or_sigma_w",
     "budget_policy",
     "target_set_hash",
+    "candidate_scores_hash",
+    "rng_version",
     "scorer_version",
     "prompt_ids_hash",
+    "sample_set_hash",
+    "prompt_scoring_config_hash",
     "runtime_config_hash",
     "decode_config_hash",
 )
@@ -163,9 +191,116 @@ class RunCheck:
         return not self.missing and not self.invalid
 
 
+SUBSPACE_SCALE_MODES = {"relative-output-rms", "projected-dense"}
+SUBSPACE_BUDGET_POLICIES = {"raw-dense", "per-target-equal", "per-layer-equal", "per-block-equal", "custom-json"}
+SUBSPACE_SIGNS = {"+", "-"}
+SUBSPACE_IDENTITY_FIELDS = (
+    "basis_hash",
+    "target_set_hash",
+    "basis_collection_config_hash",
+    "scale_mode",
+    "budget_policy",
+    "rng_version",
+    "prompt_scoring_config_hash",
+)
+SUBSPACE_CANDIDATE_IDENTITY_FIELDS = (
+    "basis_hash",
+    "target_set_hash",
+    "scale_mode",
+    "budget_policy",
+    "rng_version",
+    "prompt_scoring_config_hash",
+)
+
+
+def _is_finite_number(value: object) -> bool:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return False
+    return isfinite(numeric)
+
+
+def _is_positive_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _is_nonnegative_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _json_identity(summary: dict, field: str) -> object:
+    return summary.get(field)
+
+
+def _check_identity_consistency(
+    *,
+    invalid: list[str],
+    prefix: str,
+    payload: dict,
+    summary: dict,
+    fields: tuple[str, ...] = SUBSPACE_IDENTITY_FIELDS,
+) -> None:
+    for field in fields:
+        expected = _json_identity(summary, field)
+        if expected is None:
+            continue
+        if payload.get(field) != expected:
+            invalid.append(f"{prefix}.{field}: expected summary.{field} {expected!r}, got {payload.get(field)!r}")
+
+
+def _check_subspace_candidate(invalid: list[str], prefix: str, row: dict, summary: dict) -> None:
+    if row.get("sign") not in SUBSPACE_SIGNS:
+        invalid.append(f"{prefix}.sign: invalid")
+    if row.get("scale_mode") not in SUBSPACE_SCALE_MODES:
+        invalid.append(f"{prefix}.scale_mode: invalid")
+    if row.get("budget_policy") not in SUBSPACE_BUDGET_POLICIES:
+        invalid.append(f"{prefix}.budget_policy: invalid")
+    if not _is_finite_number(row.get("rho_or_sigma_w")):
+        invalid.append(f"{prefix}.rho_or_sigma_w: not finite")
+    for field in ("direction_seed", "radius_index", "shard_population_start", "shard_population_end"):
+        if not _is_nonnegative_int(row.get(field)):
+            invalid.append(f"{prefix}.{field}: not nonnegative integer")
+    if not _is_positive_int(row.get("basis_rank")):
+        invalid.append(f"{prefix}.basis_rank: not positive integer")
+    start = row.get("shard_population_start")
+    end = row.get("shard_population_end")
+    if _is_nonnegative_int(start) and _is_nonnegative_int(end) and end <= start:
+        invalid.append(f"{prefix}.shard_population_end: must exceed shard_population_start")
+    _check_identity_consistency(
+        invalid=invalid,
+        prefix=prefix,
+        payload=row,
+        summary=summary,
+        fields=SUBSPACE_CANDIDATE_IDENTITY_FIELDS,
+    )
+
+
+def _check_subspace_score(invalid: list[str], prefix: str, row: dict, summary: dict) -> None:
+    if row.get("split") not in {"screen", "holdout", "validation", "test"}:
+        invalid.append(f"{prefix}.split: invalid")
+    if not isinstance(row.get("aggregate_metrics"), dict) or not row.get("aggregate_metrics"):
+        invalid.append(f"{prefix}.aggregate_metrics: empty")
+    if not _is_positive_int(row.get("sample_count")):
+        invalid.append(f"{prefix}.sample_count: not positive integer")
+    for field in ("elapsed_s", "output_tokens"):
+        if not _is_finite_number(row.get(field)):
+            invalid.append(f"{prefix}.{field}: not finite")
+    for field in ("scorer_version", "prompt_ids_hash", "sample_set_hash", "decode_config_hash"):
+        expected = summary.get(field)
+        if expected is not None and row.get(field) != expected:
+            invalid.append(f"{prefix}.{field}: expected summary.{field} {expected!r}, got {row.get(field)!r}")
+
+
+def _evidence_path_exists(root: Path, value: str) -> bool:
+    path = Path(value)
+    return path.exists() if path.is_absolute() else (root / path).exists()
+
+
 def check_run(contract: RunContract) -> RunCheck:
     missing = tuple(rel for rel in contract.required_files if not (contract.root / rel).exists())
     invalid: list[str] = []
+    is_subspace_contract = "subspace_state.pt" in contract.required_files
     summary_path = contract.root / "summary.json"
     summary = {}
     if "summary.json" in contract.required_files and summary_path.exists():
@@ -205,6 +340,26 @@ def check_run(contract: RunContract) -> RunCheck:
         value = summary.get(key)
         if not value:
             invalid.append(f"summary.{key}: empty")
+    if is_subspace_contract:
+        if not isinstance(summary.get("git_dirty"), bool):
+            invalid.append("summary.git_dirty: not boolean")
+        if not summary.get("command"):
+            invalid.append("summary.command: empty")
+        if not isinstance(summary.get("environment"), dict) or not summary.get("environment"):
+            invalid.append("summary.environment: empty")
+        scale_mode = summary.get("scale_mode")
+        if scale_mode not in SUBSPACE_SCALE_MODES:
+            invalid.append("summary.scale_mode: invalid")
+        if scale_mode == "relative-output-rms":
+            if not isinstance(summary.get("rho_grid"), list) or not summary.get("rho_grid"):
+                invalid.append("summary.rho_grid: empty for relative-output-rms")
+            elif not all(_is_finite_number(item) for item in summary["rho_grid"]):
+                invalid.append("summary.rho_grid: contains non-finite value")
+        if scale_mode == "projected-dense":
+            if not isinstance(summary.get("sigma_w_grid"), list) or not summary.get("sigma_w_grid"):
+                invalid.append("summary.sigma_w_grid: empty for projected-dense")
+            elif not all(_is_finite_number(item) for item in summary["sigma_w_grid"]):
+                invalid.append("summary.sigma_w_grid: contains non-finite value")
     jsonl_counts: dict[str, int] = {}
     for rel in contract.required_jsonl_nonempty:
         path = contract.root / rel
@@ -220,12 +375,16 @@ def check_run(contract: RunContract) -> RunCheck:
                     for field in (contract.required_jsonl_fields or {}).get(rel, ()):
                         if field not in row:
                             invalid.append(f"{rel}: row {line_no} missing {field}")
-                    if rel == "candidates.jsonl":
-                        if row.get("scale_mode") not in {"relative-output-rms", "projected-dense"}:
+                    if is_subspace_contract and rel == "candidates.jsonl":
+                        _check_subspace_candidate(invalid, f"{rel}: row {line_no}", row, summary)
+                    elif rel == "candidates.jsonl":
+                        if row.get("scale_mode") not in SUBSPACE_SCALE_MODES:
                             invalid.append(f"{rel}: row {line_no} invalid scale_mode")
-                        if row.get("budget_policy") not in {"raw-dense", "per-target-equal", "per-layer-equal", "per-block-equal", "custom-json"}:
+                        if row.get("budget_policy") not in SUBSPACE_BUDGET_POLICIES:
                             invalid.append(f"{rel}: row {line_no} invalid budget_policy")
-                    if rel == "candidate_scores.jsonl":
+                    if is_subspace_contract and rel == "candidate_scores.jsonl":
+                        _check_subspace_score(invalid, f"{rel}: row {line_no}", row, summary)
+                    elif rel == "candidate_scores.jsonl":
                         if row.get("split") not in {"screen", "holdout", "validation", "test"}:
                             invalid.append(f"{rel}: row {line_no} invalid split")
                     count += 1
@@ -261,43 +420,31 @@ def check_run(contract: RunContract) -> RunCheck:
             if observed != expected:
                 invalid.append(f"{rel}.{field}: expected {expected!r}, got {observed!r}")
         if rel == "top_k_ensemble.json" and "candidates" in fields:
+            _check_identity_consistency(invalid=invalid, prefix=rel, payload=payload, summary=summary)
+            for field in ("subspace_state_hash", "candidate_scores_hash"):
+                expected = summary.get(field)
+                if expected is not None and payload.get(field) != expected:
+                    invalid.append(f"{rel}.{field}: expected summary.{field} {expected!r}, got {payload.get(field)!r}")
             if payload.get("aggregation") not in {"majority-vote", "mean-logprob", "score-sum"}:
                 invalid.append(f"{rel}.aggregation: invalid")
             if payload.get("tie_break_policy") not in {"lowest_candidate_id"}:
                 invalid.append(f"{rel}.tie_break_policy: invalid")
             if not isinstance(payload.get("K"), int) or payload.get("K") <= 0:
                 invalid.append(f"{rel}.K: not positive integer")
+            if not _is_finite_number(payload.get("rho_or_sigma_w")):
+                invalid.append(f"{rel}.rho_or_sigma_w: not finite")
             candidates = payload.get("candidates")
             if isinstance(candidates, list) and candidates:
                 if payload.get("K") != len(candidates):
                     invalid.append(f"{rel}.K: {payload.get('K')!r} != len(candidates) {len(candidates)}")
-                candidate_required = (
-                    "candidate_id",
-                    "direction_seed",
-                    "sign",
-                    "basis_hash",
-                    "target_set_hash",
-                    "scale_mode",
-                    "rho_or_sigma_w",
-                    "budget_policy",
-                    "budget_hash",
-                    "rng_version",
-                    "runtime_dtype",
-                    "radius_index",
-                    "target_preset",
-                    "basis_rank",
-                )
                 for index, candidate in enumerate(candidates, start=1):
                     if not isinstance(candidate, dict):
                         invalid.append(f"{rel}.candidates[{index}]: not object")
                         continue
-                    for field in candidate_required:
+                    for field in SUBSPACE_CANDIDATE_FIELDS:
                         if field not in candidate:
                             invalid.append(f"{rel}.candidates[{index}].{field}: missing")
-                    if candidate.get("scale_mode") not in {"relative-output-rms", "projected-dense"}:
-                        invalid.append(f"{rel}.candidates[{index}].scale_mode: invalid")
-                    if candidate.get("budget_policy") not in {"raw-dense", "per-target-equal", "per-layer-equal", "per-block-equal", "custom-json"}:
-                        invalid.append(f"{rel}.candidates[{index}].budget_policy: invalid")
+                    _check_subspace_candidate(invalid, f"{rel}.candidates[{index}]", candidate, summary)
         if rel == "validation_report.json":
             required_sections = fields
             for section in required_sections:
@@ -308,6 +455,20 @@ def check_run(contract: RunContract) -> RunCheck:
                 for field in ("status", "evidence_paths", "failures"):
                     if field not in value:
                         invalid.append(f"{rel}.{section}.{field}: missing")
+                if value.get("status") != "pass":
+                    invalid.append(f"{rel}.{section}.status: expected 'pass', got {value.get('status')!r}")
+                evidence_paths = value.get("evidence_paths")
+                if not isinstance(evidence_paths, list) or not evidence_paths:
+                    invalid.append(f"{rel}.{section}.evidence_paths: empty")
+                else:
+                    for evidence in evidence_paths:
+                        if not isinstance(evidence, str) or not evidence or not _evidence_path_exists(contract.root, evidence):
+                            invalid.append(f"{rel}.{section}.evidence_paths: missing {evidence!r}")
+                failures = value.get("failures")
+                if not isinstance(failures, list):
+                    invalid.append(f"{rel}.{section}.failures: not list")
+                elif failures:
+                    invalid.append(f"{rel}.{section}.failures: nonempty")
     for rel in contract.required_csv_nonempty:
         path = contract.root / rel
         if not path.exists():
@@ -368,7 +529,19 @@ def gpu_suite_contracts(config: GpuSuiteConfig) -> list[RunContract]:
                 required_summary = SUBSPACE_REQUIRED_SUMMARY
                 required_positive = ("population", "candidates_per_sec", "prompts_per_sec", "output_tokens_per_sec")
                 required_finite = ("lazy_overhead_pct",)
-                required_nonempty = ("basis_hash", "target_set_hash", "scorer_version", "prompt_ids_hash", "decode_config_hash")
+                required_nonempty = (
+                    "basis_hash",
+                    "target_set_hash",
+                    "basis_collection_config_hash",
+                    "subspace_state_hash",
+                    "candidate_scores_hash",
+                    "scorer_name",
+                    "scorer_version",
+                    "prompt_ids_hash",
+                    "sample_set_hash",
+                    "prompt_scoring_config_hash",
+                    "decode_config_hash",
+                )
                 required_path_keys = ()
                 expected_summary_values = {
                     "kind": f"subspace_{spec.backend}_search",

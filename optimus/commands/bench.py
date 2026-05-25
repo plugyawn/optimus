@@ -12,6 +12,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--backend", required=True, choices=["transformers", "vllm"])
     parser.add_argument("--method", required=True, choices=["dense", "lora", "subspace"])
+    lora = parser.add_argument_group("legacy LoRA bench options")
+    lora.add_argument("--adapters", type=int, help="Number of LoRA adapters for explicit legacy adapter throughput baselines.")
+    lora.add_argument("--prompts", type=int, help="Prompt count for throughput measurement.")
+    subspace = parser.add_argument_group("subspace bench options")
+    subspace.add_argument("--basis-rank", type=int, help="Activation-site basis rank.")
+    subspace.add_argument("--basis-prompts", type=int, help="Number of prompts used for basis calibration.")
+    subspace.add_argument("--target-preset", choices=["qv", "attn-qkvo", "mlp", "transformer-linears"])
+    subspace.add_argument("--layers", default=None, help="Layer selector, for example 'all' or '0,1,2'.")
+    subspace.add_argument("--basis-centering", choices=["none", "mean"])
+    subspace.add_argument("--basis-token-source", choices=["prefill", "decode", "prefill+decode"])
+    subspace.add_argument("--basis-kind", choices=["activation-svd", "random-orthonormal", "shuffled-activation-svd"])
+    subspace.add_argument("--scale-mode", choices=["projected-dense", "relative-output-rms"])
+    subspace.add_argument("--rho-grid", help="Comma-separated relative output RMS radii.")
+    subspace.add_argument("--sigma-w-grid", help="Comma-separated dense weight-noise scales.")
+    subspace.add_argument(
+        "--budget-policy",
+        choices=["raw-dense", "per-target-equal", "per-layer-equal", "per-block-equal", "custom-json"],
+    )
+    subspace.add_argument("--top-k-grid", help="Comma-separated lazy ensemble K values.")
+    subspace.add_argument("--candidate-batch-size", help="Candidate block size or 'auto'.")
+    subspace.add_argument("--kernel", choices=["torch", "triton", "custom-op"], help="Lazy delta kernel backend.")
+    subspace.add_argument(
+        "--prefix-cache-policy",
+        choices=["disabled-for-search", "candidate-keyed"],
+        help="Prefix-cache behavior for candidate-specific KV state.",
+    )
     return parser
 
 

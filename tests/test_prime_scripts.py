@@ -35,7 +35,7 @@ def test_prime_bootstrap_installs_declared_dev_extra():
     assert "cublasLt.h" in text
     assert "nvrtc.h" in text
     assert "OPTIMUS_PATCH_VLLM09_AIMV2" in text
-    assert 'OPTIMUS_VLLM_PACKAGE:-vllm>=0.19.0,<0.20' in text
+    assert 'OPTIMUS_VLLM_PACKAGE:-vllm==0.19.0' in text
     assert "transformers>=4.54,<4.55" in text
     assert "runtime import check failed" in text
 
@@ -46,6 +46,7 @@ def test_gpu_suite_launcher_delegates_execution_to_optimus_runner():
     assert "optimus run-plan" in text
     assert "optimus run-suite" in text
     assert "--execution-log \"$OUT_ROOT/execution.json\"" in text
+    assert "--strict" in text
     assert "PROMPT_VARIANTS=${PROMPT_VARIANTS:-default}" in text
     assert "--prompt-variants \"$PROMPT_VARIANTS\"" in text
     assert "run_bench()" not in text

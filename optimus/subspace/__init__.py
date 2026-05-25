@@ -17,6 +17,7 @@ from typing import Literal
 BasisKind = Literal["activation-svd", "random-orthonormal", "shuffled-activation-svd"]
 ScaleMode = Literal["projected-dense", "relative-output-rms"]
 BudgetPolicy = Literal["raw-dense", "per-target-equal", "per-layer-equal", "per-block-equal", "custom-json"]
+CandidateSign = Literal["+", "-"]
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,7 @@ class TargetModule:
 class SubspaceCandidate:
     candidate_id: str
     direction_seed: int
-    sign: int
+    sign: CandidateSign
     basis_hash: str
     target_set_hash: str
     scale_mode: ScaleMode
@@ -50,6 +51,12 @@ class SubspaceCandidate:
     radius_index: int
     target_preset: str
     basis_rank: int
+    shard_id: str
+    shard_population_start: int
+    shard_population_end: int
+    worker_id: str
+    device_id: str
+    prompt_scoring_config_hash: str
     rng_version: str = "gaussian_hash_v1"
 
 
@@ -62,6 +69,14 @@ def canonical_target_id(target_id: str) -> str:
     return canonical
 
 
+def sign_value(sign: CandidateSign | int) -> int:
+    if sign in {"+", 1}:
+        return 1
+    if sign in {"-", -1}:
+        return -1
+    raise ValueError("sign must be '+', '-', -1, or 1")
+
+
 def gaussian_hash_v1(
     *,
     direction_seed: int,
@@ -69,13 +84,12 @@ def gaussian_hash_v1(
     output_index: int,
     basis_index: int,
     salt: str = "",
-    sign: int = 1,
+    sign: CandidateSign | int = "+",
     rng_version: str = "gaussian_hash_v1",
 ) -> float:
     if rng_version != "gaussian_hash_v1":
         raise ValueError(f"unsupported rng_version {rng_version!r}")
-    if sign not in {-1, 1}:
-        raise ValueError("sign must be -1 or 1")
+    resolved_sign = sign_value(sign)
     fields = [
         rng_version,
         str(int(direction_seed)),
@@ -91,16 +105,18 @@ def gaussian_hash_v1(
     u0 = (float(word0) + 0.5) / denom
     u1 = (float(word1) + 0.5) / denom
     value = math.sqrt(-2.0 * math.log(u0)) * math.cos(2.0 * math.pi * u1)
-    return float(sign) * value
+    return float(resolved_sign) * value
 
 
 __all__ = [
     "ActivationSite",
     "BasisKind",
     "BudgetPolicy",
+    "CandidateSign",
     "canonical_target_id",
     "gaussian_hash_v1",
     "ScaleMode",
+    "sign_value",
     "SubspaceCandidate",
     "TargetModule",
 ]

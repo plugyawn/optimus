@@ -13,7 +13,6 @@ import numpy as np
 
 PerturbationMethod = Literal["dense", "lora", "subspace"]
 VALID_PERTURBATION_METHODS = frozenset({"dense", "lora", "subspace"})
-LEGACY_SUBSPACE_METHODS = frozenset({"activation_subspace", "lazy_subspace"})
 
 
 def stable_int(text: str) -> int:
@@ -31,18 +30,12 @@ def canonical_module_name(name: str) -> str:
 
 
 def _normalize_method(method: str) -> PerturbationMethod:
-    if method in LEGACY_SUBSPACE_METHODS:
-        method = "subspace"
     if method not in VALID_PERTURBATION_METHODS:
         raise ValueError(f"perturbation method must be one of {sorted(VALID_PERTURBATION_METHODS)}, got {method!r}")
     return method  # type: ignore[return-value]
 
 
 def _normalize_family(family: str) -> str:
-    if family.startswith("activation_subspace_gaussian_rank_r"):
-        return "subspace_gaussian_rank_r" + family.removeprefix("activation_subspace_gaussian_rank_r")
-    if family.startswith("lazy_subspace_gaussian_rank_r"):
-        return "subspace_gaussian_rank_r" + family.removeprefix("lazy_subspace_gaussian_rank_r")
     return family
 
 

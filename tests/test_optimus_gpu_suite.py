@@ -109,17 +109,32 @@ def write_contract_outputs(contract) -> None:
                     json.dumps(
                         {
                             "schema_version": "subspace_systems_report_v1",
-                            "candidates_per_sec": 1.0,
-                            "prompts_per_sec": 2.0,
-                            "output_tokens_per_sec": 3.0,
+                            "warmup_policy": "one_warmup_batch",
+                            "cuda_sync_policy": "sync_timed_regions",
+                            "candidate_batch_size": 4,
+                            "candidate_shard_id": "single",
+                            "gpu_model": "test-gpu",
+                            "gpu_count": 1,
+                            "gpu_memory_allocated_bytes": 1024,
+                            "gpu_memory_reserved_bytes": 2048,
                             "base_model_time_s": 1.0,
                             "qx_time_s": 0.1,
                             "lazy_delta_time_s": 0.2,
                             "scoring_time_s": 0.3,
                             "setup_time_s": 0.4,
+                            "candidates_per_sec": 1.0,
+                            "prompts_per_sec": 2.0,
+                            "output_tokens_per_sec": 3.0,
                             "lazy_overhead_pct": 10.0,
-                            "gpu_memory_allocated_bytes": 1024,
-                            "candidate_batch_size": 4,
+                            "prefix_cache_policy": "disabled-for-search",
+                            "top_k_ensemble_cost_multiplier": 1.0,
+                            "screen_score": 0.1,
+                            "holdout_score": 0.2,
+                            "screen_to_holdout_drop": -0.1,
+                            "diversity_metrics": {"distinct_answers": 1},
+                            "random_q_control": {"score": 0.1},
+                            "shuffled_q_control": {"score": 0.1},
+                            "antithetic_odd_even": {"odd": 0.0, "even": 0.0},
                         }
                     )
                     + "\n"
@@ -179,21 +194,42 @@ def write_subspace_contract_outputs(contract) -> None:
         "radius_index": 0,
         "target_preset": "transformer-linears",
         "basis_rank": 128,
+        "shard_id": "single",
+        "shard_population_start": 0,
+        "shard_population_end": 16,
+        "worker_id": "worker0",
+        "device_id": "cuda:0",
+        "prompt_scoring_config_hash": "promptscore123",
     }
     summary = {
+        "schema_version": "subspace_run_summary_v1",
         "kind": "subspace_vllm_search",
         "backend": "vllm",
         "method": "subspace",
+        "created_at": "2026-05-25T00:00:00Z",
+        "optimus_version": "0.1.0",
+        "git_commit": "testcommit",
+        "git_dirty": False,
+        "command": ["optimus", "search", "--backend", "vllm", "--method", "subspace"],
+        "environment": {"python": "test"},
         "population": 16,
         "basis_hash": "basis123",
         "target_set_hash": "target123",
+        "basis_collection_config_hash": "basisconfig123",
+        "subspace_state_hash": "statehash123",
+        "candidate_scores_hash": "scorehash123",
         "scale_mode": "relative-output-rms",
+        "rho_grid": [0.01],
+        "sigma_w_grid": None,
         "budget_policy": "per-block-equal",
         "rng_version": "gaussian_hash_v1",
         "candidate_routing": "row_candidate_id",
         "prefix_cache_policy": "disabled-for-search",
+        "scorer_name": "countdown",
         "scorer_version": "countdown_v1",
         "prompt_ids_hash": "prompts123",
+        "sample_set_hash": "samples123",
+        "prompt_scoring_config_hash": "promptscore123",
         "decode_config_hash": "decode123",
         "candidates_per_sec": 1.0,
         "prompts_per_sec": 2.0,
@@ -217,12 +253,18 @@ def write_subspace_contract_outputs(contract) -> None:
             "K": 1,
             "candidates": [candidate],
             "basis_hash": "basis123",
+            "basis_collection_config_hash": "basisconfig123",
+            "subspace_state_hash": "statehash123",
             "scale_mode": "relative-output-rms",
             "rho_or_sigma_w": 0.01,
             "budget_policy": "per-block-equal",
             "target_set_hash": "target123",
+            "candidate_scores_hash": "scorehash123",
+            "rng_version": "gaussian_hash_v1",
             "scorer_version": "countdown_v1",
             "prompt_ids_hash": "prompts123",
+            "sample_set_hash": "samples123",
+            "prompt_scoring_config_hash": "promptscore123",
             "runtime_config_hash": "runtime123",
             "decode_config_hash": "decode123",
         },
@@ -289,6 +331,7 @@ def write_subspace_contract_outputs(contract) -> None:
                             "aggregate_metrics": {"exact": 0.1},
                             "sample_count": 8,
                             "prompt_ids_hash": "prompts123",
+                            "sample_set_hash": "samples123",
                             "decode_config_hash": "decode123",
                             "elapsed_s": 0.01,
                             "output_tokens": 16,
@@ -567,6 +610,56 @@ def test_subspace_contract_rejects_invalid_top_k_semantics(tmp_path: Path):
     assert any("top_k_ensemble.json.aggregation" in item for item in result.invalid)
     assert any("top_k_ensemble.json.K" in item for item in result.invalid)
     assert any("top_k_ensemble.json.candidates[1].budget_hash" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_replay_identity_gaps(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    top_k = json.loads((contract.root / "top_k_ensemble.json").read_text())
+    top_k.pop("subspace_state_hash")
+    top_k.pop("candidate_scores_hash")
+    top_k["basis_collection_config_hash"] = "wrong"
+    top_k["candidates"][0]["sign"] = "x"
+    top_k["candidates"][0]["basis_hash"] = "wrong"
+    (contract.root / "top_k_ensemble.json").write_text(json.dumps(top_k) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("top_k_ensemble.json.subspace_state_hash" in item for item in result.invalid)
+    assert any("top_k_ensemble.json.candidate_scores_hash" in item for item in result.invalid)
+    assert any("top_k_ensemble.json.basis_collection_config_hash" in item for item in result.invalid)
+    assert any("top_k_ensemble.json.candidates[1].sign" in item for item in result.invalid)
+    assert any("top_k_ensemble.json.candidates[1].basis_hash" in item for item in result.invalid)
+
+
+def test_subspace_contract_rejects_nonpassing_validation_report(tmp_path: Path):
+    config = GpuSuiteConfig(
+        output_root=tmp_path / "runs",
+        systems_output_root=tmp_path / "systems",
+        method="subspace",
+        populations=(16,),
+    )
+    contract = next(item for item in gpu_suite_contracts(config) if item.name == "search_p16_subspace_r128")
+    write_subspace_contract_outputs(contract)
+    report = json.loads((contract.root / "validation_report.json").read_text())
+    report["math_tests"] = {"status": "fail", "evidence_paths": [], "failures": ["covariance mismatch"]}
+    report["rng_replay_tests"] = {"status": "pass", "evidence_paths": ["missing.json"], "failures": []}
+    (contract.root / "validation_report.json").write_text(json.dumps(report) + "\n")
+
+    result = check_run(contract)
+
+    assert not result.passed
+    assert any("validation_report.json.math_tests.status" in item for item in result.invalid)
+    assert any("validation_report.json.math_tests.evidence_paths" in item for item in result.invalid)
+    assert any("validation_report.json.math_tests.failures" in item for item in result.invalid)
+    assert any("validation_report.json.rng_replay_tests.evidence_paths" in item for item in result.invalid)
 
 
 def test_lora_artifacts_cannot_pass_as_subspace_run(tmp_path: Path):

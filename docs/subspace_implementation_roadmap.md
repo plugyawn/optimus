@@ -48,6 +48,13 @@ Current saved state, 2026-05-25:
     private `legacy_` names or deleted; they must not remain public core API.
   - Stable subspace schemas must include the shard metadata needed for later
     one-worker-per-GPU scaling before Phase 1 is considered complete.
+- The next checkpoint addressed this restart queue by exposing the final
+  subspace flags in `search`/`bench` help, hardening the executable artifact
+  validator, making suite validation strict from the launcher, pinning the
+  default vLLM dependency, failing `systems-report` closed for unmeasured
+  subspace runs, removing public legacy subspace alias normalization, and adding
+  shard metadata to the public `SubspaceCandidate` schema. Phase 1 still
+  requires independent re-review before runtime basis capture starts.
 
 ## Implementation Restart Plan
 
