@@ -9,7 +9,7 @@ perturbation that can be materialized by different backends.
 Optimus covers:
 
 - perturbation identity, panels, and replay;
-- dense and LoRA materialization;
+- dense, LoRA, and subspace materialization/replay;
 - high-throughput GPU screening;
 - trusted confirmation through Transformers, dense-reference checks, backend
   parity, and LightEval;
@@ -31,9 +31,9 @@ python -m pip install -e ".[eval,serving]"
 python -m pip install -e ".[dev]"
 ```
 
-The serving extra is for vLLM-backed LoRA adapter swapping. The eval extra
-installs LightEval for standard and custom-task confirmation; combine eval and
-serving extras for LightEval's vLLM backend.
+The serving extra is for vLLM-backed LoRA adapter serving and the production
+subspace backend. The eval extra installs LightEval for standard and custom-task
+confirmation; combine eval and serving extras for LightEval's vLLM backend.
 
 ## Package Layout
 
@@ -42,27 +42,35 @@ serving extras for LightEval's vLLM backend.
 | `optimus.core` | `PerturbationSpec`, deterministic panels, `ExperimentKey`, `RunRecord`, throughput records, and hooks. |
 | `optimus.tasks` | Benchmark/task definitions, prompt construction, scoring, and split hygiene. |
 | `optimus.commands` | Public CLI entrypoint modules. |
-| `optimus.modeling` | Dense Gaussian patching, low-rank geometry, deterministic LoRA tensor generation, Qwen shape/config helpers, and PEFT-compatible adapter writing. |
-| `optimus.search` | Backend-neutral zeroth-order study helpers, trusted Transformers search, selector scoring, and replay helpers. |
-| `optimus.serving` | vLLM LoRA adapter-swapping search, halving, benchmark execution, prompt/token contracts, and output scoring. |
+| `optimus.modeling` | Dense Gaussian patching, low-rank geometry, Qwen shape/config helpers, and explicit export/materialization helpers. |
+| `optimus.subspace` | Subspace basis state, candidate noise, and reference math. |
+| `optimus.backends` | vLLM and Transformers backend integrations, including vLLM subspace search. |
+| `optimus.search` | Backend-neutral zeroth-order study helpers, selector scoring, and replay helpers. |
+| `optimus.serving` | Prompt/token contracts and output scoring helpers used by backend integrations. |
 | `optimus.runs` | GPU workload specs, stable point identities, resumable execution logs, and plan serialization. |
 | `optimus.evaluation` | Backend parity gates, LightEval command/sweep planning, run validation, systems reports, and release checks. |
 
 ## Perturbation Contract
 
 `PerturbationSpec` is the boundary between search, modeling, serving, and
-evaluation. It records the method (`dense` or `lora`), family, seed, scale,
-sign, optional rank, and optional target modules. New manifests are JSONL
-records with method-qualified keys; four-field candidate keys remain parseable
-for older reports.
+evaluation. It records the method (`dense`, `lora`, or `subspace`), family,
+seed, scale, sign, optional rank, and optional target modules. New manifests
+are JSONL records with method-qualified keys.
 
 Backends must state the methods they support:
 
-- vLLM search and benchmark paths accept only `lora` perturbations because vLLM
-  hot-swaps LoRA adapters.
-- Transformers search accepts `lora` through PEFT and `dense` through in-memory
-  Gaussian patching.
+- `--backend vllm --method subspace` is the production subspace search path.
+- `--backend vllm --method lora` is adapter-search/replay infrastructure.
+- `--backend transformers` is the trusted reference path for dense, LoRA, and
+  subspace checks.
+- Subspace PEFT/vLLM adapter export is an explicit materialization step for
+  selected winners, not the search hot path.
 - LightEval is a final-evaluation lane, not the full candidate-screening loop.
+
+The transformer-linear subspace lazy-kernel implementation is governed by
+`full_model_lazy_kernel_design.md`. That design keeps vLLM as the production
+execution substrate while Optimus owns only the `G_t,c Q_s x` perturbation
+operator, candidate state, artifact contract, and validation gates.
 
 ## Systems Contract
 
@@ -86,10 +94,10 @@ Supported workflows use:
 
 ```bash
 optimus perturbation-panel ...
-optimus peft-search ...
-optimus vllm-search ...
-optimus vllm-halving ...
-optimus vllm-bench ...
+optimus search --backend vllm --method subspace ...
+optimus search --backend vllm --method lora ...
+optimus search --backend transformers --method dense ...
+optimus bench --backend vllm --method subspace ...
 optimus backend-parity-gate ...
 optimus run-plan ...
 optimus run-suite ...
@@ -113,7 +121,7 @@ Quality claims require:
 | P1024/P4096 search | `summary.json`, `candidate_summary.jsonl`, per-prompt rows, heldout rows, and throughput fields. |
 | Backend parity | Protocol match, base-row checks, ranking agreement, output-diff checks, and adapter tensor checks where applicable. |
 | Dense/LoRA distinction | Rank-`r` LoRA is not claimed as dense parity unless a dense reference run actually passes. |
-| LightEval confirmation | Standard-harness results and saved details for externally materialized final models. |
+| LightEval confirmation | Standard-harness results and saved details for externally materialized final models; lazy top-K ensembles use Optimus-native sample-level evaluation until a direct LightEval runtime adapter exists. |
 | Systems reporting | Backend/method-aware CSVs and PNGs for candidate/sec, token throughput, best-of-N, quality scaling, and staged search. |
 | GPU operations | Execution log, run validation, and pod cleanup ledger. |
 

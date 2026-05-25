@@ -85,9 +85,20 @@ include = {package_include}
     package = root / "optimus"
     package.mkdir()
     (package / "__init__.py").write_text("__version__ = '0.1.0'\n")
+    (package / "cli.py").write_text(
+        'SUPPORTED_COMMANDS = {"search": "optimus.commands.search", "bench": "optimus.commands.bench"}\n'
+    )
     docs = root / "docs"
     docs.mkdir()
-    for name in ["api.md", "gpu_suite.md", "index.md", "optimus_design.md", "release_checklist.md"]:
+    for name in [
+        "api.md",
+        "full_model_lazy_kernel_design.md",
+        "gpu_suite.md",
+        "index.md",
+        "optimus_design.md",
+        "release_checklist.md",
+        "subspace_implementation_roadmap.md",
+    ]:
         (docs / name).write_text(f"# {name}\n\nUse `optimus` commands.\n")
     (root / "README.md").write_text("# Optimus\n\nUse `optimus` commands.\n")
     systems = root / "results" / "report" / "optimus_systems"

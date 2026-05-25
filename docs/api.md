@@ -10,25 +10,25 @@ screening, validation, and systems reporting are separate contracts.
 | --- | --- |
 | `optimus.core` | `PerturbationSpec`, deterministic perturbation panels, experiment/run records, seed replay, and hook registry. |
 | `optimus.tasks` | Countdown examples, prompt variants, exact-answer scoring, and split hygiene helpers. |
-| `optimus.modeling` | Dense Gaussian patches, low-rank update geometry, deterministic LoRA noise families, and PEFT-compatible adapter materialization. |
-| `optimus.search` | Backend-neutral zeroth-order studies, trusted Transformers search, prompt-condition scoring, and replay helpers. |
-| `optimus.serving` | vLLM LoRA adapter-swapping search, staged search, benchmark orchestration, prompt/token contracts, and output scoring helpers. |
+| `optimus.modeling` | Dense Gaussian patches, low-rank update geometry, and explicit export/materialization helpers. |
+| `optimus.subspace` | Subspace basis state, candidate noise, and reference math. |
+| `optimus.backends` | vLLM and Transformers backend integrations, including vLLM subspace search. |
+| `optimus.search` | Backend-neutral zeroth-order studies, prompt-condition scoring, and replay helpers. |
+| `optimus.serving` | Prompt/token contracts and output scoring helpers used by backend integrations. |
 | `optimus.runs` | GPU-suite run specs, stable experiment keys, plan serialization, and resumable execution records. |
 | `optimus.evaluation` | Backend parity gates, run-output contracts, LightEval planning, validation, and systems reports. |
 
 Use `PerturbationSpec`, `perturbation_panel`, and `read_perturbation_file` for
-new integrations. Legacy candidate helpers live only in their internal module
-for old manifest parsing and are not part of the public package exports.
+new integrations. Candidate parsing helpers that are not exported from public
+packages are implementation details.
 
 ## CLI Commands
 
 | command | purpose |
 | --- | --- |
-| `optimus perturbation-panel` | Write a deterministic dense or LoRA perturbation panel. |
-| `optimus peft-search` | Run trusted Transformers evaluation with `--perturbation-backend lora` or `dense`. |
-| `optimus vllm-search` | Screen LoRA perturbations with vLLM adapter swapping. |
-| `optimus vllm-halving` | Run staged LoRA screening with vLLM. |
-| `optimus vllm-bench` | Measure adapter materialization and adapter-swapping throughput. |
+| `optimus perturbation-panel` | Write a deterministic dense, LoRA, or subspace perturbation panel. |
+| `optimus search` | Run perturbation search with `--backend vllm|transformers` and `--method dense|lora|subspace`. |
+| `optimus bench` | Measure backend throughput for dense, LoRA, or subspace search paths. |
 | `optimus make-countdown-data` | Generate deterministic Countdown evaluation data. |
 | `optimus backend-parity-gate` | Gate vLLM selector trust against trusted outputs and adapter tensor checks. |
 | `optimus lighteval` | Plan or run a LightEval job for standard or custom-task confirmation. |
@@ -46,15 +46,24 @@ Optimus CLI, or published package.
 
 `PerturbationSpec` records:
 
-- `method`: `dense` or `lora`;
+- `method`: `dense`, `lora`, or `subspace`;
 - `family`: the sampling family, for example `dense_gaussian`,
-  `isotropic`, or `projected_gaussian_rank_r`;
+  `isotropic`, `projected_gaussian_rank_r`, or
+  `subspace_gaussian_rank_r`;
 - `seed`, `sigma`, and `sign`: deterministic replay coordinates;
-- optional `rank` and `targets` for adapter-style methods.
+- optional `rank` and `targets` for rank-capped or adapter-exportable methods.
 
 New keys are method-qualified, for example
-`lora:isotropic:seed123:s0.0075:sign1`. Legacy four-part keys are still parsed
-for old manifests.
+`lora:isotropic:seed123:s0.0075:sign1` or
+`subspace:subspace_gaussian_rank_r:seed123:s0.0075:sign1`.
+Old method names are not part of the final public API.
+
+Subspace families build a rank-capped activation basis from a fixed screen split
+and sample per-candidate output noise. The implicit dense update is
+`G @ activation_basis`. The planned vLLM backend applies this effect during
+search without adapter swapping and fails closed until the roadmap acceptance
+gates land. PEFT/vLLM adapter export is available only as a materialization step
+for selected winners, using `subspace_state.pt`.
 
 ## Report Semantics
 

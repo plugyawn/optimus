@@ -2,9 +2,9 @@
 
 Optimus separates candidate proposal from trusted evaluation.
 
-The high-throughput vLLM path screens thousands of LoRA perturbations through
-adapter swapping. Dense perturbations use the trusted Transformers path because
-they mutate model weights directly.
+The high-throughput vLLM path screens LoRA perturbations through adapter serving
+and is the planned production substrate for subspace search. Dense perturbations
+use the trusted Transformers path because they mutate model weights directly.
 
 The trusted-eval path uses HF/PEFT, dense-reference checks, backend parity gates,
 and LightEval. LightEval is the standard harness for benchmark/task execution,
@@ -56,17 +56,20 @@ optimus lighteval-sweep \
 
 Use LightEval for final confirmation of an externally materialized model path,
 for example a base model, merged adapter checkpoint, or other final model
-artifact. It is not the full P1024/P4096 candidate-screening loop; the sweep
-command expects the caller to provide model/path templates for already
-materialized selected states.
+artifact. Lazy top-K subspace ensembles are evaluated with Optimus-native
+sample-level evaluation in v1; LightEval is valid for a single-candidate export,
+merged checkpoint, or distilled ensemble artifact unless a later PR adds a
+direct lazy-ensemble LightEval runtime. LightEval is not the full P1024/P4096
+candidate-screening loop; the sweep command expects model/path templates for
+already materialized selected states.
 
 ## Required Evidence
 
 Publication-grade selector evidence should include:
 
 - screen-only candidate selection;
-- Transformers, dense-reference, or LightEval confirmation for the selected
-  materialized model state;
+- Transformers, dense-reference, Optimus-native lazy-ensemble, or LightEval
+  confirmation for the selected state, matched to the artifact type;
 - sample-level details saved for every evaluated example;
 - confidence intervals or paired significance tests;
 - no headline selector claim based on holdout-oracle selection.

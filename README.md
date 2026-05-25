@@ -1,18 +1,20 @@
 # Optimus
 
 Optimus is a research library for zeroth-order post-training of large language
-models. It gives perturbations stable identities, materializes them as dense
-weight patches or LoRA adapters, runs high-throughput GPU screens, and keeps the
-systems and validation records needed to decide whether a candidate actually
-transfers.
+models. It gives perturbations stable identities, applies them as dense weight
+patches, LoRA adapters, or lazy subspace updates, runs
+high-throughput GPU screens, and keeps the systems and validation records
+needed to decide whether a candidate actually transfers.
 
 The supported public interface is the `optimus` package and CLI.
 
 ## What Optimus Is For
 
-- Backend-neutral perturbation panels with explicit `dense` and `lora` methods.
-- High-throughput GPU screening through vLLM adapter swapping when the method is
-  LoRA, and trusted Transformers execution for LoRA or dense perturbations.
+- Backend-neutral perturbation panels with explicit `dense`, `lora`, and
+  `subspace` methods.
+- High-throughput GPU screening through vLLM: adapter serving for LoRA and the
+  planned production substrate for subspace search. Transformers remains the
+  trusted reference path for dense, LoRA, and subspace checks.
 - Population scaling studies for P1024/P4096 zeroth-order search.
 - Systems plots: candidate/sec, prompts/sec, token throughput, backend/method
   throughput, best-of-N scaling, quality scaling, and staged-search savings
@@ -31,8 +33,8 @@ python -m pip install -e .
 ```
 
 GPU runs additionally need a CUDA build of PyTorch and the model weights
-available locally or through Hugging Face authentication. vLLM is only required
-for the adapter-swapping backend.
+available locally or through Hugging Face authentication. vLLM is required for
+LoRA adapter serving and for the planned production subspace backend.
 
 The default public model is `Qwen/Qwen3-4B`, a dense Qwen3 text model close to
 the old 3B operating profile. Larger Qwen3.x models can be passed with
@@ -69,7 +71,9 @@ python -m pip install -e ".[dev]"
 optimus/
   core/        perturbation identities, experiment records, seed replay
   tasks/       benchmark data models, prompt builders, and scorers
-  modeling/    dense patches, low-rank geometry, and adapter materialization
+  modeling/    dense patches, low-rank geometry, and materialization helpers
+  subspace/    subspace basis state, candidate noise, and reference math
+  backends/    vLLM and Transformers backend integrations
   runs/        reusable workload specifications for GPU validation suites
   search/      zeroth-order studies, selection, and trusted HF execution
   serving/     vLLM adapter-swapping and throughput-oriented execution
@@ -106,14 +110,15 @@ optimus perturbation-panel \
   --antithetic
 ```
 
-Run a trusted dense or LoRA search with Transformers:
+Run a trusted dense reference search with Transformers:
 
 ```bash
-optimus peft-search \
+optimus search \
+  --backend transformers \
+  --method dense \
   --out results/p1024_dense_reference \
   --data data/countdown_generated_1200_seed20260507.json \
   --model Qwen/Qwen3-4B \
-  --perturbation-backend dense \
   --family dense_gaussian \
   --population 1024 \
   --prompts 64 \
@@ -124,26 +129,41 @@ optimus peft-search \
   --stop-at-answer
 ```
 
-Run a high-throughput vLLM LoRA search:
+Planned production subspace search over vLLM:
 
 ```bash
-DATA=data/countdown_generated_1200_seed20260507.json
-
-optimus vllm-search \
-  --out results/p1024_vllm_search \
-  --data "$DATA" \
+optimus search \
+  --backend vllm \
+  --method subspace \
+  --out results/subspace_p1024 \
+  --data data/countdown_generated_1200_seed20260507.json \
   --model Qwen/Qwen3-4B \
-  --family isotropic \
+  --family subspace_gaussian_rank_r \
   --population 1024 \
   --prompts 64 \
   --holdout-prompts 256 \
-  --rank 8 \
-  --targets q_proj,v_proj \
-  --tensor-parallel-size 1 \
-  --sigma-values 0.0075 \
+  --match-screen-to-holdout-base-exact \
+  --screen-pool-prompts 512 \
+  --basis-prompts 32 \
+  --basis-rank 128 \
+  --target-preset transformer-linears \
+  --scale-mode relative-output-rms \
+  --rho-grid 0.002,0.005,0.01,0.02 \
+  --budget-policy per-block-equal \
+  --basis-kind activation-svd \
+  --basis-centering none \
+  --basis-token-source prefill \
+  --top-k-grid 1,4,8,16 \
+  --candidate-batch-size auto \
   --max-new-tokens 32 \
   --stop-at-answer
 ```
+
+The vLLM subspace route fails closed until the backend reaches the Phase 5
+acceptance gate in `docs/subspace_implementation_roadmap.md`. When enabled,
+subspace search stores the activation basis in `subspace_state.pt`, samples
+per-seed output noise, and applies `G Q x` inside the vLLM execution path
+without adapter swapping.
 
 Run a backend parity gate before trusting vLLM as selector of record:
 
@@ -241,9 +261,11 @@ Quality claims require:
 - Per-prompt rows, not only aggregate means.
 - Exact-answer, malformed, cap-hit, and answer-closure rates reported separately.
 - Prompt-robust selection when prompt variants are part of the claim.
-- vLLM selection only after adapter tensor checks and ranking/output parity pass.
-- Dense-reference, HF/PEFT, or LightEval-backed confirmation for the selected
-  materialized model state.
+- vLLM selection only after backend parity, routing/cache checks, and
+  method-specific tensor/effect checks pass.
+- Dense-reference, HF/PEFT, Optimus-native lazy-ensemble, or LightEval-backed
+  confirmation for the selected state, depending on whether the artifact is a
+  lazy ensemble or a materialized model.
 - Clear separation between prompt-local lift, heldout lift vs base, and
   dense-Gaussian parity.
 

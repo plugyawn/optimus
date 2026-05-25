@@ -51,6 +51,8 @@ def test_perturbation_records_preserve_method_rank_and_targets(tmp_path: Path):
 def test_invalid_perturbation_specs_fail_fast():
     with pytest.raises(ValueError, match="method"):
         PerturbationSpec("x", 1, 0.1, method="adapter")
+    with pytest.raises(ValueError, match="subspace"):
+        PerturbationSpec("isotropic", 1, 0.1, method="subspace")
     with pytest.raises(ValueError, match="sign"):
         PerturbationSpec("x", 1, 0.1, sign=0)
     with pytest.raises(ValueError, match="dense perturbations"):
@@ -80,6 +82,68 @@ def test_antithetic_panel_returns_requested_odd_population():
     assert specs[0].sign == 1
     assert specs[1].sign == -1
     assert all(spec.rank == 8 for spec in specs)
+
+
+def test_subspace_panel_roundtrips_as_subspace_method():
+    specs = perturbation_panel(
+        "subspace",
+        "subspace_gaussian_rank_r",
+        3,
+        0.01,
+        123,
+        False,
+        rank=8,
+        targets="q_proj,v_proj",
+    )
+
+    assert parse_perturbation_key(specs[0].key) == specs[0]
+    assert specs[0].method == "subspace"
+    assert specs[0].family == "subspace_gaussian_rank_r"
+    require_materialization_contract(
+        specs,
+        backend="test",
+        method="subspace",
+        rank=8,
+        targets="q_proj,v_proj",
+        require_explicit=True,
+    )
+
+
+def test_legacy_activation_subspace_keys_normalize_to_subspace():
+    spec = PerturbationSpec(
+        "activation_subspace_gaussian_rank_r",
+        1,
+        0.1,
+        method="activation_subspace",
+        rank=8,
+        targets="q_proj",
+    )
+
+    assert spec.method == "subspace"
+    assert spec.family == "subspace_gaussian_rank_r"
+
+
+def test_subspace_family_still_supports_lora_export_contract():
+    specs = perturbation_panel(
+        "lora",
+        "subspace_gaussian_rank_r",
+        3,
+        0.01,
+        123,
+        False,
+        rank=8,
+        targets="q_proj,v_proj",
+    )
+
+    assert specs[0].method == "lora"
+    require_materialization_contract(
+        specs,
+        backend="adapter export",
+        method="lora",
+        rank=8,
+        targets="q_proj,v_proj",
+        require_explicit=True,
+    )
 
 
 def test_zeroth_order_study_is_backend_neutral():

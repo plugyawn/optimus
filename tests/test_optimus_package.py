@@ -22,8 +22,9 @@ def test_optimus_version_is_available():
     assert __version__ == "0.1.0"
 
 
-def test_cli_resolves_vllm_search_entrypoint():
-    assert resolve_command("vllm-search") == "optimus.commands.vllm_search"
+def test_cli_resolves_public_search_and_bench_entrypoints():
+    assert resolve_command("search") == "optimus.commands.search"
+    assert resolve_command("bench") == "optimus.commands.bench"
 
 
 def test_cli_exposes_professional_run_commands():
@@ -33,13 +34,21 @@ def test_cli_exposes_professional_run_commands():
     assert resolve_command("lighteval") == "optimus.commands.lighteval"
     assert resolve_command("lighteval-report") == "optimus.commands.lighteval_report"
     assert resolve_command("lighteval-sweep") == "optimus.commands.lighteval_sweep"
-    assert resolve_command("peft-search") == "optimus.commands.peft_search"
     assert resolve_command("perturbation-panel") == "optimus.commands.perturbation_panel"
     assert resolve_command("run-suite") == "optimus.runs.gpu_suite_runner"
 
 
 def test_cli_does_not_resolve_unsupported_commands():
-    for command in ["upstream-baseline-audit", "multirun-gate", "prompt-robustness", "score-sanity-audit"]:
+    for command in [
+        "upstream-baseline-audit",
+        "multirun-gate",
+        "prompt-robustness",
+        "score-sanity-audit",
+        "peft-search",
+        "vllm-search",
+        "vllm-halving",
+        "vllm-bench",
+    ]:
         try:
             resolve_command(command)
         except ValueError as exc:
@@ -76,15 +85,32 @@ def test_pyproject_declares_serving_and_dev_extras():
     assert pyproject["tool"]["setuptools"]["packages"]["find"]["include"] == ["optimus*"]
 
 
-def test_vllm_help_is_lightweight_and_optimus_owned():
+def test_search_help_is_lightweight_and_optimus_owned():
     result = subprocess.run(
-        [sys.executable, "-m", "optimus.cli", "vllm-search", "--help"],
+        [sys.executable, "-m", "optimus.cli", "search", "--help"],
         check=True,
         capture_output=True,
         text=True,
     )
 
-    assert "usage: optimus vllm-search" in result.stdout
+    assert "usage: optimus search" in result.stdout
+    assert "--backend" in result.stdout
+    assert "--method" in result.stdout
+    assert "PyTorch" not in result.stderr
+    assert "NumPy" not in result.stderr
+
+
+def test_bench_help_is_lightweight_and_optimus_owned():
+    result = subprocess.run(
+        [sys.executable, "-m", "optimus.cli", "bench", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "usage: optimus bench" in result.stdout
+    assert "--backend" in result.stdout
+    assert "--method" in result.stdout
     assert "PyTorch" not in result.stderr
     assert "NumPy" not in result.stderr
 
@@ -102,18 +128,27 @@ def test_backend_parity_help_is_lightweight_and_optimus_owned():
     assert "NumPy" not in result.stderr
 
 
-def test_peft_search_help_is_lightweight_and_optimus_owned():
+def test_legacy_search_wrappers_are_not_public_commands():
+    for command in ["peft-search", "vllm-search", "vllm-halving", "vllm-bench"]:
+        result = subprocess.run(
+            [sys.executable, "-m", "optimus.cli", command, "--help"],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0
+        assert "unknown Optimus command" in result.stderr
+
+
+def test_subspace_vllm_route_fails_closed_until_backend_lands():
     result = subprocess.run(
-        [sys.executable, "-m", "optimus.cli", "peft-search", "--help"],
-        check=True,
+        [sys.executable, "-m", "optimus.cli", "search", "--backend", "vllm", "--method", "subspace"],
         capture_output=True,
         text=True,
     )
 
-    assert "usage: optimus peft-search" in result.stdout
-    assert "PyTorch" not in result.stderr
-    assert "NumPy" not in result.stderr
-    assert FORBIDDEN_PACKAGE not in result.stdout
+    assert result.returncode != 0
+    assert "planned production path" in result.stderr
 
 
 def test_unsupported_command_is_not_available_through_cli():
@@ -135,7 +170,12 @@ def test_public_cli_does_not_expose_experiment_catchall():
         text=True,
     )
 
-    assert "peft-search" in result.stdout
+    assert "search" in result.stdout
+    assert "bench" in result.stdout
+    assert "peft-search" not in result.stdout
+    assert "vllm-search" not in result.stdout
+    assert "vllm-halving" not in result.stdout
+    assert "vllm-bench" not in result.stdout
     assert "experiment" not in result.stdout
     assert "upstream-baseline-audit" not in result.stdout
     assert "goal-audit" not in result.stdout
@@ -209,6 +249,23 @@ def test_serving_namespace_import_is_lightweight():
     assert "run_vllm_search" in result.stdout
     assert "backend_contract" in result.stdout
     assert "score_rows" in result.stdout
+    assert result.stderr == ""
+
+
+def test_subspace_and_backends_public_packages_import_lightweight():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import optimus.subspace, optimus.backends; print(optimus.subspace.__all__, optimus.backends.__all__)",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "SubspaceCandidate" in result.stdout
+    assert "BackendName" in result.stdout
     assert result.stderr == ""
 
 

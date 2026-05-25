@@ -1,7 +1,7 @@
 [project]
 name = "optimus"
 version = "0.1.0"
-description = "GPU-oriented zeroth-order optimization for dense and low-rank model perturbations."
+description = "GPU-oriented zeroth-order optimization for dense, low-rank, and activation-subspace model perturbations."
 readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["llm", "gpu", "lora", "dense-perturbations", "zeroth-order-optimization", "vllm"]

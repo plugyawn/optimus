@@ -13,16 +13,14 @@ SUPPORTED_COMMANDS: dict[str, str] = {
     "lighteval-sweep": "optimus.commands.lighteval_sweep",
     "make-countdown-data": "optimus.commands.make_countdown_data",
     "materialize-selected": "optimus.commands.materialize_selected",
-    "peft-search": "optimus.commands.peft_search",
+    "bench": "optimus.commands.bench",
     "perturbation-panel": "optimus.commands.perturbation_panel",
     "release-check": "optimus.evaluation.release",
     "run-plan": "optimus.runs.gpu_suite",
     "run-suite": "optimus.runs.gpu_suite_runner",
+    "search": "optimus.commands.search",
     "systems-report": "optimus.commands.systems_report",
     "validate-run": "optimus.evaluation.validation",
-    "vllm-bench": "optimus.commands.vllm_bench",
-    "vllm-halving": "optimus.commands.vllm_halving",
-    "vllm-search": "optimus.commands.vllm_search",
 }
 
 

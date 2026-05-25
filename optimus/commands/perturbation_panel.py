@@ -14,7 +14,7 @@ def parse_float_list(text: str) -> list[float]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Write a deterministic zeroth-order perturbation panel.")
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--method", choices=["dense", "lora"], required=True)
+    parser.add_argument("--method", choices=["dense", "lora", "subspace"], required=True)
     parser.add_argument("--family", required=True)
     parser.add_argument("--population", type=int, required=True)
     parser.add_argument("--sigma", type=float, required=True)

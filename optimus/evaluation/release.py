@@ -14,6 +14,15 @@ from optimus.runs.gpu_suite import GpuSuiteConfig, parse_int_tuple
 
 FORBIDDEN_PACKAGE = "randopt_" + "lora_lab"
 FORBIDDEN_REPO = "randopt-" + "lora-lab"
+LEGACY_PUBLIC_COMMANDS = ("peft-search", "vllm-search", "vllm-halving", "vllm-bench")
+LEGACY_PUBLIC_PATTERNS = (
+    r"\bactivation_subspace\b",
+    r"\blazy-subspace\b",
+    r"\blazy_subspace\b",
+    r"\bfamily_state(?:\.pt)?\b",
+    r"--activation-state-prompts\b",
+    r"\boptimus\s+(?:peft-search|vllm-search|vllm-halving|vllm-bench)\b",
+)
 
 
 @dataclass(frozen=True)
@@ -85,10 +94,12 @@ def public_doc_checks(root: Path) -> list[ReleaseCheck]:
     docs = [
         root / "README.md",
         root / "docs" / "api.md",
+        root / "docs" / "full_model_lazy_kernel_design.md",
         root / "docs" / "gpu_suite.md",
         root / "docs" / "index.md",
         root / "docs" / "optimus_design.md",
         root / "docs" / "release_checklist.md",
+        root / "docs" / "subspace_implementation_roadmap.md",
     ]
     missing = [str(path.relative_to(root)) for path in docs if not path.exists()]
     leaked: list[str] = []
@@ -116,6 +127,44 @@ def public_doc_checks(root: Path) -> list[ReleaseCheck]:
             not leaked,
             "no old command/import examples" if not leaked else f"matches={leaked!r}",
         ),
+    ]
+
+
+def public_api_surface_checks(root: Path) -> list[ReleaseCheck]:
+    docs = [
+        root / "README.md",
+        root / "docs" / "api.md",
+        root / "docs" / "gpu_suite.md",
+        root / "docs" / "index.md",
+        root / "docs" / "optimus_design.md",
+        root / "docs" / "release_checklist.md",
+    ]
+    leaks: list[str] = []
+    for path in docs:
+        if not path.exists():
+            continue
+        text = path.read_text()
+        for pattern in LEGACY_PUBLIC_PATTERNS:
+            if re.search(pattern, text):
+                leaks.append(f"{path.relative_to(root)}:{pattern}")
+
+    cli_path = root / "optimus" / "cli.py"
+    cli_detail = "missing optimus/cli.py"
+    cli_ok = False
+    if cli_path.exists():
+        text = cli_path.read_text()
+        has_final = '"search"' in text and '"bench"' in text
+        old = [command for command in LEGACY_PUBLIC_COMMANDS if f'"{command}"' in text]
+        cli_ok = has_final and not old
+        cli_detail = "final commands present, legacy wrappers absent" if cli_ok else f"legacy={old!r}, has_final={has_final}"
+
+    return [
+        ReleaseCheck(
+            "public_docs_do_not_promote_legacy_subspace_surface",
+            not leaks,
+            "no legacy public names" if not leaks else f"matches={leaks!r}",
+        ),
+        ReleaseCheck("public_cli_uses_search_and_bench_surface", cli_ok, cli_detail),
     ]
 
 
@@ -397,6 +446,7 @@ def build_release_checks(
     checks: list[ReleaseCheck] = []
     checks.extend(pyproject_checks(root))
     checks.extend(public_doc_checks(root))
+    checks.extend(public_api_surface_checks(root))
     checks.extend(package_code_checks(root))
     checks.extend(repo_structure_checks(root))
     checks.extend(git_state_checks(root))

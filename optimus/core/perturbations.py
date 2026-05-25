@@ -11,8 +11,9 @@ from typing import Any, Literal, Protocol
 import numpy as np
 
 
-PerturbationMethod = Literal["dense", "lora"]
-VALID_PERTURBATION_METHODS = frozenset({"dense", "lora"})
+PerturbationMethod = Literal["dense", "lora", "subspace"]
+VALID_PERTURBATION_METHODS = frozenset({"dense", "lora", "subspace"})
+LEGACY_SUBSPACE_METHODS = frozenset({"activation_subspace", "lazy_subspace"})
 
 
 def stable_int(text: str) -> int:
@@ -30,9 +31,23 @@ def canonical_module_name(name: str) -> str:
 
 
 def _normalize_method(method: str) -> PerturbationMethod:
+    if method in LEGACY_SUBSPACE_METHODS:
+        method = "subspace"
     if method not in VALID_PERTURBATION_METHODS:
         raise ValueError(f"perturbation method must be one of {sorted(VALID_PERTURBATION_METHODS)}, got {method!r}")
     return method  # type: ignore[return-value]
+
+
+def _normalize_family(family: str) -> str:
+    if family.startswith("activation_subspace_gaussian_rank_r"):
+        return "subspace_gaussian_rank_r" + family.removeprefix("activation_subspace_gaussian_rank_r")
+    if family.startswith("lazy_subspace_gaussian_rank_r"):
+        return "subspace_gaussian_rank_r" + family.removeprefix("lazy_subspace_gaussian_rank_r")
+    return family
+
+
+def _is_subspace_family_name(family: str) -> bool:
+    return family.startswith("subspace_gaussian_rank_r")
 
 
 def _normalize_targets(targets: Sequence[str] | str | None) -> tuple[str, ...]:
@@ -47,9 +62,9 @@ def _normalize_targets(targets: Sequence[str] | str | None) -> tuple[str, ...]:
 class PerturbationSpec:
     """Stable identity for a zeroth-order perturbation candidate.
 
-    `method` states whether the perturbation is materialized densely or as a
-    low-rank adapter. Four-field manifest keys are still accepted for reading
-    older local run artifacts.
+    `method` states whether the perturbation is a dense update, a low-rank
+    adapter update, or an implicit activation-subspace update. Four-field
+    manifest keys are still accepted for reading older local run artifacts.
     """
 
     family: str
@@ -71,7 +86,7 @@ class PerturbationSpec:
         rank: int | None = None,
         targets: Sequence[str] | str | None = None,
     ) -> None:
-        family = str(family)
+        family = _normalize_family(str(family))
         if not family:
             raise ValueError("perturbation family must be non-empty")
         sigma = float(sigma)
@@ -92,7 +107,10 @@ class PerturbationSpec:
             raise ValueError("dense perturbations currently require family='dense_gaussian'")
         if family == "dense_gaussian" and method != "dense":
             raise ValueError("dense_gaussian perturbations require method='dense'")
-        object.__setattr__(self, "method", _normalize_method(str(method)))
+        method = _normalize_method(str(method))
+        if method == "subspace" and not _is_subspace_family_name(family):
+            raise ValueError("subspace perturbations require a subspace family")
+        object.__setattr__(self, "method", method)
         object.__setattr__(self, "rank", rank)
         object.__setattr__(self, "targets", _normalize_targets(targets))
 

@@ -15,3 +15,4 @@ wandb/
 *.pth
 hf_cache/
 external/
+local/

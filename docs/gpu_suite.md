@@ -7,11 +7,11 @@ search quality, GPU throughput, and staged-search behavior.
 
 | run | default output | purpose |
 | --- | --- | --- |
-| P1024 full search | `results/optimus_gpu_suite/search_p1024_chunk32` | Matched quality and systems baseline. |
-| P4096 full search | `results/optimus_gpu_suite/search_p4096_chunk32` | Best-of-N and scaling evidence. |
-| P1024 halving | `results/optimus_gpu_suite/halving_p1024_stage8_surv64` | Staged-search savings and regret. |
-| Adapter throughput benches | `results/optimus_gpu_suite/bench_a*_p64` | Candidate/sec, prompts/sec, tokens/sec, adapter-scaling data. |
-| Systems report | `results/report/optimus_systems` | Backend/method-aware plot inputs and PNGs for candidate/sec, adapter throughput, token throughput, best-of-N, quality scaling, and staging tradeoffs. |
+| P1024 full search | `results/optimus_gpu_suite/search_p1024` | Matched quality and systems baseline. |
+| P4096 full search | `results/optimus_gpu_suite/search_p4096` | Best-of-N and scaling evidence. |
+| P1024 staged search | `results/optimus_gpu_suite/staged_p1024` | Staged-search savings and regret when enabled. |
+| Backend throughput benches | `results/optimus_gpu_suite/bench_*` | Candidate/sec, prompts/sec, tokens/sec, and backend-scaling data. |
+| Systems report | `results/report/optimus_systems` | Backend/method-aware plot inputs and PNGs for candidate/sec, backend throughput, token throughput, best-of-N, quality scaling, and staging tradeoffs. |
 | Execution log | `results/optimus_gpu_suite/execution.json` | Ordered command/status record from `optimus run-suite`. |
 
 ## Launcher
@@ -51,11 +51,31 @@ MODEL=Qwen/Qwen3-4B \
 PROMPTS=64 \
 HOLDOUT_PROMPTS=256 \
 PROMOTE=64 \
-CHUNK_ADAPTERS=32 \
-MAX_LORAS=32 \
-MAX_CPU_LORAS=8192 \
+CANDIDATE_BATCH_SIZE=auto \
 TENSOR_PARALLEL_SIZE=1 \
 scripts/run_optimus_gpu_suite.sh
+```
+
+For a p128/p256/p512/p1024 subspace validation plan:
+
+```bash
+optimus run-plan \
+  --out results/optimus_gpu_suite_subspace/plan.json \
+  --root results/optimus_gpu_suite_subspace \
+  --populations 128,256,512,1024 \
+  --method subspace \
+  --backend vllm \
+  --match-screen-to-holdout-base-exact \
+  --screen-pool-prompts 512 \
+  --basis-prompts 32 \
+  --basis-rank 128 \
+  --target-preset transformer-linears \
+  --scale-mode relative-output-rms \
+  --rho-grid 0.002,0.005,0.01,0.02 \
+  --budget-policy per-block-equal \
+  --basis-kind activation-svd \
+  --top-k-grid 1,4,8,16 \
+  --skip-halving
 ```
 
 For Qwen3-4B, prefer data-parallel independent jobs or LightEval
@@ -72,7 +92,8 @@ The generated evidence is not enough by itself. A final claim requires:
 4. Backend parity or trusted confirmation before using any fast backend ranking
    as the selector of record.
 5. P1024/P4096 best-of-N curves from saved candidate summaries.
-6. Systems plots from `optimus systems-report`, including `adapter_throughput.png`, `token_throughput.png`, `best_of_n.png`, and `quality_scaling.png`.
+6. Systems plots from `optimus systems-report`, including backend throughput,
+   token throughput, best-of-N, quality scaling, and top-K ensemble quality.
 7. `optimus validate-run` passes for the run root and systems report.
 8. Active GPU pods stopped or explicitly reported after the run.
 
