@@ -358,6 +358,34 @@ Use the torch reference and injection-point checks for arithmetic development;
 use vLLM adapter replay as an integration reference, not as the fused-kernel
 contract itself.
 
+## A6000 Target-Output Drift Capture
+
+The target-output capture probe samples q/v-packed target outputs for the same
+candidate and prompt under native vLLM adapter replay and lazy hook replay. It
+compares the returned module outputs by candidate id, target id, and call index.
+
+| lazy backend | generated match | max common top-logprob diff | target-output max abs | target-output mean RMS | worst layer | lazy delta s | kernel s | stack s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| triton-counter-inplace | 1/1 | `0.5011` | `1.5` | `0.0216` | 35 | `18.46` | `18.44` | `0.01` |
+| vLLM-LoRA-kernel-in-hook | 1/1 | `0.4991` | `0.75` | `0.0168` | 33 | `38.24` | `0.04` | `38.11` |
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/a6000_drift_capture/target_output_drift_by_layer.png`
+- `results/remote_lazy_kernel_validation/a6000_drift_capture/target_output_capture_summary.json`
+- `results/remote_lazy_kernel_validation/a6000_drift_capture/c1p1_targetsplit/target_output_drift.csv`
+- `results/remote_lazy_kernel_validation/a6000_drift_capture/c1p1_vllm_lora_kernel/target_output_drift.csv`
+
+Layer 0 drift is tiny (`0.00195` max abs for the in-place counter backend),
+and the visible mismatch accumulates in late layers. The same strict-signature
+failure class appears for both the stateless in-place counter backend and the
+vLLM-LoRA-kernel-in-hook backend, so the capture does not point to a counter
+kernel arithmetic bug. It points to adapter replay versus hook execution
+semantics plus accumulated bf16/order drift. The speed profile still supports
+the fused/custom-op lever: the counter path removes factor-stack construction,
+while the bridge spends almost all measured lazy time in stack setup for this
+cold c1/p1 capture.
+
 ## Benchmark Ladder
 
 All benchmark rows must record hardware, vLLM version, FlashInfer version,

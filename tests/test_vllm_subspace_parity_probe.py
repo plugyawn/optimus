@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import torch
+
 from scripts import probe_vllm_subspace_parity as probe
 
 
@@ -83,3 +85,54 @@ def test_compare_rows_flags_generated_token_mismatch() -> None:
 
     assert rows[0]["generated_token_match"] is False
     assert summary["generated_token_match_count"] == 0
+
+
+def test_compare_capture_rows_reports_layer_drift() -> None:
+    adapter = [
+        {
+            "candidate_id": "seed1:+:r64:rho0.4",
+            "target_id": "layer_0.self_attn.qkv_proj",
+            "call_index": 0,
+            "layer_index": 0,
+            "suffix": "qkv_proj",
+            "tensor": torch.tensor([[1.0, 2.0], [3.0, 4.0]]),
+        }
+    ]
+    lazy = [
+        {
+            "candidate_id": "seed1:+:r64:rho0.4",
+            "target_id": "layer_0.self_attn.qkv_proj",
+            "call_index": 0,
+            "layer_index": 0,
+            "suffix": "qkv_proj",
+            "tensor": torch.tensor([[1.0, 1.5], [2.5, 4.0]]),
+        }
+    ]
+
+    rows, summary = probe._compare_capture_rows(adapter, lazy)
+
+    assert rows[0]["shape_match"] is True
+    assert rows[0]["max_abs"] == 0.5
+    assert summary["comparisons"] == 1
+    assert summary["max_abs"] == 0.5
+    assert summary["worst"]["target_id"] == "layer_0.self_attn.qkv_proj"
+
+
+def test_compare_capture_rows_tracks_missing_adapter_rows() -> None:
+    rows, summary = probe._compare_capture_rows(
+        [],
+        [
+            {
+                "candidate_id": "seed1:+:r64:rho0.4",
+                "target_id": "layer_0.self_attn.qkv_proj",
+                "call_index": 0,
+                "layer_index": 0,
+                "suffix": "qkv_proj",
+                "tensor": torch.zeros(1, 2),
+            }
+        ],
+    )
+
+    assert rows == []
+    assert summary["missing_adapter_count"] == 1
+    assert summary["comparisons"] == 0

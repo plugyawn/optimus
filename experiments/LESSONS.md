@@ -76,3 +76,11 @@
   already float32, `to(...).contiguous()` can preserve storage aliasing and
   `safetensors` rejects the file. The bridge now clones LoRA tensors after dtype
   conversion.
+- Target-output capture confirms the nonzero strict adapter mismatch is
+  accumulated execution drift, not an obvious counter-kernel arithmetic bug.
+  On A6000 c1/p1, layer-0 target drift is tiny, while worst drift appears at
+  layers 33-35; both `triton-counter-inplace` and
+  `vllm-lora-kernel`-in-hook fail top-logprob parity around `0.5`. The next
+  lever remains vLLM custom-op/scheduling integration for `Qx + counter expand
+  + add`; adapter replay is an integration reference, not the production
+  equality contract.

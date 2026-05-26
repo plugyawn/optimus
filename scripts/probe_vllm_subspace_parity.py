@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import gc
 import json
 import os
@@ -53,6 +54,11 @@ from scripts.eval_vllm_lazy_k1 import (
     _single_radius,
 )
 from scripts.eval_vllm_subspace_adapter_k1 import _default_targets as _default_adapter_targets
+
+
+def _main_tensor(value: Any) -> torch.Tensor | None:
+    main = value[0] if isinstance(value, tuple) and value and torch.is_tensor(value[0]) else value
+    return main if torch.is_tensor(main) else None
 
 
 def _jsonl(path: Path) -> list[dict[str, Any]]:
@@ -255,6 +261,188 @@ def _llm_kwargs(args: argparse.Namespace) -> dict[str, Any]:
     return kwargs
 
 
+def _parse_capture_layers(text: str | None) -> set[int] | None:
+    if text is None or text.strip().lower() in {"", "all"}:
+        return None
+    out = {int(item.strip()) for item in text.split(",") if item.strip()}
+    if not out:
+        return None
+    return out
+
+
+class _TargetOutputCapture:
+    def __init__(
+        self,
+        *,
+        backend: str,
+        max_rows: int,
+        max_calls_per_target: int,
+    ) -> None:
+        self.backend = backend
+        self.max_rows = max(1, int(max_rows))
+        self.max_calls_per_target = max(1, int(max_calls_per_target))
+        self.current_candidate_id: str | None = None
+        self.rows: list[dict[str, Any]] = []
+        self._call_counts: dict[tuple[str, str], int] = {}
+
+    def hook_for(self, target: Any) -> Any:
+        def hook(_module: Any, _args: tuple[Any, ...], output: Any, *, __target: Any = target) -> None:
+            candidate_id = self.current_candidate_id
+            if candidate_id is None:
+                return
+            key = (candidate_id, __target.target_id)
+            call_index = self._call_counts.get(key, 0)
+            if call_index >= self.max_calls_per_target:
+                return
+            main = _main_tensor(output)
+            if main is None:
+                return
+            flat = main.detach().reshape(-1, main.shape[-1])
+            sample = flat[: self.max_rows].detach().float().cpu().contiguous()
+            self.rows.append(
+                {
+                    "backend": self.backend,
+                    "candidate_id": candidate_id,
+                    "target_id": str(__target.target_id),
+                    "module_name": str(__target.module_name),
+                    "layer_index": int(__target.layer_index),
+                    "suffix": str(__target.suffix),
+                    "call_index": int(call_index),
+                    "original_shape": tuple(int(dim) for dim in main.shape),
+                    "captured_rows": int(sample.shape[0]),
+                    "output_dim": int(sample.shape[-1]),
+                    "tensor": sample,
+                }
+            )
+            self._call_counts[key] = call_index + 1
+
+        return hook
+
+
+def _install_target_output_capture(
+    args: argparse.Namespace,
+    targets: list[Any],
+    *,
+    backend: str,
+) -> tuple[_TargetOutputCapture | None, list[Any]]:
+    if not bool(args.capture_target_outputs):
+        return None, []
+    wanted_layers = _parse_capture_layers(args.capture_layers)
+    selected = [target for target in targets if wanted_layers is None or int(target.layer_index) in wanted_layers]
+    capture = _TargetOutputCapture(
+        backend=backend,
+        max_rows=int(args.capture_max_rows),
+        max_calls_per_target=int(args.capture_max_calls_per_target),
+    )
+    handles = [target.module.register_forward_hook(capture.hook_for(target)) for target in selected]
+    return capture, handles
+
+
+def _remove_capture_hooks(handles: list[Any]) -> None:
+    for handle in handles:
+        handle.remove()
+
+
+def _capture_path(out: Path, backend: str) -> Path:
+    return out / f"{backend}_target_outputs.pt"
+
+
+def _save_capture(out: Path, backend: str, capture: _TargetOutputCapture | None) -> None:
+    if capture is None:
+        return
+    torch.save(capture.rows, _capture_path(out, backend))
+
+
+def _tensor_diff_stats(left: torch.Tensor, right: torch.Tensor) -> dict[str, Any]:
+    left_f = left.detach().float()
+    right_f = right.detach().float()
+    if tuple(left_f.shape) != tuple(right_f.shape):
+        return {
+            "shape_match": False,
+            "left_shape": tuple(int(dim) for dim in left_f.shape),
+            "right_shape": tuple(int(dim) for dim in right_f.shape),
+            "max_abs": None,
+            "mean_abs": None,
+            "rms_abs": None,
+            "relative_rms": None,
+        }
+    diff = left_f - right_f
+    abs_diff = diff.abs()
+    rms = torch.sqrt(torch.mean(diff * diff)) if diff.numel() else torch.tensor(0.0)
+    denom = torch.sqrt(torch.mean(left_f * left_f) + torch.mean(right_f * right_f)) if diff.numel() else torch.tensor(0.0)
+    relative = float((rms / denom).item()) if float(denom.item()) > 0 else 0.0
+    return {
+        "shape_match": True,
+        "left_shape": tuple(int(dim) for dim in left_f.shape),
+        "right_shape": tuple(int(dim) for dim in right_f.shape),
+        "max_abs": float(abs_diff.max().item()) if abs_diff.numel() else 0.0,
+        "mean_abs": float(abs_diff.mean().item()) if abs_diff.numel() else 0.0,
+        "rms_abs": float(rms.item()),
+        "relative_rms": relative,
+    }
+
+
+def _compare_capture_rows(adapter_rows: list[dict[str, Any]], lazy_rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    by_key = {
+        (str(row["candidate_id"]), str(row["target_id"]), int(row["call_index"])): row
+        for row in adapter_rows
+    }
+    comparisons: list[dict[str, Any]] = []
+    missing_adapter = 0
+    for lazy in lazy_rows:
+        key = (str(lazy["candidate_id"]), str(lazy["target_id"]), int(lazy["call_index"]))
+        adapter = by_key.get(key)
+        if adapter is None:
+            missing_adapter += 1
+            continue
+        stats = _tensor_diff_stats(adapter["tensor"], lazy["tensor"])
+        comparisons.append(
+            {
+                "candidate_id": key[0],
+                "target_id": key[1],
+                "call_index": key[2],
+                "layer_index": int(lazy.get("layer_index", adapter.get("layer_index", -1))),
+                "suffix": str(lazy.get("suffix", adapter.get("suffix", ""))),
+                "adapter_shape": list(stats["left_shape"]),
+                "lazy_shape": list(stats["right_shape"]),
+                "shape_match": bool(stats["shape_match"]),
+                "max_abs": stats["max_abs"],
+                "mean_abs": stats["mean_abs"],
+                "rms_abs": stats["rms_abs"],
+                "relative_rms": stats["relative_rms"],
+            }
+        )
+    numeric = [row for row in comparisons if row.get("shape_match")]
+    max_abs_values = [float(row["max_abs"]) for row in numeric if row.get("max_abs") is not None]
+    mean_abs_values = [float(row["mean_abs"]) for row in numeric if row.get("mean_abs") is not None]
+    rms_values = [float(row["rms_abs"]) for row in numeric if row.get("rms_abs") is not None]
+    worst = max(numeric, key=lambda row: float(row.get("max_abs") or 0.0), default=None)
+    summary = {
+        "comparisons": len(comparisons),
+        "shape_match_count": sum(1 for row in comparisons if row.get("shape_match")),
+        "missing_adapter_count": missing_adapter,
+        "missing_lazy_count": max(0, len(adapter_rows) - len(comparisons)),
+        "max_abs": max(max_abs_values) if max_abs_values else None,
+        "mean_abs_mean": sum(mean_abs_values) / max(len(mean_abs_values), 1) if mean_abs_values else None,
+        "rms_abs_mean": sum(rms_values) / max(len(rms_values), 1) if rms_values else None,
+        "worst": None if worst is None else {key: worst[key] for key in ("candidate_id", "target_id", "call_index", "layer_index", "max_abs", "mean_abs", "rms_abs", "relative_rms")},
+    }
+    return comparisons, summary
+
+
+def _write_capture_comparisons(out: Path, comparisons: list[dict[str, Any]]) -> None:
+    _write_jsonl(out / "target_output_drift.jsonl", comparisons)
+    csv_path = out / "target_output_drift.csv"
+    if not comparisons:
+        csv_path.write_text("")
+        return
+    fieldnames = list(comparisons[0].keys())
+    with csv_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(comparisons)
+
+
 def _run_adapter_signatures(
     args: argparse.Namespace,
     *,
@@ -306,19 +494,38 @@ def _run_adapter_signatures(
         enforce_eager=bool(args.enforce_eager),
         **_llm_kwargs(args),
     )
-    rows: list[dict[str, Any]] = []
-    for spec, candidate in zip(specs, candidates):
-        request = LoRARequest(spec.name, spec.lora_int_id, spec.path)
-        outputs = llm.generate(prompt_inputs, sampling, lora_request=request, use_tqdm=False)
-        rows.extend(
-            _signature_rows(
-                outputs,
-                candidate_id=candidate.candidate_id,
-                examples=examples,
-                backend="vllm_subspace_adapter",
-                prompt_tail_tokens=args.prompt_tail_tokens,
-            )
+    capture: _TargetOutputCapture | None = None
+    capture_handles: list[Any] = []
+    if args.capture_target_outputs:
+        _, torch_model = find_vllm_model(llm)
+        discovered = discover_targets(torch_model, preset=source_summary.get("target_preset") or "qv", layers=None)
+        filtered = _filter_targets(
+            discovered,
+            targets,
+            qkv_dims=_qkv_dims_from_config(args.model, local_files_only=bool(args.local_files_only)),
         )
+        capture, capture_handles = _install_target_output_capture(args, filtered, backend="adapter")
+    rows: list[dict[str, Any]] = []
+    try:
+        for spec, candidate in zip(specs, candidates):
+            if capture is not None:
+                capture.current_candidate_id = candidate.candidate_id
+            request = LoRARequest(spec.name, spec.lora_int_id, spec.path)
+            outputs = llm.generate(prompt_inputs, sampling, lora_request=request, use_tqdm=False)
+            rows.extend(
+                _signature_rows(
+                    outputs,
+                    candidate_id=candidate.candidate_id,
+                    examples=examples,
+                    backend="vllm_subspace_adapter",
+                    prompt_tail_tokens=args.prompt_tail_tokens,
+                )
+            )
+    finally:
+        if capture is not None:
+            capture.current_candidate_id = None
+        _remove_capture_hooks(capture_handles)
+        _save_capture(out, "adapter", capture)
     del llm
     gc.collect()
     if torch.cuda.is_available():
@@ -372,10 +579,13 @@ def _run_lazy_signatures(
     )
     route_handle = install_model_runner_routing(runtime, model_runner)
     hook_handles = install_hooks(runtime)
+    capture, capture_handles = _install_target_output_capture(args, filtered, backend="lazy")
     rows: list[dict[str, Any]] = []
     try:
         for candidate in candidates:
             runtime.set_candidate(candidate)
+            if capture is not None:
+                capture.current_candidate_id = candidate.candidate_id
             runtime.reset_timing()
             outputs = llm.generate(prompt_inputs, sampling, use_tqdm=False)
             if runtime.delta_rows <= 0:
@@ -390,6 +600,10 @@ def _run_lazy_signatures(
                 )
             )
     finally:
+        if capture is not None:
+            capture.current_candidate_id = None
+        _remove_capture_hooks(capture_handles)
+        _save_capture(Path(args.out), "lazy", capture)
         remove_hooks(hook_handles)
         remove_model_runner_routing(route_handle)
     timing = {
@@ -444,6 +658,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lazy-qkv-kernel-policy", default="split-launches", choices=["split-launches", "packed-qkv"])
     parser.add_argument("--lazy-compute-dtype", default="bfloat16")
     parser.add_argument("--sync-lazy-timing", action="store_true")
+    parser.add_argument("--capture-target-outputs", action="store_true")
+    parser.add_argument("--capture-layers", default="all")
+    parser.add_argument("--capture-max-rows", type=int, default=16)
+    parser.add_argument("--capture-max-calls-per-target", type=int, default=2)
     parser.add_argument("--strict-token-match", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--max-logprob-diff", type=float, default=0.0)
     parser.add_argument("--mode", choices=["both", "adapter", "lazy", "compare"], default="both")
@@ -529,6 +747,7 @@ def main() -> int:
 
     comparisons: list[dict[str, Any]] = []
     parity: dict[str, Any] = {}
+    target_output_drift: dict[str, Any] = {}
     pass_status = True
     if adapter_rows and lazy_rows:
         comparisons, parity = _compare_rows(adapter_rows, lazy_rows)
@@ -538,6 +757,15 @@ def main() -> int:
             pass_status = False
     elif args.mode == "compare":
         raise FileNotFoundError(f"missing signature files under {out}")
+    if args.capture_target_outputs:
+        adapter_capture_path = _capture_path(out, "adapter")
+        lazy_capture_path = _capture_path(out, "lazy")
+        if adapter_capture_path.exists() and lazy_capture_path.exists():
+            capture_comparisons, target_output_drift = _compare_capture_rows(
+                torch.load(adapter_capture_path, map_location="cpu"),
+                torch.load(lazy_capture_path, map_location="cpu"),
+            )
+            _write_capture_comparisons(out, capture_comparisons)
     summary = {
         "kind": "vllm_subspace_lazy_signature_parity_probe",
         "status": "partial" if not (adapter_rows and lazy_rows) else ("pass" if pass_status else "fail"),
@@ -570,6 +798,11 @@ def main() -> int:
         "parity": parity,
         "adapter_build_s": adapter_build_s,
         "lazy_timing": lazy_timing,
+        "target_output_drift": target_output_drift,
+        "capture_target_outputs": bool(args.capture_target_outputs),
+        "capture_layers": args.capture_layers,
+        "capture_max_rows": int(args.capture_max_rows),
+        "capture_max_calls_per_target": int(args.capture_max_calls_per_target),
         "runtime_environment": runtime_environment(),
         "git_commit": git_commit(),
         "git_dirty": git_dirty(),
