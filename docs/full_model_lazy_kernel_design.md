@@ -8,11 +8,19 @@ transformer-linear subspace RandOpt backend over vLLM. The public method name is
 perturbations are applied to transformer block linear modules through activation
 bases captured at the sites those modules read from.
 
-Current repository status: this is a design and artifact contract. The
-production vLLM subspace backend is not implemented yet, and public vLLM
-subspace search/bench routes must fail closed until the roadmap Phase 5/6 gates
-land. Existing LoRA adapter serving code is legacy baseline infrastructure and
-is not the subspace search hot path.
+Current branch status: the vLLM subspace bridge is implemented as a
+forward-hook backend with a `vllm-lora-kernel` lazy-delta path. That bridge is
+validated as a research/systems baseline and p128 speed target, not as the
+final production fused kernel. The strict signature probe passes exactly at
+zero scale and preserves one-step generated tokens at nonzero scale, but
+nonzero top-logprob parity is still open. Public claims still require closing
+that semantic gap and then landing the fused/custom-op follow-up described in
+`KERNEL.md`.
+
+Existing LoRA adapter serving code is legacy baseline infrastructure and is not
+the subspace search hot path. The current bridge may reuse vLLM's LoRA Triton
+shrink/expand kernels internally, but it does not load or swap adapters for
+candidate search.
 
 The search-time operation for target module `t` and candidate `c` is:
 
@@ -32,9 +40,10 @@ Where:
 
 Algebraically, each candidate induces a low-rank perturbation
 `Delta W_t,c = beta_t G_t,c Q_s(t)`, but the planned search-time execution is
-lazy: the vLLM backend will inject `beta_t G_t,c Q_s(t) x` inside model
-execution and must never load, swap, or materialize per-candidate adapters in
-the hot path.
+lazy: the vLLM backend injects `beta_t G_t,c Q_s(t) x` inside model execution
+and must never load, swap, or materialize per-candidate adapters in the hot
+path. The final fused kernel is still pending; the current implementation is a
+measured bridge against that target.
 
 The primary serving artifact is a lazy top-K candidate ensemble. Single-winner
 materialized exports remain useful for replay, debugging, distillation, and

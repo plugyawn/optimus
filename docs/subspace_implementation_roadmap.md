@@ -4,15 +4,19 @@ This roadmap is the execution checklist for
 `docs/full_model_lazy_kernel_design.md`. Do not start optimized kernel work
 until the early correctness and basis-quality gates pass.
 
-Current saved state, 2026-05-25:
+Current saved state, 2026-05-26:
 
-- This roadmap is planning-only. It authorizes documentation, test planning,
-  compatibility audits, and review-driven contract cleanup, but not basis
-  capture, vLLM hook work, lazy-kernel implementation, optimized kernels, or
-  new search experiments.
-- Implementation is paused until Phase 0 is independently accepted. This file
-  is the saved implementation roadmap to reference when implementation starts;
-  it is not itself permission to start runtime work.
+- The branch now contains a vLLM forward-hook subspace bridge and a
+  `vllm-lora-kernel` lazy-delta path. That bridge has p128 A100 evidence and is
+  the current baseline for fused-kernel work.
+- The strict L40S signature probe now proves zero-scale adapter-vs-lazy parity
+  exactly, but nonzero scale still fails top-logprob parity even though the
+  first generated token matches. Treat the bridge as a measured baseline and
+  semantic-debug harness, not as the final parity claim.
+- The final production fused/custom-op kernel is not implemented yet. Do not
+  claim production fused-kernel readiness until the strict signature parity
+  probe, p128 speed gate, and fused/custom-op benchmark ladder in `KERNEL.md`
+  pass on current artifacts.
 - Repository state entering this roadmap refresh: commit `69d7212`
   (`Enforce subspace evidence gates`). That checkpoint removes the stale staged
   serving files from the public package, hardens subspace replay/evidence
@@ -30,10 +34,9 @@ Current saved state, 2026-05-25:
   Public API and artifacts must not use `activation_subspace`,
   `lazy-subspace`, `engine`, `family_state`, or LoRA adapter terminology for
   the lazy-kernel path.
-- Phase 0 is the current gate. It is complete only after the refreshed docs,
-  executable validation gates, release checks, package surface, and
-  implementation plan pass independent review on the current head. Until then,
-  every subspace runtime path remains planned/fail-closed.
+- The current bridge gate is active. It is complete only when adapter-vs-lazy
+  arithmetic parity is proven by the signature/logprob probe rather than only
+  by multi-token generation scores.
 - The saved implementation sequence is:
   1. keep Phase 0 gates green and reviewed;
   2. add the core `optimus.subspace` data model and deterministic candidate
