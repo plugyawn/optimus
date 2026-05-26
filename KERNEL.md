@@ -207,6 +207,9 @@ Artifacts:
 - `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/p128_row_runtime_cbs32/`
 - `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/p1024_row_runtime_cbs32/`
 - `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/counter_end_to_end_throughput.png`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/plots_counter_batch_parity/throughput.png`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/plots_counter_batch_parity/lazy_timing_breakdown.png`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/plots_counter_batch_parity/validation_summary.json`
 
 The key systems bug was treating `rows` as a Triton constexpr. vLLM decode
 scheduling changes row counts frequently, so this caused excessive compilation
@@ -217,6 +220,30 @@ measured point. The remaining bottleneck is the counter expand kernel itself:
 the bridge still has a faster kernel phase at cbs16, so a production custom op
 needs either a faster RNG/delta kernel or integration that removes more launch
 and hook overhead.
+
+Counter-batch replay parity is not fully closed. With p128 cbs32 as the
+reference, the p1024 cbs32 prefix subset has exact replay parity across the
+128 common candidates and 1024 common prompt rows. Changing candidate batch
+size still causes one score mismatch out of 128 candidates:
+
+| comparison | common candidates | score mismatches | max score diff | prompt exact match | text match |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| p128 cbs32 vs p128 cbs16 | 128 | 1 | `0.125` | `0.9990` | `0.7295` |
+| p128 cbs32 vs p128 cbs64 | 128 | 1 | `0.125` | `0.9990` | `0.8604` |
+| p128 cbs32 vs p1024 cbs32 prefix | 128 | 0 | `0.0` | `1.0000` | `1.0000` |
+
+This is acceptable for kernel-throughput exploration, but not for a strict
+replay claim. The remaining correctness gate is deterministic run-level replay
+under different candidate batch sizes or a documented decode determinism mode.
+
+The Amdahl read is also more constrained than "make the expand kernel faster."
+At p128 cbs32, lazy-delta time is `12.39s` inside `31.93s` scoring, so removing
+the entire lazy path would cap the replay speedup at about `1.63x`; removing
+only the measured kernel phase caps it at about `1.32x`. At p1024 cbs32,
+lazy-delta time is `33.16s` inside `99.12s`, but measured kernel time is only
+`3.69s`, so the fused/custom-op path must remove hook dispatch, separate
+`Qx`, delta allocation/add, and timing/scheduling overhead too. A standalone
+faster expand kernel is necessary but not sufficient.
 
 The p128/32-prompt L40S shape also OOMed under vLLM after many candidate
 chunks, despite smaller per-chunk scheduling, because the run became a KV/cache

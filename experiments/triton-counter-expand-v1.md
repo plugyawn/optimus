@@ -90,3 +90,34 @@ Artifacts:
 - `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/p128_row_runtime_cbs32/`
 - `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/p1024_row_runtime_cbs32/`
 - `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/counter_end_to_end_throughput.png`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/plots_counter_batch_parity/throughput.png`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/plots_counter_batch_parity/lazy_timing_breakdown.png`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/plots_counter_batch_parity/validation_summary.md`
+
+## Replay Parity Follow-up
+
+The p1024 cbs32 run exactly replays the p128 cbs32 prefix subset:
+
+| comparison | common candidates | score mismatches | prompt exact match | text match |
+| --- | ---: | ---: | ---: | ---: |
+| p128 cbs32 vs p1024 cbs32 prefix | 128 | 0 | `1.0000` | `1.0000` |
+
+Candidate-batch changes are not yet strict-replay clean:
+
+| comparison | common candidates | score mismatches | max score diff | prompt exact match | text match |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| p128 cbs32 vs p128 cbs16 | 128 | 1 | `0.125` | `0.9990` | `0.7295` |
+| p128 cbs32 vs p128 cbs64 | 128 | 1 | `0.125` | `0.9990` | `0.8604` |
+
+This is enough to keep optimizing the kernel path, but not enough to claim full
+run-level deterministic parity across scheduler shapes.
+
+## Amdahl Note
+
+The fused-kernel lever is still the right lever, but it needs to fuse the full
+lazy delta path, not only speed up the stateless expand math. At p128 cbs32,
+lazy-delta time is `12.39s` inside `31.93s` scoring. At p1024 cbs32,
+lazy-delta time is `33.16s` inside `99.12s`, while measured kernel time is
+only `3.69s`. The custom-op path therefore needs to collapse hook dispatch,
+`Qx`, random-field expand, delta add, and row-routing overhead into the vLLM
+execution path.
