@@ -115,14 +115,26 @@ Current L40S strict signature evidence:
 | condition | backend | scale | status | token match | max generated logprob diff | max common top-logprob diff |
 | --- | --- | ---: | --- | ---: | ---: | ---: |
 | zero scale | torch | 0.0 | pass | 2/2 | 0.0000 | 0.0000 |
-| nonzero scale | torch | 2.0 | fail | 2/2 | 0.0183 | 0.1532 |
-| nonzero scale | torch fp32 compute | 2.0 | fail | 2/2 | 0.0805 | 0.2499 |
-| nonzero scale | vLLM LoRA-kernel bridge | 2.0 | fail | 2/2 | 0.0796 | 0.2498 |
+| nonzero target-split | torch | 2.0 | fail | 2/2 | 0.0310 | 0.2031 |
+| nonzero fused-qkv-exact | torch | 2.0 | fail | 2/2 | 0.0701 | 0.1249 |
+| nonzero fused-qkv-exact | vLLM LoRA-kernel bridge, split launches | 2.0 | fail | 2/2 | 0.0287 | 0.1249 |
+| nonzero fused-qkv-exact | vLLM LoRA-kernel bridge, packed qkv launch | 2.0 | fail | 2/2 | 0.0797 | 0.1250 |
 
 The zero-scale pass shows the probe is not dominated by run-to-run vLLM noise.
-The nonzero failures mean strict adapter-vs-lazy logprob parity is still open.
-Do not convert this bridge into a production claim; use it to localize the
-exact semantic gap that the fused/custom-op path must close.
+The nonzero failures mean strict adapter-vs-lazy logprob parity is still open,
+but the newer field-policy sweep narrows the issue. `fused-qkv-exact` improves
+top-logprob agreement versus target-split, and a direct layer probe confirms
+native vLLM's loaded q/v adapter tensors match the expected subspace tensors
+exactly. On the same layer-0 `qkv_proj` activation, native vLLM adapter delta
+and lazy delta agree to max absolute error `0.00586` in bf16, with zero K-slice
+leakage. The remaining signature gap is therefore accumulated bf16/kernel-order
+drift across layers, not adapter-file generation, qkv packing, or hook
+placement.
+
+Do not spend more time on Python-hook variants unless they are a correctness
+probe for the fused/custom-op path. The viable next lever is a custom fused
+delta/random-field kernel that removes factor-stack construction, vLLM LoRA
+metadata prep, and separate shrink/expand launches.
 
 ## Benchmark Ladder
 

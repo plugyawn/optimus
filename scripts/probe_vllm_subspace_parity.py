@@ -339,6 +339,8 @@ def _run_lazy_signatures(
     dtype: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     os.environ["OPTIMUS_LAZY_DELTA_BACKEND"] = args.lazy_delta_backend
+    os.environ["OPTIMUS_LAZY_FIELD_POLICY"] = args.lazy_field_policy
+    os.environ["OPTIMUS_LAZY_QKV_KERNEL_POLICY"] = args.lazy_qkv_kernel_policy
     if args.lazy_compute_dtype:
         os.environ["OPTIMUS_LAZY_COMPUTE_DTYPE"] = args.lazy_compute_dtype
     from vllm import LLM, SamplingParams
@@ -438,6 +440,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt-logprobs", type=int, default=20)
     parser.add_argument("--prompt-tail-tokens", type=int, default=8)
     parser.add_argument("--lazy-delta-backend", default="vllm-lora-kernel", choices=["torch", "vllm-lora-kernel", "vllm-lora"])
+    parser.add_argument("--lazy-field-policy", default="target-split", choices=["target-split", "fused-qkv-exact"])
+    parser.add_argument("--lazy-qkv-kernel-policy", default="split-launches", choices=["split-launches", "packed-qkv"])
     parser.add_argument("--lazy-compute-dtype", default="bfloat16")
     parser.add_argument("--sync-lazy-timing", action="store_true")
     parser.add_argument("--strict-token-match", action=argparse.BooleanOptionalAction, default=True)
@@ -552,6 +556,8 @@ def main() -> int:
         "dtype": dtype,
         "adapter_dtype": adapter_dtype,
         "lazy_delta_backend": args.lazy_delta_backend,
+        "lazy_field_policy": args.lazy_field_policy,
+        "lazy_qkv_kernel_policy": args.lazy_qkv_kernel_policy,
         "lazy_compute_dtype": args.lazy_compute_dtype,
         "max_logprob_diff": float(args.max_logprob_diff),
         "strict_token_match": bool(args.strict_token_match),

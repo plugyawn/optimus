@@ -74,6 +74,12 @@ class LazyHookRuntime:
         self.sync_timing = _env_flag("OPTIMUS_SYNC_LAZY_TIMING", default=False) if sync_timing is None else bool(sync_timing)
         self.compute_dtype_policy = os.environ.get("OPTIMUS_LAZY_COMPUTE_DTYPE", "activation").strip().lower()
         self.delta_backend = os.environ.get("OPTIMUS_LAZY_DELTA_BACKEND", "torch").strip().lower() or "torch"
+        self.field_policy = os.environ.get("OPTIMUS_LAZY_FIELD_POLICY", "target-split").strip().lower() or "target-split"
+        if self.field_policy not in {"target-split", "fused-qkv-exact"}:
+            raise ValueError(f"unknown OPTIMUS_LAZY_FIELD_POLICY={self.field_policy!r}")
+        self.qkv_kernel_policy = os.environ.get("OPTIMUS_LAZY_QKV_KERNEL_POLICY", "split-launches").strip().lower() or "split-launches"
+        if self.qkv_kernel_policy not in {"split-launches", "packed-qkv"}:
+            raise ValueError(f"unknown OPTIMUS_LAZY_QKV_KERNEL_POLICY={self.qkv_kernel_policy!r}")
         self.collecting = False
         self.active_candidate: SubspaceCandidate | None = None
         self.active_candidates: list[SubspaceCandidate] = []
@@ -102,7 +108,7 @@ class LazyHookRuntime:
         self._vllm_mapping_cache: dict[tuple[Any, ...], torch.Tensor] = {}
         self._vllm_a_stack_cache: dict[tuple[str, str, torch.dtype, int, int, int], torch.Tensor] = {}
         self._vllm_b_stack_cache: dict[
-            tuple[str, tuple[tuple[str, int], ...], str, torch.dtype, int, int, int, float],
+            tuple[str, tuple[tuple[str, int], ...], str, torch.dtype, int, int, tuple[int, int] | None, int, int, float],
             torch.Tensor,
         ] = {}
         self._row_mapping_generation = 0
@@ -367,20 +373,31 @@ class LazyHookRuntime:
             for suffix in target.fused_qkv_slices:
                 output_slice = self._qkv_slice_for(target, suffix, output_dim)
                 width = int(output_slice.stop - output_slice.start)
-                split_target_id = self._split_target_id(target, suffix)
                 beta = self._beta_for_split(target, suffix)
                 if beta is None or float(beta) == 0.0:
                     continue
-                field = self.scaled_field(
-                    target,
-                    candidate,
-                    output_dim=width,
-                    rank=rank,
-                    device=device,
-                    dtype=dtype,
-                    beta=float(beta),
-                    target_id=split_target_id,
-                )
+                if self.field_policy == "fused-qkv-exact":
+                    field = self.scaled_field(
+                        target,
+                        candidate,
+                        output_dim=output_dim,
+                        rank=rank,
+                        device=device,
+                        dtype=dtype,
+                        beta=float(beta),
+                        target_id=target.target_id,
+                    )[output_slice, :].contiguous()
+                else:
+                    field = self.scaled_field(
+                        target,
+                        candidate,
+                        output_dim=width,
+                        rank=rank,
+                        device=device,
+                        dtype=dtype,
+                        beta=float(beta),
+                        target_id=self._split_target_id(target, suffix),
+                    )
                 delta[:, output_slice] = z @ field.T
             return delta
         beta = self._beta_for_split(target)
@@ -474,29 +491,49 @@ class LazyHookRuntime:
         dtype: torch.dtype,
         beta: float,
         target_id: str,
+        field_output_dim: int | None = None,
+        field_slice: slice | None = None,
     ) -> torch.Tensor:
         candidate_key = tuple((candidate.candidate_id, int(candidate.basis_rank)) for candidate in candidates)
         source_rank = max([int(rank), *(int(candidate.basis_rank) for candidate in candidates)])
-        key = (target_id, candidate_key, str(device), dtype, int(output_dim), int(source_rank), int(rank), float(beta))
+        field_output_dim_int = int(field_output_dim or output_dim)
+        slice_key = None if field_slice is None else (int(field_slice.start or 0), int(field_slice.stop or field_output_dim_int))
+        key = (
+            target_id,
+            candidate_key,
+            str(device),
+            dtype,
+            int(output_dim),
+            int(field_output_dim_int),
+            slice_key,
+            int(source_rank),
+            int(rank),
+            float(beta),
+        )
         cached = self._vllm_b_stack_cache.get(key)
         if cached is not None:
             return cached
-        stack = torch.stack(
-            [
-                self.scaled_field(
-                    target,
-                    candidate,
-                    output_dim=output_dim,
-                    rank=rank,
-                    device=device,
-                    dtype=dtype,
-                    beta=float(beta),
-                    target_id=target_id,
+        fields = []
+        for candidate in candidates:
+            field = self.scaled_field(
+                target,
+                candidate,
+                output_dim=field_output_dim_int,
+                rank=rank,
+                device=device,
+                dtype=dtype,
+                beta=float(beta),
+                target_id=target_id,
+            )
+            if field_slice is not None:
+                field = field[field_slice, :]
+            if int(field.shape[0]) != int(output_dim):
+                raise RuntimeError(
+                    "lazy vLLM B-stack field/output width mismatch: "
+                    f"field={tuple(field.shape)} output_dim={output_dim} target_id={target_id}"
                 )
-                for candidate in candidates
-            ],
-            dim=0,
-        ).contiguous()
+            fields.append(field.contiguous())
+        stack = torch.stack(fields, dim=0).contiguous()
         self._vllm_b_stack_cache[key] = stack
         return stack
 
@@ -512,6 +549,8 @@ class LazyHookRuntime:
         dtype: torch.dtype,
         beta: float,
         target_id: str,
+        field_output_dim: int | None = None,
+        field_slice: slice | None = None,
     ) -> torch.Tensor:
         if not flat_x.is_cuda:
             raise RuntimeError("vllm-lora-kernel lazy delta backend requires CUDA tensors")
@@ -549,6 +588,8 @@ class LazyHookRuntime:
             dtype=dtype,
             beta=float(beta),
             target_id=target_id,
+            field_output_dim=field_output_dim,
+            field_slice=field_slice,
         )
         self.stack_time_s += time.perf_counter() - stack_started
 
@@ -570,6 +611,117 @@ class LazyHookRuntime:
         kernel_started = time.perf_counter()
         lora_shrink(x_kernel, (a_stack,), buffer, *meta.meta_args(rows, True), 1.0)
         lora_expand(buffer, (b_stack,), delta, *meta.meta_args(rows, True), offset_start=0, add_inputs=True)
+        self.kernel_time_s += time.perf_counter() - kernel_started
+        return delta
+
+    def _vllm_lora_kernel_delta_for_qkv(
+        self,
+        target: HookTarget,
+        candidates: list[SubspaceCandidate],
+        row_mapping: torch.Tensor,
+        flat_x: torch.Tensor,
+        *,
+        output_dim: int,
+        rank: int,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if not flat_x.is_cuda:
+            raise RuntimeError("vllm-lora-kernel lazy delta backend requires CUDA tensors")
+        if dtype not in {torch.float16, torch.bfloat16}:
+            raise RuntimeError("vllm-lora-kernel lazy delta backend requires fp16/bf16 compute dtype")
+        try:
+            from vllm.lora.ops.triton_ops import lora_expand, lora_shrink
+        except Exception as exc:  # pragma: no cover - exercised on GPU hosts with vLLM.
+            raise RuntimeError("OPTIMUS_LAZY_DELTA_BACKEND=vllm-lora-kernel requires vLLM Triton LoRA ops") from exc
+
+        basis = self.basis_for(target.site_id, device=flat_x.device, dtype=dtype)
+        if basis is None:
+            raise RuntimeError(f"missing lazy basis for activation site {target.site_id}")
+        basis = basis[:rank].contiguous()
+        input_dim = int(flat_x.shape[-1])
+        if int(basis.shape[-1]) != input_dim:
+            raise RuntimeError(f"basis width mismatch for {target.site_id}: basis={tuple(basis.shape)} x={tuple(flat_x.shape)}")
+
+        q_slice = self._qkv_slice_for(target, "q_proj", output_dim)
+        k_slice = self._qkv_slice_for(target, "k_proj", output_dim)
+        v_slice = self._qkv_slice_for(target, "v_proj", output_dim)
+        slice_by_suffix = {"q_proj": q_slice, "k_proj": k_slice, "v_proj": v_slice}
+        width_by_suffix = {suffix: int(s.stop - s.start) for suffix, s in slice_by_suffix.items()}
+        active = set(target.fused_qkv_slices)
+        num_loras = max(1, len(candidates))
+
+        stack_started = time.perf_counter()
+        basis_stack = self._vllm_a_stack(
+            target,
+            basis,
+            num_loras=num_loras,
+            input_dim=input_dim,
+            rank=rank,
+            device=flat_x.device,
+            dtype=dtype,
+        )
+        zero_a_stack: torch.Tensor | None = None
+        a_stacks: list[torch.Tensor] = []
+        b_stacks: list[torch.Tensor] = []
+        for suffix in ("q_proj", "k_proj", "v_proj"):
+            width = width_by_suffix[suffix]
+            beta = self._beta_for_split(target, suffix)
+            if suffix not in active or beta is None or float(beta) == 0.0:
+                if zero_a_stack is None:
+                    zero_a_stack = torch.zeros_like(basis_stack)
+                a_stacks.append(zero_a_stack)
+                b_stacks.append(torch.zeros((num_loras, width, rank), device=flat_x.device, dtype=dtype))
+                continue
+            a_stacks.append(basis_stack)
+            if self.field_policy == "fused-qkv-exact":
+                b_stacks.append(
+                    self._vllm_b_stack(
+                        target,
+                        candidates,
+                        output_dim=width,
+                        rank=rank,
+                        device=flat_x.device,
+                        dtype=dtype,
+                        beta=float(beta),
+                        target_id=target.target_id,
+                        field_output_dim=output_dim,
+                        field_slice=slice_by_suffix[suffix],
+                    )
+                )
+            else:
+                b_stacks.append(
+                    self._vllm_b_stack(
+                        target,
+                        candidates,
+                        output_dim=width,
+                        rank=rank,
+                        device=flat_x.device,
+                        dtype=dtype,
+                        beta=float(beta),
+                        target_id=self._split_target_id(target, suffix),
+                    )
+                )
+        self.stack_time_s += time.perf_counter() - stack_started
+
+        rows = int(flat_x.shape[0])
+        meta_key = (str(flat_x.device), num_loras, rows)
+        meta = self._vllm_meta(device=flat_x.device, max_loras=num_loras, rows=rows)
+        meta_started = time.perf_counter()
+        token_mapping, mapping_key = self._token_mapping_for(
+            row_mapping,
+            device=flat_x.device,
+            rows=rows,
+            num_loras=num_loras,
+        )
+        self.meta_time_s += time.perf_counter() - meta_started
+        self._prepare_vllm_meta(meta, token_mapping, meta_key=meta_key, mapping_key=mapping_key)
+
+        x_kernel = flat_x.to(dtype=dtype).contiguous()
+        buffer = torch.empty((3, rows, rank), device=flat_x.device, dtype=torch.float32)
+        delta = torch.zeros((rows, output_dim), device=flat_x.device, dtype=dtype)
+        kernel_started = time.perf_counter()
+        lora_shrink(x_kernel, tuple(a_stacks), buffer, *meta.meta_args(rows, True), 1.0)
+        lora_expand(buffer, tuple(b_stacks), delta, *meta.meta_args(rows, True), offset_start=0, add_inputs=True)
         self.kernel_time_s += time.perf_counter() - kernel_started
         return delta
 
@@ -604,25 +756,46 @@ class LazyHookRuntime:
                     )
 
         if target.suffix == "qkv_proj" and target.fused_qkv_slices:
-            delta = torch.zeros((int(flat_x.shape[0]), output_dim), device=flat_x.device, dtype=dtype)
-            for suffix in target.fused_qkv_slices:
-                beta = self._beta_for_split(target, suffix)
-                if beta is None or float(beta) == 0.0:
-                    continue
-                output_slice = self._qkv_slice_for(target, suffix, output_dim)
-                width = int(output_slice.stop - output_slice.start)
-                split = self._vllm_lora_kernel_delta_for_target(
+            if self.qkv_kernel_policy == "packed-qkv":
+                delta = self._vllm_lora_kernel_delta_for_qkv(
                     target,
                     candidates,
                     row_mapping,
                     flat_x,
-                    output_dim=width,
+                    output_dim=output_dim,
                     rank=rank,
                     dtype=dtype,
-                    beta=float(beta),
-                    target_id=self._split_target_id(target, suffix),
                 )
-                delta[:, output_slice] = split
+            else:
+                delta = torch.zeros((int(flat_x.shape[0]), output_dim), device=flat_x.device, dtype=dtype)
+                for suffix in target.fused_qkv_slices:
+                    beta = self._beta_for_split(target, suffix)
+                    if beta is None or float(beta) == 0.0:
+                        continue
+                    output_slice = self._qkv_slice_for(target, suffix, output_dim)
+                    width = int(output_slice.stop - output_slice.start)
+                    if self.field_policy == "fused-qkv-exact":
+                        field_target_id = target.target_id
+                        field_output_dim = output_dim
+                        field_slice = output_slice
+                    else:
+                        field_target_id = self._split_target_id(target, suffix)
+                        field_output_dim = None
+                        field_slice = None
+                    split = self._vllm_lora_kernel_delta_for_target(
+                        target,
+                        candidates,
+                        row_mapping,
+                        flat_x,
+                        output_dim=width,
+                        rank=rank,
+                        dtype=dtype,
+                        beta=float(beta),
+                        target_id=field_target_id,
+                        field_output_dim=field_output_dim,
+                        field_slice=field_slice,
+                    )
+                    delta[:, output_slice] = split
             return delta.reshape(y.shape).to(dtype=y.dtype)
 
         beta = self._beta_for_split(target)

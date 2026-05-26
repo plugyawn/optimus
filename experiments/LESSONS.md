@@ -14,3 +14,8 @@
   scale still has logprob gaps. That makes the next useful work semantic
   parity at the injection point plus the fused delta op, not more end-to-end
   generation-score probing.
+- The field-policy sweep rules out the easy qkv-packing explanation. Native
+  vLLM loads the expected q/v GQ tensors exactly, lazy layer deltas match native
+  adapter deltas at the injection site to bf16 tolerance, and K remains zero.
+  The remaining gap is accumulated kernel-order drift plus bridge overhead; the
+  next implementation should go to the fused lazy delta/random-field kernel.

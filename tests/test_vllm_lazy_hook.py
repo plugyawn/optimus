@@ -92,6 +92,20 @@ def _candidate(candidate_id: str, seed: int) -> SubspaceCandidate:
     )
 
 
+def test_vllm_lazy_hook_internal_policy_env_validation(monkeypatch):
+    monkeypatch.setenv("OPTIMUS_LAZY_FIELD_POLICY", "fused-qkv-exact")
+    monkeypatch.setenv("OPTIMUS_LAZY_QKV_KERNEL_POLICY", "packed-qkv")
+
+    runtime = LazyHookRuntime([])
+
+    assert runtime.field_policy == "fused-qkv-exact"
+    assert runtime.qkv_kernel_policy == "packed-qkv"
+
+    monkeypatch.setenv("OPTIMUS_LAZY_QKV_KERNEL_POLICY", "bad-policy")
+    with pytest.raises(ValueError, match="OPTIMUS_LAZY_QKV_KERNEL_POLICY"):
+        LazyHookRuntime([])
+
+
 def test_vllm_lazy_hook_row_candidate_batch_matches_serial_deltas():
     target = HookTarget(
         module_name="model.layers.0.self_attn.q_proj",
@@ -841,6 +855,66 @@ def test_vllm_lazy_replay_fused_qkv_matches_target_split_requested_slices():
         candidate=candidate,
         targets=["q_proj", "v_proj"],
         policy="target-split",
+        tensor_dtype="float32",
+        adapter_rank=2,
+        scale_multiplier=2.0,
+    )
+    q_a = tensors["base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight"]
+    q_b = tensors["base_model.model.model.layers.0.self_attn.q_proj.lora_B.weight"]
+    v_a = tensors["base_model.model.model.layers.0.self_attn.v_proj.lora_A.weight"]
+    v_b = tensors["base_model.model.model.layers.0.self_attn.v_proj.lora_B.weight"]
+    expected = torch.zeros_like(y)
+    expected[:, :4] = (x @ q_a.T) @ q_b.T
+    expected[:, 6:8] = (x @ v_a.T) @ v_b.T
+
+    assert torch.allclose(delta, expected)
+    assert torch.equal(delta[:, 4:6], torch.zeros_like(delta[:, 4:6]))
+
+
+def test_vllm_lazy_replay_fused_qkv_exact_field_policy_matches_adapter_slices():
+    basis = torch.eye(4)[:3].contiguous()
+    state_payload = {"basis_tensors": {"basis/layer_0.attn_in": basis}}
+    state_summary = {"activation_sites": [{"site_id": "layer_0.attn_in", "basis_tensor_key": "basis/layer_0.attn_in"}]}
+    source_summary = {
+        "resolved_target_scales": [
+            {
+                "target_id": "layer_0.self_attn.qkv_proj",
+                "beta_t_by_radius": {"0.4": 0.25},
+            }
+        ]
+    }
+    candidate = replace(_subspace_candidate_for_adapter(), basis_rank=3)
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.qkv_proj",
+        target_id="layer_0.self_attn.qkv_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="qkv_proj",
+        module=torch.nn.Linear(4, 8),
+        input_dim=4,
+        output_dim=8,
+        fused_qkv_slices=("q_proj", "v_proj"),
+        fused_q_out=4,
+        fused_kv_out=2,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.field_policy = "fused-qkv-exact"
+    runtime.basis_by_site[target.site_id] = basis[:2].contiguous()
+    runtime.beta_by_target.update(_load_betas(source_summary, radius=0.4, scale_multiplier=2.0))
+    runtime.set_candidate(candidate)
+    x = torch.tensor([[1.0, -2.0, 0.5, 3.0], [0.25, 1.5, -1.0, 2.0]])
+    y = torch.zeros((2, 8))
+
+    delta = runtime.delta(target, x, y)
+    tensors = subspace_lora_tensors(
+        config=_TinyQwenConfig(),
+        state_payload=state_payload,
+        state_summary=state_summary,
+        source_summary=source_summary,
+        candidate=candidate,
+        targets=["q_proj", "v_proj"],
+        policy="fused-qkv-exact",
         tensor_dtype="float32",
         adapter_rank=2,
         scale_multiplier=2.0,

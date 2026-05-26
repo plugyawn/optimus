@@ -13,6 +13,13 @@ Current saved state, 2026-05-26:
   exactly, but nonzero scale still fails top-logprob parity even though the
   first generated token matches. Treat the bridge as a measured baseline and
   semantic-debug harness, not as the final parity claim.
+- The follow-up L40S field-policy probe shows the easy qkv-packing explanation
+  is not enough: `fused-qkv-exact` improves top-logprob agreement but still
+  fails strict parity, while a direct layer probe verifies that native vLLM
+  loads the expected q/v subspace tensors exactly and lazy layer deltas match
+  native adapter deltas at the injection site to bf16 tolerance. Further work
+  should target the fused lazy delta/random-field kernel rather than additional
+  Python-hook variants.
 - The final production fused/custom-op kernel is not implemented yet. Do not
   claim production fused-kernel readiness until the strict signature parity
   probe, p128 speed gate, and fused/custom-op benchmark ladder in `KERNEL.md`

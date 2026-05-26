@@ -13,9 +13,13 @@ forward-hook backend with a `vllm-lora-kernel` lazy-delta path. That bridge is
 validated as a research/systems baseline and p128 speed target, not as the
 final production fused kernel. The strict signature probe passes exactly at
 zero scale and preserves one-step generated tokens at nonzero scale, but
-nonzero top-logprob parity is still open. Public claims still require closing
-that semantic gap and then landing the fused/custom-op follow-up described in
-`KERNEL.md`.
+nonzero top-logprob parity is still open. A follow-up field-policy probe shows
+that native vLLM loads the expected q/v subspace tensors exactly and lazy
+layer deltas match native adapter deltas at the qkv injection site to bf16
+tolerance, so the remaining gap is accumulated kernel-order drift plus bridge
+overhead rather than adapter-file generation or qkv packing. Public claims
+still require closing that semantic gap and then landing the fused/custom-op
+follow-up described in `KERNEL.md`.
 
 Existing LoRA adapter serving code is legacy baseline infrastructure and is not
 the subspace search hot path. The current bridge may reuse vLLM's LoRA Triton
