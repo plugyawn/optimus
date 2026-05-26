@@ -453,6 +453,51 @@ only from `15.924` to `16.034 cand/s`, because model rollout and scheduling now
 dominate. The production path still needs a vLLM custom-op/scheduling
 integration that reduces work around the kernel, not only a faster q/v add.
 
+Current A6000 direct `Qx + counter add` evidence:
+
+The guarded `triton_subspace_add_counter_qv_from_x_` prototype directly takes
+activation rows `x`, basis `Q`, candidate seeds, q/v target hashes, and the
+fused qkv output buffer. It computes local `Qx` inside the counter-add kernel
+and writes q/v while preserving the K slice. Runtime access is intentionally
+behind `OPTIMUS_LAZY_QKV_KERNEL_POLICY=packed-qkv-from-x`; it is not the
+default path.
+
+Remote validation:
+
+| check | result |
+| --- | --- |
+| CUDA focused suite | `42 passed` |
+| fp32 direct fused-from-`x` max diff | `3.8e-05` to `9.9e-05` |
+| bf16 direct fused-from-`x` max diff | `0.5` to `1.0`, consistent with low-precision accumulation/add-order differences |
+| fetched PNG headers | valid |
+
+Synthetic A6000 direct-fusion A/B:
+
+| dtype | rows | rank | q dim | kv dim | `Qx + packed q/v` ms | fused from `x` ms | speed vs packed |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fp32 | 64 | 64 | 1024 | 256 | `0.122` | `1.884` | `0.065x` |
+| fp32 | 256 | 64 | 1024 | 256 | `0.152` | `5.810` | `0.026x` |
+| fp32 | 256 | 128 | 4096 | 1024 | `1.004` | `41.398` | `0.024x` |
+| fp32 | 512 | 128 | 4096 | 1024 | `1.958` | `91.148` | `0.021x` |
+| bf16 | 64 | 64 | 1024 | 256 | `0.115` | `1.854` | `0.062x` |
+| bf16 | 256 | 64 | 1024 | 256 | `0.139` | `4.544` | `0.031x` |
+| bf16 | 256 | 128 | 4096 | 1024 | `0.990` | `32.478` | `0.030x` |
+| bf16 | 512 | 128 | 4096 | 1024 | `1.919` | `62.311` | `0.031x` |
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/a6000_qxcounter/fp32/kernel_ablation_qv_fused_from_x.png`
+- `results/remote_lazy_kernel_validation/a6000_qxcounter/bf16/kernel_ablation_qv_fused_from_x.png`
+- `results/remote_lazy_kernel_validation/a6000_qxcounter/fp32/kernel_ablation_summary.json`
+- `results/remote_lazy_kernel_validation/a6000_qxcounter/bf16/kernel_ablation_summary.json`
+
+This rules out the naive output-tiled single-kernel implementation. It
+recomputes `Qx` for every output tile, which overwhelms the benefit of avoiding
+the intermediate `z` tensor. A viable production `Qx + counter add` path needs
+one `Qx` computation per activation-site row block followed by scheduled
+counter add, likely as a vLLM custom-op/two-stage shrink-expand pipeline with
+explicit row-candidate routing.
+
 ## Benchmark Ladder
 
 All benchmark rows must record hardware, vLLM version, FlashInfer version,

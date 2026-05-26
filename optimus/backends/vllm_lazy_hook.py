@@ -89,7 +89,7 @@ class LazyHookRuntime:
         if self.field_policy not in {"target-split", "fused-qkv-exact"}:
             raise ValueError(f"unknown OPTIMUS_LAZY_FIELD_POLICY={self.field_policy!r}")
         self.qkv_kernel_policy = os.environ.get("OPTIMUS_LAZY_QKV_KERNEL_POLICY", "split-launches").strip().lower() or "split-launches"
-        if self.qkv_kernel_policy not in {"split-launches", "packed-qkv"}:
+        if self.qkv_kernel_policy not in {"split-launches", "packed-qkv", "packed-qkv-from-x"}:
             raise ValueError(f"unknown OPTIMUS_LAZY_QKV_KERNEL_POLICY={self.qkv_kernel_policy!r}")
         self.collecting = False
         self.active_candidate: SubspaceCandidate | None = None
@@ -999,6 +999,122 @@ class LazyHookRuntime:
         )
         self.kernel_time_s += time.perf_counter() - kernel_started
 
+    def _triton_counter_add_qv_from_x_for_target(
+        self,
+        target: HookTarget,
+        candidates: list[SubspaceCandidate],
+        row_mapping: torch.Tensor,
+        flat_x: torch.Tensor,
+        basis: torch.Tensor,
+        output: torch.Tensor,
+        *,
+        q_dim: int,
+        kv_dim: int,
+        q_beta: float,
+        v_beta: float,
+        q_target_id: str,
+        v_target_id: str,
+        q_field_output_offset: int = 0,
+        v_field_output_offset: int = 0,
+    ) -> None:
+        from optimus.kernels import triton_subspace_add_counter_qv_from_x_
+
+        stack_started = time.perf_counter()
+        seeds, signs = self._counter_candidate_tensors(candidates, device=flat_x.device)
+        row_mapping_device = row_mapping.to(device=flat_x.device, dtype=torch.int32, non_blocking=True).contiguous()
+        self.stack_time_s += time.perf_counter() - stack_started
+        kernel_started = time.perf_counter()
+        triton_subspace_add_counter_qv_from_x_(
+            flat_x,
+            basis,
+            seeds,
+            signs,
+            row_mapping_device,
+            output,
+            q_target_hash=stable_u32(q_target_id),
+            v_target_hash=stable_u32(v_target_id),
+            q_beta=float(q_beta),
+            v_beta=float(v_beta),
+            q_dim=int(q_dim),
+            kv_dim=int(kv_dim),
+            q_field_output_offset=int(q_field_output_offset),
+            v_field_output_offset=int(v_field_output_offset),
+        )
+        self.kernel_time_s += time.perf_counter() - kernel_started
+
+    def _delta_triton_counter_inplace_qv_from_x(
+        self,
+        target: HookTarget,
+        flat_x: torch.Tensor,
+        basis: torch.Tensor,
+        y: torch.Tensor,
+        *,
+        candidate: SubspaceCandidate | None,
+        row_candidates: list[SubspaceCandidate],
+        row_candidate_indices: torch.Tensor | None,
+        output_dim: int,
+    ) -> tuple[torch.Tensor, bool] | None:
+        if not y.is_cuda or not y.is_contiguous():
+            return None
+        if target.suffix != "qkv_proj" or set(target.fused_qkv_slices) != {"q_proj", "v_proj"}:
+            return None
+        q_beta = self._beta_for_split(target, "q_proj")
+        v_beta = self._beta_for_split(target, "v_proj")
+        if q_beta is None or v_beta is None or float(q_beta) == 0.0 or float(v_beta) == 0.0:
+            return None
+        if target.fused_q_out is None or target.fused_kv_out is None:
+            raise RuntimeError(f"{target.module_name} requires fused qkv dimensions for packed q/v lazy replay")
+        q_dim = int(target.fused_q_out)
+        kv_dim = int(target.fused_kv_out)
+        if output_dim != q_dim + 2 * kv_dim:
+            raise RuntimeError(f"{target.module_name} output dim {output_dim} != expected fused qkv dim {q_dim + 2 * kv_dim}")
+
+        if candidate is not None:
+            candidates = [candidate]
+            row_mapping = torch.zeros((int(flat_x.shape[0]),), dtype=torch.int32)
+        else:
+            if row_candidate_indices is None or not row_candidates:
+                raise RuntimeError("missing row-candidate routing for triton-counter-inplace lazy delta backend")
+            candidates = row_candidates
+            row_mapping = row_candidate_indices.to(dtype=torch.int32)
+            if row_mapping.numel():
+                min_index = int(row_mapping.min().item())
+                max_index = int(row_mapping.max().item())
+                if min_index < 0 or max_index >= len(candidates):
+                    raise RuntimeError(
+                        "Triton-counter-inplace lazy hook row-candidate mapping is out of bounds: "
+                        f"min={min_index} max={max_index} candidates={len(candidates)}"
+                    )
+
+        if self.field_policy == "fused-qkv-exact":
+            q_target_id = target.target_id
+            v_target_id = target.target_id
+            q_field_output_offset = 0
+            v_field_output_offset = q_dim + kv_dim
+        else:
+            q_target_id = self._split_target_id(target, "q_proj")
+            v_target_id = self._split_target_id(target, "v_proj")
+            q_field_output_offset = 0
+            v_field_output_offset = 0
+        flat_y = y.reshape(-1, y.shape[-1])
+        self._triton_counter_add_qv_from_x_for_target(
+            target,
+            candidates,
+            row_mapping,
+            flat_x,
+            basis,
+            flat_y,
+            q_dim=q_dim,
+            kv_dim=kv_dim,
+            q_beta=float(q_beta),
+            v_beta=float(v_beta),
+            q_target_id=q_target_id,
+            v_target_id=v_target_id,
+            q_field_output_offset=q_field_output_offset,
+            v_field_output_offset=v_field_output_offset,
+        )
+        return y, True
+
     def _delta_triton_counter(
         self,
         target: HookTarget,
@@ -1345,6 +1461,31 @@ class LazyHookRuntime:
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return torch.zeros_like(y)
+        if self.delta_backend == "triton-counter-inplace" and self.qkv_kernel_policy == "packed-qkv-from-x":
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
+            delta_start = time.perf_counter()
+            fused = self._delta_triton_counter_inplace_qv_from_x(
+                target,
+                flat_x,
+                basis,
+                y,
+                candidate=candidate,
+                row_candidates=row_candidates,
+                row_candidate_indices=row_candidate_indices,
+                output_dim=output_dim,
+            )
+            if fused is not None:
+                delta, is_output = fused
+                if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                    torch.cuda.synchronize(flat_x.device)
+                self._last_delta_is_output = is_output
+                self.delta_time_s += time.perf_counter() - delta_start
+                self.delta_rows += int(flat_x.shape[0])
+                self.delta_calls += 1
+                return delta
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
         if self.delta_backend in {"vllm-lora", "vllm-lora-kernel"}:
             if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
                 torch.cuda.synchronize(flat_x.device)

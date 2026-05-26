@@ -99,3 +99,11 @@
   time from `10.39s` to `5.47s`. Past this point the next material lever is
   not another q/v add microkernel; it is reducing model-rollout, hook, and
   scheduling overhead around the kernel.
+- The literal output-tiled `Qx + counter add` single-kernel path is a dead end
+  for Qwen-shaped dimensions. On A6000, the guarded fused-from-`x` prototype is
+  correct (`42` CUDA tests passed; fp32 max diff below `1e-4`) but only
+  `0.021-0.065x` as fast as `torch Qx + packed q/v add` in fp32 and
+  `0.030-0.062x` in bf16. The reason is structural: it recomputes `Qx` for
+  each output tile. A viable production path must compute one `Qx` per
+  activation-site row block, then schedule counter add without materialized
+  adapters or Python per-target overhead.

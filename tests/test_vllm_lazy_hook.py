@@ -9,6 +9,7 @@ from optimus.backends.vllm_lazy_hook import _ensemble_input_rows
 from scripts import eval_vllm_lazy_k1 as lazy_k1
 from optimus.backends.vllm_lora_hook import FusedQKVSpec, LazyLoraHookRuntime
 from optimus.core.perturbations import PerturbationSpec
+from optimus.kernels import triton_subspace_add_counter_, triton_subspace_add_counter_qv_from_x_
 from optimus.modeling.subspace_lora import subspace_lora_tensors
 from optimus.modeling.noise import lora_noise_tensors
 from optimus.search.ensemble import majority_vote_evaluation
@@ -755,6 +756,65 @@ def test_vllm_lazy_hook_triton_counter_inplace_packed_qv_matches_split_qv_offset
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+def test_vllm_lazy_hook_triton_counter_inplace_packed_qv_from_x_matches_split_qv_offsets():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.qkv_proj",
+        target_id="layer_0.self_attn.qkv_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="qkv_proj",
+        module=torch.nn.Linear(12, 20),
+        input_dim=12,
+        output_dim=20,
+        fused_qkv_slices=("q_proj", "v_proj"),
+        fused_q_out=8,
+        fused_kv_out=6,
+    )
+    torch.manual_seed(8)
+    basis = torch.randn((4, 12), dtype=torch.float32)
+    x = torch.randn((7, 12), device="cuda", dtype=torch.float32)
+    base = torch.randn((7, 20), device="cuda", dtype=torch.float32)
+    cand_a = replace(_candidate("a", 71), rng_version="counter_gaussian_v1", basis_rank=4, sign="+")
+    cand_b = replace(_candidate("b", 73), rng_version="counter_gaussian_v1", basis_rank=4, sign="-")
+    beta_by_target = {
+        "layer_0.self_attn.q_proj": 0.05,
+        "layer_0.self_attn.v_proj": 0.09,
+    }
+
+    split_runtime = LazyHookRuntime([target])
+    split_runtime.delta_backend = "triton-counter-inplace"
+    split_runtime.field_policy = "target-split"
+    split_runtime.qkv_kernel_policy = "split-launches"
+    split_runtime.compute_dtype_policy = "float32"
+    split_runtime.basis_by_site[target.site_id] = basis
+    split_runtime.beta_by_target.update(beta_by_target)
+    split_runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=1)
+    split_runtime.update_row_candidates(["0", "1"], [0, 3, 7])
+
+    fused_runtime = LazyHookRuntime([target])
+    fused_runtime.delta_backend = "triton-counter-inplace"
+    fused_runtime.field_policy = "target-split"
+    fused_runtime.qkv_kernel_policy = "packed-qkv-from-x"
+    fused_runtime.compute_dtype_policy = "float32"
+    fused_runtime.basis_by_site[target.site_id] = basis
+    fused_runtime.beta_by_target.update(beta_by_target)
+    fused_runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=1)
+    fused_runtime.update_row_candidates(["0", "1"], [0, 3, 7])
+
+    split_base = base.clone()
+    fused_base = base.clone()
+    expected = split_runtime.delta(target, x, split_base)
+    actual = fused_runtime.delta(target, x, fused_base)
+
+    assert split_runtime._last_delta_is_output
+    assert fused_runtime._last_delta_is_output
+    assert fused_runtime.qx_time_s == 0.0
+    assert torch.allclose(actual, expected, atol=1e-4, rtol=1e-4)
+    assert torch.equal(actual[:, 8:14], base[:, 8:14])
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
 def test_vllm_lazy_hook_triton_counter_packed_qv_matches_fused_qkv_exact_offsets():
     target = HookTarget(
         module_name="model.layers.0.self_attn.qkv_proj",
@@ -802,6 +862,68 @@ def test_vllm_lazy_hook_triton_counter_packed_qv_matches_fused_qkv_exact_offsets
 
     assert torch.allclose(actual, expected, atol=1e-5, rtol=1e-5)
     assert torch.count_nonzero(actual[:, 8:14]) == 0
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+def test_triton_counter_qv_from_x_matches_qx_then_split_qv_add():
+    torch.manual_seed(7)
+    x = torch.randn((6, 12), device="cuda", dtype=torch.float32)
+    basis = torch.randn((4, 12), device="cuda", dtype=torch.float32)
+    base = torch.randn((6, 20), device="cuda", dtype=torch.float32)
+    seeds = torch.tensor([61, 67], device="cuda", dtype=torch.int64)
+    signs = torch.tensor([1, -1], device="cuda", dtype=torch.int32)
+    mapping = torch.tensor([0, 0, 1, 1, 0, 1], device="cuda", dtype=torch.int32)
+    q_dim = 8
+    kv_dim = 6
+    q_target_hash = 0x1234ABCD
+    v_target_hash = 0x9876DCBA
+
+    z = x @ basis.T
+    expected = base.clone()
+    triton_subspace_add_counter_(
+        z,
+        seeds,
+        signs,
+        mapping,
+        expected,
+        target_hash=q_target_hash,
+        beta=0.05,
+        output_dim=q_dim,
+        output_offset=0,
+    )
+    triton_subspace_add_counter_(
+        z,
+        seeds,
+        signs,
+        mapping,
+        expected,
+        target_hash=v_target_hash,
+        beta=0.09,
+        output_dim=kv_dim,
+        output_offset=q_dim + kv_dim,
+    )
+
+    actual = base.clone()
+    triton_subspace_add_counter_qv_from_x_(
+        x,
+        basis,
+        seeds,
+        signs,
+        mapping,
+        actual,
+        q_target_hash=q_target_hash,
+        v_target_hash=v_target_hash,
+        q_beta=0.05,
+        v_beta=0.09,
+        q_dim=q_dim,
+        kv_dim=kv_dim,
+        block_n=4,
+        block_m=8,
+        block_d=8,
+    )
+
+    assert torch.allclose(actual, expected, atol=1e-4, rtol=1e-4)
+    assert torch.equal(actual[:, q_dim : q_dim + kv_dim], base[:, q_dim : q_dim + kv_dim])
 
 
 class _FakeLazyRuntime:

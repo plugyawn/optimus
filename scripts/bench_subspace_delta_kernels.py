@@ -15,6 +15,7 @@ import torch
 from optimus.kernels import (
     triton_subspace_add_counter_,
     triton_subspace_add_counter_qv_,
+    triton_subspace_add_counter_qv_from_x_,
     triton_subspace_expand,
     triton_subspace_expand_counter,
 )
@@ -88,8 +89,14 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         "qv_kv_dim",
         "qv_split_inplace_ms",
         "qv_packed_inplace_ms",
+        "qv_split_total_ms",
+        "qv_packed_total_ms",
+        "qv_fused_from_x_ms",
         "qv_packed_speedup",
+        "qv_fused_from_x_speedup_vs_split_total",
+        "qv_fused_from_x_speedup_vs_packed_total",
         "qv_max_diff",
+        "qv_fused_from_x_max_diff",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
@@ -187,6 +194,38 @@ def _plot_qv_speedup(path: Path, rows: list[dict[str, object]]) -> None:
     plt.close(fig)
 
 
+def _plot_qv_fused_from_x(path: Path, rows: list[dict[str, object]]) -> None:
+    os.environ.setdefault("MPLCONFIGDIR", "/tmp/optimus-matplotlib")
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    labels = [str(row["shape"]) for row in rows]
+    split_total = [float(row["qv_split_total_ms"]) for row in rows]
+    packed_total = [float(row["qv_packed_total_ms"]) for row in rows]
+    fused = [float(row["qv_fused_from_x_ms"]) for row in rows]
+    speedup = [float(row["qv_fused_from_x_speedup_vs_packed_total"]) for row in rows]
+    x = list(range(len(rows)))
+    fig, axes = plt.subplots(2, 1, figsize=(max(8.0, 1.8 * len(rows)), 7.0), sharex=True)
+    axes[0].bar([idx - 0.24 for idx in x], split_total, width=0.24, label="Qx + split q/v", color="#2563eb")
+    axes[0].bar(x, packed_total, width=0.24, label="Qx + packed q/v", color="#047857")
+    axes[0].bar([idx + 0.24 for idx in x], fused, width=0.24, label="fused from x", color="#d97706")
+    axes[0].set_ylabel("milliseconds / call")
+    axes[0].set_title("Fused Qx + q/v Counter Add Prototype")
+    axes[0].grid(axis="y", alpha=0.25)
+    axes[0].legend(fontsize=8)
+    axes[1].bar(x, speedup, width=0.48, color="#7c3aed")
+    axes[1].axhline(1.0, color="#4b5563", linewidth=1.0, linestyle="--")
+    axes[1].set_ylabel("speedup vs Qx+packed")
+    axes[1].set_xticks(x, labels)
+    axes[1].tick_params(axis="x", rotation=20)
+    axes[1].grid(axis="y", alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
 def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters: int, warmup: int) -> dict[str, object]:
     x = torch.randn((shape.rows, input_dim), device="cuda", dtype=dtype)
     basis = torch.randn((shape.rank, input_dim), device="cuda", dtype=dtype)
@@ -274,6 +313,24 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
     torch.cuda.synchronize()
     qv_max_diff = float((qv_expected - qv_actual).to(dtype=torch.float32).abs().max().item())
 
+    qv_fused_from_x_actual = qv_base.clone()
+    triton_subspace_add_counter_qv_from_x_(
+        x,
+        basis,
+        seeds,
+        signs,
+        mapping,
+        qv_fused_from_x_actual,
+        q_target_hash=target_hash,
+        v_target_hash=v_target_hash,
+        q_beta=beta,
+        v_beta=v_beta,
+        q_dim=qv_q_dim,
+        kv_dim=qv_kv_dim,
+    )
+    torch.cuda.synchronize()
+    qv_fused_from_x_max_diff = float((qv_expected - qv_fused_from_x_actual).to(dtype=torch.float32).abs().max().item())
+
     for _ in range(warmup):
         z = x @ basis.T
         _ = triton_subspace_expand(z, materialized_b, mapping)
@@ -281,6 +338,7 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
         _ = base + triton_subspace_expand_counter(z, seeds, signs, mapping, target_hash=target_hash, beta=beta, output_dim=shape.output_dim)
         triton_subspace_add_counter_(z, seeds, signs, mapping, actual, target_hash=target_hash, beta=beta, output_dim=shape.output_dim)
         triton_subspace_add_counter_qv_(z, seeds, signs, mapping, qv_actual, q_target_hash=target_hash, v_target_hash=v_target_hash, q_beta=beta, v_beta=v_beta, q_dim=qv_q_dim, kv_dim=qv_kv_dim)
+        triton_subspace_add_counter_qv_from_x_(x, basis, seeds, signs, mapping, qv_fused_from_x_actual, q_target_hash=target_hash, v_target_hash=v_target_hash, q_beta=beta, v_beta=v_beta, q_dim=qv_q_dim, kv_dim=qv_kv_dim)
 
     holder: dict[str, torch.Tensor] = {"z": z}
 
@@ -390,6 +448,66 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
             kv_dim=qv_kv_dim,
         )
 
+    def qv_split_total() -> None:
+        local_z = x @ basis.T
+        local_base = qv_base.clone()
+        triton_subspace_add_counter_(
+            local_z,
+            seeds,
+            signs,
+            mapping,
+            local_base,
+            target_hash=target_hash,
+            beta=beta,
+            output_dim=qv_q_dim,
+            output_offset=0,
+        )
+        triton_subspace_add_counter_(
+            local_z,
+            seeds,
+            signs,
+            mapping,
+            local_base,
+            target_hash=v_target_hash,
+            beta=v_beta,
+            output_dim=qv_kv_dim,
+            output_offset=qv_q_dim + qv_kv_dim,
+        )
+
+    def qv_packed_total() -> None:
+        local_z = x @ basis.T
+        local_base = qv_base.clone()
+        triton_subspace_add_counter_qv_(
+            local_z,
+            seeds,
+            signs,
+            mapping,
+            local_base,
+            q_target_hash=target_hash,
+            v_target_hash=v_target_hash,
+            q_beta=beta,
+            v_beta=v_beta,
+            q_dim=qv_q_dim,
+            kv_dim=qv_kv_dim,
+        )
+
+    def qv_fused_from_x() -> None:
+        local_base = qv_base.clone()
+        triton_subspace_add_counter_qv_from_x_(
+            x,
+            basis,
+            seeds,
+            signs,
+            mapping,
+            local_base,
+            q_target_hash=target_hash,
+            v_target_hash=v_target_hash,
+            q_beta=beta,
+            v_beta=v_beta,
+            q_dim=qv_q_dim,
+            kv_dim=qv_kv_dim,
+        )
+
     qx_ms = _time_cuda(qx, iters=iters)
     materialized_expand_ms = _time_cuda(materialized_expand, iters=iters)
     counter_expand_ms = _time_cuda(counter_expand, iters=iters)
@@ -399,6 +517,9 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
     total_counter_inplace_ms = _time_cuda(total_counter_inplace, iters=iters)
     qv_split_inplace_ms = _time_cuda(qv_split_inplace, iters=iters)
     qv_packed_inplace_ms = _time_cuda(qv_packed_inplace, iters=iters)
+    qv_split_total_ms = _time_cuda(qv_split_total, iters=iters)
+    qv_packed_total_ms = _time_cuda(qv_packed_total, iters=iters)
+    qv_fused_from_x_ms = _time_cuda(qv_fused_from_x, iters=iters)
 
     return {
         "shape": shape.label,
@@ -425,8 +546,14 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
         "qv_kv_dim": qv_kv_dim,
         "qv_split_inplace_ms": qv_split_inplace_ms,
         "qv_packed_inplace_ms": qv_packed_inplace_ms,
+        "qv_split_total_ms": qv_split_total_ms,
+        "qv_packed_total_ms": qv_packed_total_ms,
+        "qv_fused_from_x_ms": qv_fused_from_x_ms,
         "qv_packed_speedup": qv_split_inplace_ms / qv_packed_inplace_ms,
+        "qv_fused_from_x_speedup_vs_split_total": qv_split_total_ms / qv_fused_from_x_ms,
+        "qv_fused_from_x_speedup_vs_packed_total": qv_packed_total_ms / qv_fused_from_x_ms,
         "qv_max_diff": qv_max_diff,
+        "qv_fused_from_x_max_diff": qv_fused_from_x_max_diff,
     }
 
 
@@ -472,6 +599,7 @@ def main() -> int:
     _plot(args.out / "kernel_ablation_latency.png", rows)
     _plot_speedup(args.out / "kernel_ablation_speedup.png", rows)
     _plot_qv_speedup(args.out / "kernel_ablation_qv_speedup.png", rows)
+    _plot_qv_fused_from_x(args.out / "kernel_ablation_qv_fused_from_x.png", rows)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
