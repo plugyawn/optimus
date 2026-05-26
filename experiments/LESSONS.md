@@ -55,3 +55,11 @@
   shapes (`0.98-1.01x` at rank=128/out=4096). The production lever is not
   further Python hook polish or only replacing `main + delta`; it is fusing or
   scheduling `Qx`, counter expansion, and output addition inside vLLM routing.
+- The reproducible A6000 ablation confirms the same Amdahl shape in both fp32
+  and bf16. Total `Qx + in-place add` speedup is `1.02-1.03x` at
+  rank=128/output=4096, while bf16 numerical differences are just add-order
+  rounding (`max=0.5`, mean about `0.025`). Naive single-kernel fusion that
+  recomputes `Qx` per output tile is therefore unlikely to be the right next
+  step; the useful production path is vLLM scheduling/custom-op integration
+  that computes one `Qx` per activation site and applies counter expand/add
+  without Python per-target overhead.

@@ -302,6 +302,30 @@ at realistic larger rank/output shapes it is neutral on the isolated kernel.
 The production path must fuse or schedule the shrink `Qx`, counter expansion,
 and output addition under vLLM routing, not merely remove `main + delta`.
 
+Current reproducible A6000 kernel-ablation evidence:
+
+| dtype | rows | rank | output dim | total out-of-place ms | total in-place ms | total speedup | max diff | mean diff |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fp32 | 64 | 64 | 1024 | `0.1038` | `0.0842` | `1.232x` | `0.0` | `0.0` |
+| fp32 | 256 | 64 | 1024 | `0.1348` | `0.1312` | `1.028x` | `0.0` | `0.0` |
+| fp32 | 256 | 128 | 4096 | `0.7965` | `0.7806` | `1.020x` | `0.0` | `0.0` |
+| fp32 | 512 | 128 | 4096 | `1.5723` | `1.5343` | `1.025x` | `0.0` | `0.0` |
+| bf16 | 64 | 64 | 1024 | `0.1053` | `0.0755` | `1.395x` | `0.5` | `0.0180` |
+| bf16 | 256 | 64 | 1024 | `0.1201` | `0.1178` | `1.020x` | `0.5` | `0.0179` |
+| bf16 | 256 | 128 | 4096 | `0.7912` | `0.7796` | `1.015x` | `0.5` | `0.0255` |
+| bf16 | 512 | 128 | 4096 | `1.5533` | `1.5240` | `1.019x` | `0.5` | `0.0253` |
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/a6000_kernel_ablation/fp32/kernel_ablation_latency.png`
+- `results/remote_lazy_kernel_validation/a6000_kernel_ablation/fp32/kernel_ablation_speedup.png`
+- `results/remote_lazy_kernel_validation/a6000_kernel_ablation/bf16/kernel_ablation_latency.png`
+- `results/remote_lazy_kernel_validation/a6000_kernel_ablation/bf16/kernel_ablation_speedup.png`
+
+The fp32 path is exact. The bf16 max diff is add-order rounding between
+PyTorch out-of-place add and Triton in-place add; mean absolute diff stays
+around `0.018-0.026`.
+
 The updated Amdahl read is that eliminating the final add/allocation helps,
 but the remaining p1024 lazy path still spends `10.56s` in lazy-delta work
 inside `90.57s` scoring. The next production lever remains deeper vLLM
