@@ -6,12 +6,13 @@ import json
 import os
 import sys
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import torch
+from transformers import AutoConfig
 
 from optimus.backends.vllm_lazy_hook import (
     LazyHookRuntime,
@@ -134,6 +135,15 @@ def _default_targets(source_summary: dict[str, Any]) -> list[str]:
     return ["q_proj", "v_proj"]
 
 
+def _qkv_dims_from_config(model: str, *, local_files_only: bool = False) -> tuple[int, int]:
+    config = AutoConfig.from_pretrained(model, trust_remote_code=True, local_files_only=local_files_only)
+    hidden = int(config.hidden_size)
+    heads = int(config.num_attention_heads)
+    kv_heads = int(getattr(config, "num_key_value_heads", heads))
+    head_dim = int(getattr(config, "head_dim", hidden // heads))
+    return heads * head_dim, kv_heads * head_dim
+
+
 def _parse_targets(text: str | None, source_summary: dict[str, Any]) -> list[str]:
     raw = text or ",".join(_default_targets(source_summary))
     targets = [item.strip() for item in raw.split(",") if item.strip()]
@@ -142,9 +152,26 @@ def _parse_targets(text: str | None, source_summary: dict[str, Any]) -> list[str
     return targets
 
 
-def _filter_targets(targets: list[Any], suffixes: list[str]) -> list[Any]:
+def _filter_targets(targets: list[Any], suffixes: list[str], *, qkv_dims: tuple[int, int] | None = None) -> list[Any]:
     wanted = set(suffixes)
     filtered = [target for target in targets if target.suffix in wanted]
+    wanted_qkv_slices = tuple(suffix for suffix in ("q_proj", "k_proj", "v_proj") if suffix in wanted)
+    if wanted_qkv_slices:
+        direct_attn_layers = {target.layer_index for target in filtered if target.suffix in {"q_proj", "k_proj", "v_proj"}}
+        q_out, kv_out = qkv_dims or (None, None)
+        for target in targets:
+            if target.suffix != "qkv_proj" or target.layer_index in direct_attn_layers:
+                continue
+            if q_out is None or kv_out is None:
+                raise ValueError("fused qkv target filtering requires q/k/v dimensions")
+            filtered.append(
+                replace(
+                    target,
+                    fused_qkv_slices=wanted_qkv_slices,
+                    fused_q_out=int(q_out),
+                    fused_kv_out=int(kv_out),
+                )
+            )
     if not filtered:
         available = sorted({target.suffix for target in targets})
         raise ValueError(f"no vLLM lazy hook targets matched {sorted(wanted)}; available suffixes: {available}")
@@ -390,7 +417,12 @@ def main() -> int:
     llm_kwargs.setdefault("gpu_memory_utilization", args.gpu_memory_utilization)
     llm = LLM(model=model_id, dtype=dtype, **llm_kwargs)
     _, model = find_vllm_model(llm)
-    targets = _filter_targets(discover_targets(model, preset=source_summary.get("target_preset") or "qv", layers=None), target_suffixes)
+    qkv_dims = _qkv_dims_from_config(model_id, local_files_only=bool(args.local_files_only))
+    targets = _filter_targets(
+        discover_targets(model, preset=source_summary.get("target_preset") or "qv", layers=None),
+        target_suffixes,
+        qkv_dims=qkv_dims,
+    )
     runtime = LazyHookRuntime(targets)
     runtime.basis_by_site.update(_load_basis(source, effective_rank=effective_rank))
     runtime.beta_by_target.update(_load_betas(source_summary, radius=radius, scale_multiplier=float(args.scale_multiplier)))

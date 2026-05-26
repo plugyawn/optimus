@@ -62,6 +62,9 @@ class HookTarget:
     output_dim: int | None = None
     output_power_sum: float = 0.0
     output_power_count: int = 0
+    fused_qkv_slices: tuple[str, ...] = ()
+    fused_q_out: int | None = None
+    fused_kv_out: int | None = None
 
 
 class LazyHookRuntime:
@@ -75,6 +78,7 @@ class LazyHookRuntime:
         self.active_candidates: list[SubspaceCandidate] = []
         self.request_candidate_by_id: dict[str, SubspaceCandidate] = {}
         self._candidate_index_by_id: dict[str, int] = {}
+        self._order_prompt_count = 0
         self._row_candidate_indices_cpu: torch.Tensor | None = None
         self._row_candidate_spans: list[tuple[int, int, int]] = []
         self._row_candidate_indices_len = 0
@@ -86,6 +90,7 @@ class LazyHookRuntime:
         self.delta_rows = 0
         self.delta_calls = 0
         self._field_cache: dict[tuple[str, str, str, torch.dtype, int, int, int], torch.Tensor] = {}
+        self._scaled_field_cache: dict[tuple[str, str, str, torch.dtype, int, int, int, float], torch.Tensor] = {}
         self._basis_cache: dict[tuple[str, str, torch.dtype], torch.Tensor] = {}
 
     def reset_timing(self) -> None:
@@ -99,10 +104,12 @@ class LazyHookRuntime:
         self.active_candidates = []
         self.request_candidate_by_id = {}
         self._candidate_index_by_id = {}
+        self._order_prompt_count = 0
         self._row_candidate_indices_cpu = None
         self._row_candidate_spans = []
         self._row_candidate_indices_len = 0
         self._field_cache.clear()
+        self._scaled_field_cache.clear()
 
     def set_candidate_batch(self, request_candidate_by_id: dict[str, SubspaceCandidate]) -> None:
         self.active_candidate = None
@@ -116,13 +123,27 @@ class LazyHookRuntime:
             candidates.append(candidate)
         self.active_candidates = candidates
         self._candidate_index_by_id = {candidate.candidate_id: idx for idx, candidate in enumerate(candidates)}
+        self._order_prompt_count = 0
         self._row_candidate_indices_cpu = None
         self._row_candidate_spans = []
         self._row_candidate_indices_len = 0
         self._field_cache.clear()
+        self._scaled_field_cache.clear()
+
+    def set_candidate_batch_by_order(self, candidates: list[SubspaceCandidate], *, prompt_count: int) -> None:
+        self.active_candidate = None
+        self.request_candidate_by_id = {}
+        self.active_candidates = list(candidates)
+        self._candidate_index_by_id = {candidate.candidate_id: idx for idx, candidate in enumerate(candidates)}
+        self._order_prompt_count = max(1, int(prompt_count))
+        self._row_candidate_indices_cpu = None
+        self._row_candidate_spans = []
+        self._row_candidate_indices_len = 0
+        self._field_cache.clear()
+        self._scaled_field_cache.clear()
 
     def update_row_candidates(self, req_ids: list[str], query_start_loc: Any) -> None:
-        if not self.request_candidate_by_id:
+        if not self.request_candidate_by_id and not (self.active_candidates and self._order_prompt_count > 0):
             self._row_candidate_indices_cpu = None
             self._row_candidate_spans = []
             self._row_candidate_indices_len = 0
@@ -141,8 +162,11 @@ class LazyHookRuntime:
             count = max(0, end - start)
             if count == 0:
                 continue
-            candidate = self.request_candidate_by_id.get(str(req_id))
-            candidate_index = -1 if candidate is None else self._candidate_index_by_id[candidate.candidate_id]
+            if self.request_candidate_by_id:
+                candidate = self.request_candidate_by_id.get(str(req_id))
+                candidate_index = -1 if candidate is None else self._candidate_index_by_id[candidate.candidate_id]
+            else:
+                candidate_index = min(req_index // self._order_prompt_count, len(self.active_candidates) - 1)
             pieces.append(torch.full((count,), candidate_index, dtype=torch.int16))
             if candidate_index >= 0:
                 spans.append((candidate_index, start, end))
@@ -202,20 +226,18 @@ class LazyHookRuntime:
         rank: int,
         device: torch.device,
         dtype: torch.dtype,
+        target_id: str | None = None,
     ) -> torch.Tensor:
         source_rank = max(int(rank), int(candidate.basis_rank))
-        key = (target.target_id, candidate.candidate_id, str(device), dtype, output_dim, source_rank, rank)
+        field_target_id = target.target_id if target_id is None else target_id
+        key = (field_target_id, candidate.candidate_id, str(device), dtype, output_dim, source_rank, rank)
         cached = self._field_cache.get(key)
         if cached is not None:
             return cached
-        seed_payload = f"{candidate.direction_seed}\0{target.target_id}\0torch_generator_field_v1".encode("utf-8")
+        seed_payload = f"{candidate.direction_seed}\0{field_target_id}\0torch_generator_field_v1".encode("utf-8")
         seed = int(hashlib.sha256(seed_payload).hexdigest()[:16], 16) % (2**63 - 1)
-        try:
-            gen = torch.Generator(device=device).manual_seed(seed)
-            field = torch.randn((output_dim, source_rank), generator=gen, device=device, dtype=torch.float32)
-        except Exception:
-            gen = torch.Generator(device="cpu").manual_seed(seed)
-            field = torch.randn((output_dim, source_rank), generator=gen, dtype=torch.float32).to(device)
+        gen = torch.Generator(device="cpu").manual_seed(seed)
+        field = torch.randn((output_dim, source_rank), generator=gen, dtype=torch.float32).to(device)
         if candidate.sign == "-":
             field = -field
         field = field[:, : int(rank)].contiguous()
@@ -223,6 +245,111 @@ class LazyHookRuntime:
             field = field.to(dtype=dtype)
         self._field_cache[key] = field
         return field
+
+    def scaled_field(
+        self,
+        target: HookTarget,
+        candidate: SubspaceCandidate,
+        *,
+        output_dim: int,
+        rank: int,
+        device: torch.device,
+        dtype: torch.dtype,
+        beta: float,
+        target_id: str | None = None,
+    ) -> torch.Tensor:
+        source_rank = max(int(rank), int(candidate.basis_rank))
+        field_target_id = target.target_id if target_id is None else target_id
+        key = (field_target_id, candidate.candidate_id, str(device), dtype, output_dim, source_rank, rank, float(beta))
+        cached = self._scaled_field_cache.get(key)
+        if cached is not None:
+            return cached
+        field = self.field(
+            target,
+            candidate,
+            output_dim=output_dim,
+            rank=rank,
+            device=device,
+            dtype=torch.float32,
+            target_id=field_target_id,
+        )
+        scaled = (float(beta) * field).to(dtype=dtype).contiguous()
+        self._scaled_field_cache[key] = scaled
+        return scaled
+
+    def _qkv_slice_for(self, target: HookTarget, suffix: str, output_dim: int) -> slice:
+        if target.fused_q_out is None or target.fused_kv_out is None:
+            raise RuntimeError(f"{target.module_name} requires fused qkv dimensions for split lazy replay")
+        q_out = int(target.fused_q_out)
+        kv_out = int(target.fused_kv_out)
+        if output_dim != q_out + 2 * kv_out:
+            raise RuntimeError(f"{target.module_name} output dim {output_dim} != expected fused qkv dim {q_out + 2 * kv_out}")
+        if suffix == "q_proj":
+            return slice(0, q_out)
+        if suffix == "k_proj":
+            return slice(q_out, q_out + kv_out)
+        if suffix == "v_proj":
+            return slice(q_out + kv_out, q_out + 2 * kv_out)
+        raise RuntimeError(f"unsupported fused qkv split suffix {suffix!r}")
+
+    def _split_target_id(self, target: HookTarget, suffix: str) -> str:
+        if suffix in {"q_proj", "k_proj", "v_proj"} and target.suffix == "qkv_proj":
+            return f"layer_{target.layer_index}.self_attn.{suffix}"
+        return target.target_id
+
+    def _beta_for_split(self, target: HookTarget, suffix: str | None = None) -> float | None:
+        if suffix is not None:
+            split_target_id = self._split_target_id(target, suffix)
+            beta = self.beta_by_target.get(split_target_id)
+            if beta is not None:
+                return beta
+        return self.beta_by_target.get(target.target_id)
+
+    def _candidate_delta_from_z(
+        self,
+        target: HookTarget,
+        candidate: SubspaceCandidate,
+        z: torch.Tensor,
+        *,
+        output_dim: int,
+        rank: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if target.suffix == "qkv_proj" and target.fused_qkv_slices:
+            delta = torch.zeros((int(z.shape[0]), output_dim), device=device, dtype=dtype)
+            for suffix in target.fused_qkv_slices:
+                output_slice = self._qkv_slice_for(target, suffix, output_dim)
+                width = int(output_slice.stop - output_slice.start)
+                split_target_id = self._split_target_id(target, suffix)
+                beta = self._beta_for_split(target, suffix)
+                if beta is None or float(beta) == 0.0:
+                    continue
+                field = self.scaled_field(
+                    target,
+                    candidate,
+                    output_dim=width,
+                    rank=rank,
+                    device=device,
+                    dtype=dtype,
+                    beta=float(beta),
+                    target_id=split_target_id,
+                )
+                delta[:, output_slice] = z @ field.T
+            return delta
+        beta = self._beta_for_split(target)
+        if beta is None or float(beta) == 0.0:
+            return torch.zeros((int(z.shape[0]), output_dim), device=device, dtype=dtype)
+        field = self.scaled_field(
+            target,
+            candidate,
+            output_dim=output_dim,
+            rank=rank,
+            device=device,
+            dtype=dtype,
+            beta=float(beta),
+        )
+        return z @ field.T
 
     def delta(self, target: HookTarget, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor | None:
         candidate = self.active_candidate
@@ -232,8 +359,12 @@ class LazyHookRuntime:
             return None
         compute_dtype = self.compute_dtype_for(x)
         basis = self.basis_for(target.site_id, device=x.device, dtype=compute_dtype)
-        beta = self.beta_by_target.get(target.target_id)
-        if basis is None or beta is None:
+        if basis is None:
+            return None
+        if target.suffix == "qkv_proj" and target.fused_qkv_slices:
+            if not any(self._beta_for_split(target, suffix) is not None for suffix in target.fused_qkv_slices):
+                return None
+        elif self._beta_for_split(target) is None:
             return None
         flat_x = x.reshape(-1, x.shape[-1])
         output_dim = int(y.shape[-1])
@@ -243,7 +374,13 @@ class LazyHookRuntime:
                     "vLLM lazy hook candidate-batch routing row count mismatch: "
                     f"expected {self._row_candidate_indices_len}, got {int(flat_x.shape[0])}"
                 )
-        if beta == 0.0:
+        rank = int(basis.shape[0])
+        all_zero = False
+        if target.suffix == "qkv_proj" and target.fused_qkv_slices:
+            all_zero = all(float(self._beta_for_split(target, suffix) or 0.0) == 0.0 for suffix in target.fused_qkv_slices)
+        else:
+            all_zero = float(self._beta_for_split(target) or 0.0) == 0.0
+        if all_zero:
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return torch.zeros_like(y)
@@ -258,30 +395,30 @@ class LazyHookRuntime:
             torch.cuda.synchronize(flat_x.device)
         delta_start = time.perf_counter()
         if candidate is not None:
-            field = self.field(
+            delta = self._candidate_delta_from_z(
                 target,
                 candidate,
                 output_dim=output_dim,
-                rank=int(basis.shape[0]),
+                rank=rank,
                 device=flat_x.device,
                 dtype=compute_dtype,
-            )
-            delta = (float(beta) * (z @ field.T)).reshape(y.shape).to(dtype=y.dtype)
+                z=z,
+            ).reshape(y.shape).to(dtype=y.dtype)
         else:
             delta_flat = torch.zeros((int(flat_x.shape[0]), output_dim), device=flat_x.device, dtype=compute_dtype)
             for candidate_index, start, end in self._row_candidate_spans:
                 row_candidate = row_candidates[candidate_index]
                 if end <= start:
                     continue
-                field = self.field(
+                delta_flat[start:end] = self._candidate_delta_from_z(
                     target,
                     row_candidate,
                     output_dim=output_dim,
-                    rank=int(basis.shape[0]),
+                    rank=rank,
                     device=flat_x.device,
                     dtype=compute_dtype,
+                    z=z[start:end],
                 )
-                delta_flat[start:end] = float(beta) * (z[start:end] @ field.T)
             delta = delta_flat.reshape(y.shape).to(dtype=y.dtype)
         if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
             torch.cuda.synchronize(flat_x.device)
@@ -644,12 +781,7 @@ def _candidate_batch_context(runtime: LazyHookRuntime, llm: Any, candidates: lis
         runtime.set_candidate(None)
         yield
         return
-    start_request_id = int(getattr(llm.request_counter, "counter"))
-    request_candidate_by_id: dict[str, SubspaceCandidate] = {}
-    for candidate_index, candidate in enumerate(candidates):
-        for prompt_index in range(prompt_count):
-            request_candidate_by_id[str(start_request_id + candidate_index * prompt_count + prompt_index)] = candidate
-    runtime.set_candidate_batch(request_candidate_by_id)
+    runtime.set_candidate_batch_by_order(candidates, prompt_count=prompt_count)
     try:
         yield
     finally:

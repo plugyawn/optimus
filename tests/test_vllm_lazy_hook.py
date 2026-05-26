@@ -11,7 +11,7 @@ from optimus.modeling.noise import lora_noise_tensors
 from optimus.search.ensemble import majority_vote_evaluation
 from optimus.subspace import SubspaceCandidate
 from optimus.tasks.countdown import CountdownExample
-from scripts.eval_vllm_lazy_k1 import _load_betas
+from scripts.eval_vllm_lazy_k1 import _filter_targets, _load_betas
 
 
 def test_vllm_lazy_hook_ensemble_rows_normalize_candidate_id():
@@ -116,6 +116,39 @@ def test_vllm_lazy_hook_row_candidate_batch_matches_serial_deltas():
 
     runtime.set_candidate_batch({"10": cand_a, "11": cand_b})
     runtime.update_row_candidates(["10", "11"], [0, 2, 4])
+    batched = runtime.delta(target, x, y)
+
+    assert torch.allclose(batched[:2], serial_a)
+    assert torch.allclose(batched[2:], serial_b)
+
+
+def test_vllm_lazy_hook_input_order_candidate_batch_matches_serial_deltas():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+        input_dim=2,
+        output_dim=3,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.basis_by_site[target.site_id] = torch.eye(2)
+    runtime.beta_by_target[target.target_id] = 0.25
+    x = torch.tensor([[1.0, 0.0], [2.0, 1.0], [0.5, 1.5], [1.0, -1.0]])
+    y = torch.zeros((4, 3))
+    cand_a = _candidate("a", 11)
+    cand_b = _candidate("b", 29)
+
+    runtime.set_candidate(cand_a)
+    serial_a = runtime.delta(target, x[:2], y[:2])
+    runtime.set_candidate(cand_b)
+    serial_b = runtime.delta(target, x[2:], y[2:])
+
+    runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=1)
+    runtime.update_row_candidates(["opaque-a", "opaque-b"], [0, 2, 4])
     batched = runtime.delta(target, x, y)
 
     assert torch.allclose(batched[:2], serial_a)
@@ -490,3 +523,171 @@ def test_vllm_lazy_replay_matches_target_split_subspace_adapter_rank_and_scale()
     expected = (x @ a.T) @ b.T
 
     assert torch.allclose(delta, expected)
+
+
+def test_vllm_lazy_replay_fused_qkv_matches_target_split_requested_slices():
+    basis = torch.eye(4)[:3].contiguous()
+    state_payload = {"basis_tensors": {"basis/layer_0.attn_in": basis}}
+    state_summary = {"activation_sites": [{"site_id": "layer_0.attn_in", "basis_tensor_key": "basis/layer_0.attn_in"}]}
+    source_summary = {
+        "resolved_target_scales": [
+            {
+                "target_id": "layer_0.self_attn.qkv_proj",
+                "beta_t_by_radius": {"0.4": 0.25},
+            }
+        ]
+    }
+    candidate = replace(_subspace_candidate_for_adapter(), basis_rank=3)
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.qkv_proj",
+        target_id="layer_0.self_attn.qkv_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="qkv_proj",
+        module=torch.nn.Linear(4, 8),
+        input_dim=4,
+        output_dim=8,
+        fused_qkv_slices=("q_proj", "v_proj"),
+        fused_q_out=4,
+        fused_kv_out=2,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.basis_by_site[target.site_id] = basis[:2].contiguous()
+    runtime.beta_by_target.update(_load_betas(source_summary, radius=0.4, scale_multiplier=2.0))
+    runtime.set_candidate(candidate)
+    x = torch.tensor([[1.0, -2.0, 0.5, 3.0], [0.25, 1.5, -1.0, 2.0]])
+    y = torch.zeros((2, 8))
+
+    delta = runtime.delta(target, x, y)
+    tensors = subspace_lora_tensors(
+        config=_TinyQwenConfig(),
+        state_payload=state_payload,
+        state_summary=state_summary,
+        source_summary=source_summary,
+        candidate=candidate,
+        targets=["q_proj", "v_proj"],
+        policy="target-split",
+        tensor_dtype="float32",
+        adapter_rank=2,
+        scale_multiplier=2.0,
+    )
+    q_a = tensors["base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight"]
+    q_b = tensors["base_model.model.model.layers.0.self_attn.q_proj.lora_B.weight"]
+    v_a = tensors["base_model.model.model.layers.0.self_attn.v_proj.lora_A.weight"]
+    v_b = tensors["base_model.model.model.layers.0.self_attn.v_proj.lora_B.weight"]
+    expected = torch.zeros_like(y)
+    expected[:, :4] = (x @ q_a.T) @ q_b.T
+    expected[:, 6:8] = (x @ v_a.T) @ v_b.T
+
+    assert torch.allclose(delta, expected)
+    assert torch.equal(delta[:, 4:6], torch.zeros_like(delta[:, 4:6]))
+
+
+def test_vllm_lazy_replay_bfloat16_scales_field_before_matmul_like_adapter():
+    basis = torch.eye(4)[:3].contiguous()
+    state_payload = {"basis_tensors": {"basis/layer_0.attn_in": basis}}
+    state_summary = {"activation_sites": [{"site_id": "layer_0.attn_in", "basis_tensor_key": "basis/layer_0.attn_in"}]}
+    source_summary = {
+        "resolved_target_scales": [
+            {
+                "target_id": "layer_0.self_attn.qkv_proj",
+                "beta_t_by_radius": {"0.4": 0.25},
+            }
+        ]
+    }
+    candidate = replace(_subspace_candidate_for_adapter(), basis_rank=3)
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(4, 4),
+        input_dim=4,
+        output_dim=4,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.compute_dtype_policy = "bfloat16"
+    runtime.basis_by_site[target.site_id] = basis[:2].contiguous()
+    runtime.beta_by_target.update(_load_betas(source_summary, radius=0.4, scale_multiplier=2.0))
+    runtime.set_candidate(candidate)
+    x = torch.tensor([[1.0, -2.0, 0.5, 3.0], [0.25, 1.5, -1.0, 2.0]], dtype=torch.bfloat16)
+    y = torch.zeros((2, 4), dtype=torch.bfloat16)
+
+    delta = runtime.delta(target, x, y)
+    tensors = subspace_lora_tensors(
+        config=_TinyQwenConfig(),
+        state_payload=state_payload,
+        state_summary=state_summary,
+        source_summary=source_summary,
+        candidate=candidate,
+        targets=["q_proj"],
+        policy="target-split",
+        tensor_dtype="bfloat16",
+        adapter_rank=2,
+        scale_multiplier=2.0,
+    )
+    a = tensors["base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight"]
+    b = tensors["base_model.model.model.layers.0.self_attn.q_proj.lora_B.weight"]
+    expected = (x @ a.T) @ b.T
+
+    assert torch.equal(delta, expected)
+
+
+def test_vllm_lazy_random_field_is_device_independent_when_cuda_available():
+    if not torch.cuda.is_available():
+        return
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(4, 4),
+    )
+    candidate = replace(_subspace_candidate_for_adapter(), basis_rank=3)
+    runtime = LazyHookRuntime([target])
+
+    cpu_field = runtime.scaled_field(
+        target,
+        candidate,
+        output_dim=4,
+        rank=2,
+        device=torch.device("cpu"),
+        dtype=torch.bfloat16,
+        beta=0.25,
+    )
+    cuda_field = runtime.scaled_field(
+        target,
+        candidate,
+        output_dim=4,
+        rank=2,
+        device=torch.device("cuda"),
+        dtype=torch.bfloat16,
+        beta=0.25,
+    )
+
+    assert torch.equal(cpu_field, cuda_field.cpu())
+
+
+def test_vllm_lazy_replay_filter_maps_requested_qv_to_fused_qkv_target():
+    fused = HookTarget(
+        module_name="model.layers.0.self_attn.qkv_proj",
+        target_id="layer_0.self_attn.qkv_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="qkv_proj",
+        module=torch.nn.Linear(4, 8),
+    )
+
+    targets = _filter_targets([fused], ["q_proj", "v_proj"], qkv_dims=(4, 2))
+
+    assert len(targets) == 1
+    assert targets[0].suffix == "qkv_proj"
+    assert targets[0].fused_qkv_slices == ("q_proj", "v_proj")
+    assert targets[0].fused_q_out == 4
+    assert targets[0].fused_kv_out == 2
