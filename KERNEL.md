@@ -386,6 +386,59 @@ the fused/custom-op lever: the counter path removes factor-stack construction,
 while the bridge spends almost all measured lazy time in stack setup for this
 cold c1/p1 capture.
 
+## L40S Packed q/v Counter Kernel
+
+The packed q/v counter kernel specializes the common fused-qkv case where the
+subspace run perturbs q and v but leaves k untouched. It replaces two separate
+`triton_subspace_add_counter_` launches with one launch that writes the q slice
+and v slice of the fused qkv output. It supports both `target-split` and
+`fused-qkv-exact` random-field policies by passing explicit q/v target hashes
+and field output offsets.
+
+Remote validation:
+
+| check | result |
+| --- | --- |
+| CUDA focused suite | `40 passed` |
+| fp32 packed q/v vs split q/v max diff | `0.0` for all benchmark shapes |
+| bf16 packed q/v vs split q/v max diff | `0.0` for all benchmark shapes |
+| p16 vLLM split vs packed `candidate_scores.jsonl` | exact after dropping timing fields |
+| p16 vLLM split vs packed `per_prompt.jsonl` | exact after dropping timing fields |
+
+Synthetic L40S q/v launch-fusion A/B:
+
+| dtype | rows | rank | q dim | kv dim | split q/v ms | packed q/v ms | speedup |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fp32 | 64 | 64 | 1024 | 256 | `0.0481` | `0.0306` | `1.57x` |
+| fp32 | 256 | 64 | 1024 | 256 | `0.0805` | `0.0666` | `1.21x` |
+| fp32 | 256 | 128 | 4096 | 1024 | `0.4941` | `0.4773` | `1.04x` |
+| fp32 | 512 | 128 | 4096 | 1024 | `0.9360` | `0.9274` | `1.01x` |
+| bf16 | 64 | 64 | 1024 | 256 | `0.0508` | `0.0295` | `1.72x` |
+| bf16 | 256 | 64 | 1024 | 256 | `0.0802` | `0.0654` | `1.23x` |
+| bf16 | 256 | 128 | 4096 | 1024 | `0.4957` | `0.4824` | `1.03x` |
+| bf16 | 512 | 128 | 4096 | 1024 | `0.9462` | `0.9307` | `1.02x` |
+
+End-to-end p16 replay on L40S:
+
+| qkv policy | candidate replay sec | lazy delta s | lazy kernel s | stack s | Qx s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| split launches | `1.755` | `26.737` | `26.559` | `0.087` | `0.052` |
+| packed q/v | `0.868` | `12.680` | `12.560` | `0.048` | `0.050` |
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/l40s_qvpack/fp32/kernel_ablation_qv_speedup.png`
+- `results/remote_lazy_kernel_validation/l40s_qvpack/bf16/kernel_ablation_qv_speedup.png`
+- `results/remote_lazy_kernel_validation/l40s_qvpack/vllm_p16_split-launches/summary.json`
+- `results/remote_lazy_kernel_validation/l40s_qvpack/vllm_p16_packed-qkv/summary.json`
+
+This is a real kernel-aligned improvement and it removes one obvious launch
+overhead in the q/v target preset. It is not the final Amdahl lever. At larger
+rank/output shapes, isolated packed q/v speedup is close to neutral, so the
+production path still needs a vLLM custom-op/scheduling integration that
+computes one `Qx` per activation site and applies packed counter add without
+Python per-target hook overhead.
+
 ## Benchmark Ladder
 
 All benchmark rows must record hardware, vLLM version, FlashInfer version,

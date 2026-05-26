@@ -958,6 +958,47 @@ class LazyHookRuntime:
         )
         self.kernel_time_s += time.perf_counter() - kernel_started
 
+    def _triton_counter_add_qv_for_target(
+        self,
+        target: HookTarget,
+        candidates: list[SubspaceCandidate],
+        row_mapping: torch.Tensor,
+        z: torch.Tensor,
+        output: torch.Tensor,
+        *,
+        q_dim: int,
+        kv_dim: int,
+        q_beta: float,
+        v_beta: float,
+        q_target_id: str,
+        v_target_id: str,
+        q_field_output_offset: int = 0,
+        v_field_output_offset: int = 0,
+    ) -> None:
+        from optimus.kernels import triton_subspace_add_counter_qv_
+
+        stack_started = time.perf_counter()
+        seeds, signs = self._counter_candidate_tensors(candidates, device=z.device)
+        row_mapping_device = row_mapping.to(device=z.device, dtype=torch.int32, non_blocking=True).contiguous()
+        self.stack_time_s += time.perf_counter() - stack_started
+        kernel_started = time.perf_counter()
+        triton_subspace_add_counter_qv_(
+            z,
+            seeds,
+            signs,
+            row_mapping_device,
+            output,
+            q_target_hash=stable_u32(q_target_id),
+            v_target_hash=stable_u32(v_target_id),
+            q_beta=float(q_beta),
+            v_beta=float(v_beta),
+            q_dim=int(q_dim),
+            kv_dim=int(kv_dim),
+            q_field_output_offset=int(q_field_output_offset),
+            v_field_output_offset=int(v_field_output_offset),
+        )
+        self.kernel_time_s += time.perf_counter() - kernel_started
+
     def _delta_triton_counter(
         self,
         target: HookTarget,
@@ -988,6 +1029,43 @@ class LazyHookRuntime:
                     )
 
         if target.suffix == "qkv_proj" and target.fused_qkv_slices:
+            if self.qkv_kernel_policy == "packed-qkv" and set(target.fused_qkv_slices) == {"q_proj", "v_proj"}:
+                q_beta = self._beta_for_split(target, "q_proj")
+                v_beta = self._beta_for_split(target, "v_proj")
+                if q_beta is not None and v_beta is not None and float(q_beta) != 0.0 and float(v_beta) != 0.0:
+                    if target.fused_q_out is None or target.fused_kv_out is None:
+                        raise RuntimeError(f"{target.module_name} requires fused qkv dimensions for packed q/v lazy replay")
+                    q_dim = int(target.fused_q_out)
+                    kv_dim = int(target.fused_kv_out)
+                    if output_dim != q_dim + 2 * kv_dim:
+                        raise RuntimeError(f"{target.module_name} output dim {output_dim} != expected fused qkv dim {q_dim + 2 * kv_dim}")
+                    if self.field_policy == "fused-qkv-exact":
+                        q_target_id = target.target_id
+                        v_target_id = target.target_id
+                        q_field_output_offset = 0
+                        v_field_output_offset = q_dim + kv_dim
+                    else:
+                        q_target_id = self._split_target_id(target, "q_proj")
+                        v_target_id = self._split_target_id(target, "v_proj")
+                        q_field_output_offset = 0
+                        v_field_output_offset = 0
+                    delta = torch.zeros((int(z.shape[0]), output_dim), device=z.device, dtype=dtype)
+                    self._triton_counter_add_qv_for_target(
+                        target,
+                        candidates,
+                        row_mapping,
+                        z.to(dtype=dtype),
+                        delta,
+                        q_dim=q_dim,
+                        kv_dim=kv_dim,
+                        q_beta=float(q_beta),
+                        v_beta=float(v_beta),
+                        q_target_id=q_target_id,
+                        v_target_id=v_target_id,
+                        q_field_output_offset=q_field_output_offset,
+                        v_field_output_offset=v_field_output_offset,
+                    )
+                    return delta.reshape(y.shape).to(dtype=y.dtype)
             delta = torch.zeros((int(z.shape[0]), output_dim), device=z.device, dtype=dtype)
             for suffix in target.fused_qkv_slices:
                 beta = self._beta_for_split(target, suffix)
@@ -1076,6 +1154,42 @@ class LazyHookRuntime:
                     )
 
         if target.suffix == "qkv_proj" and target.fused_qkv_slices:
+            if self.qkv_kernel_policy == "packed-qkv" and set(target.fused_qkv_slices) == {"q_proj", "v_proj"}:
+                q_beta = self._beta_for_split(target, "q_proj")
+                v_beta = self._beta_for_split(target, "v_proj")
+                if q_beta is not None and v_beta is not None and float(q_beta) != 0.0 and float(v_beta) != 0.0:
+                    if target.fused_q_out is None or target.fused_kv_out is None:
+                        raise RuntimeError(f"{target.module_name} requires fused qkv dimensions for packed q/v lazy replay")
+                    q_dim = int(target.fused_q_out)
+                    kv_dim = int(target.fused_kv_out)
+                    if output_dim != q_dim + 2 * kv_dim:
+                        raise RuntimeError(f"{target.module_name} output dim {output_dim} != expected fused qkv dim {q_dim + 2 * kv_dim}")
+                    if self.field_policy == "fused-qkv-exact":
+                        q_target_id = target.target_id
+                        v_target_id = target.target_id
+                        q_field_output_offset = 0
+                        v_field_output_offset = q_dim + kv_dim
+                    else:
+                        q_target_id = self._split_target_id(target, "q_proj")
+                        v_target_id = self._split_target_id(target, "v_proj")
+                        q_field_output_offset = 0
+                        v_field_output_offset = 0
+                    self._triton_counter_add_qv_for_target(
+                        target,
+                        candidates,
+                        row_mapping,
+                        z.to(dtype=dtype),
+                        flat_y,
+                        q_dim=q_dim,
+                        kv_dim=kv_dim,
+                        q_beta=float(q_beta),
+                        v_beta=float(v_beta),
+                        q_target_id=q_target_id,
+                        v_target_id=v_target_id,
+                        q_field_output_offset=q_field_output_offset,
+                        v_field_output_offset=v_field_output_offset,
+                    )
+                    return y, True
             for suffix in target.fused_qkv_slices:
                 beta = self._beta_for_split(target, suffix)
                 if beta is None or float(beta) == 0.0:

@@ -84,3 +84,11 @@
   lever remains vLLM custom-op/scheduling integration for `Qx + counter expand
   + add`; adapter replay is an integration reference, not the production
   equality contract.
+- Packed q/v launch fusion is worth keeping, but it does not change the final
+  Amdahl conclusion. On L40S p16 replay, packed q/v cuts measured lazy kernel
+  time from `26.56s` to `12.56s` with exact non-timing replay parity against
+  split launches. The isolated synthetic win is `1.57-1.72x` at small
+  rows/rank/output and only `1.01-1.03x` at rank128/output4096, so the next
+  production step is still a vLLM custom-op/scheduling path that computes one
+  `Qx` per activation site and applies packed counter add without Python
+  per-target overhead.

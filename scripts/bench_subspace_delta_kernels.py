@@ -12,7 +12,12 @@ from typing import Callable, Iterable
 
 import torch
 
-from optimus.kernels import triton_subspace_add_counter_, triton_subspace_expand, triton_subspace_expand_counter
+from optimus.kernels import (
+    triton_subspace_add_counter_,
+    triton_subspace_add_counter_qv_,
+    triton_subspace_expand,
+    triton_subspace_expand_counter,
+)
 
 
 @dataclass(frozen=True)
@@ -79,6 +84,12 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         "inplace_add_speedup",
         "total_inplace_speedup",
         "qx_fraction_of_inplace_total",
+        "qv_q_dim",
+        "qv_kv_dim",
+        "qv_split_inplace_ms",
+        "qv_packed_inplace_ms",
+        "qv_packed_speedup",
+        "qv_max_diff",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
@@ -146,6 +157,36 @@ def _plot_speedup(path: Path, rows: list[dict[str, object]]) -> None:
     plt.close(fig)
 
 
+def _plot_qv_speedup(path: Path, rows: list[dict[str, object]]) -> None:
+    os.environ.setdefault("MPLCONFIGDIR", "/tmp/optimus-matplotlib")
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    labels = [str(row["shape"]) for row in rows]
+    split = [float(row["qv_split_inplace_ms"]) for row in rows]
+    packed = [float(row["qv_packed_inplace_ms"]) for row in rows]
+    speedup = [float(row["qv_packed_speedup"]) for row in rows]
+    x = list(range(len(rows)))
+    fig, axes = plt.subplots(2, 1, figsize=(max(8.0, 1.8 * len(rows)), 7.0), sharex=True)
+    axes[0].bar([idx - 0.18 for idx in x], split, width=0.36, label="split q/v launches", color="#2563eb")
+    axes[0].bar([idx + 0.18 for idx in x], packed, width=0.36, label="packed q/v launch", color="#047857")
+    axes[0].set_ylabel("milliseconds / call")
+    axes[0].set_title("Packed q/v Counter Add")
+    axes[0].grid(axis="y", alpha=0.25)
+    axes[0].legend(fontsize=8)
+    axes[1].bar(x, speedup, width=0.48, color="#d97706")
+    axes[1].axhline(1.0, color="#4b5563", linewidth=1.0, linestyle="--")
+    axes[1].set_ylabel("speedup")
+    axes[1].set_xticks(x, labels)
+    axes[1].tick_params(axis="x", rotation=20)
+    axes[1].grid(axis="y", alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
 def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters: int, warmup: int) -> dict[str, object]:
     x = torch.randn((shape.rows, input_dim), device="cuda", dtype=dtype)
     basis = torch.randn((shape.rank, input_dim), device="cuda", dtype=dtype)
@@ -154,9 +195,15 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
     signs = torch.where(torch.arange(shape.candidates, device="cuda") % 2 == 0, 1, -1).to(torch.int32)
     mapping = (torch.arange(shape.rows, device="cuda") % shape.candidates).to(torch.int32)
     target_hash = 0x1234ABCD
+    v_target_hash = 0x9876DCBA
     beta = 0.03125
+    v_beta = 0.046875
     z = x @ basis.T
     materialized_b = torch.randn((shape.candidates, shape.output_dim, shape.rank), device="cuda", dtype=dtype)
+    qv_q_dim = shape.output_dim
+    qv_kv_dim = max(1, shape.output_dim // 4)
+    qv_output_dim = qv_q_dim + 2 * qv_kv_dim
+    qv_base = torch.randn((shape.rows, qv_output_dim), device="cuda", dtype=dtype)
 
     expected = base + triton_subspace_expand_counter(
         z,
@@ -187,12 +234,53 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
     max_expected_abs = float(expected.to(dtype=torch.float32).abs().max().item())
     max_actual_abs = float(actual.to(dtype=torch.float32).abs().max().item())
 
+    qv_expected = qv_base.clone()
+    triton_subspace_add_counter_(
+        z,
+        seeds,
+        signs,
+        mapping,
+        qv_expected,
+        target_hash=target_hash,
+        beta=beta,
+        output_dim=qv_q_dim,
+        output_offset=0,
+    )
+    triton_subspace_add_counter_(
+        z,
+        seeds,
+        signs,
+        mapping,
+        qv_expected,
+        target_hash=v_target_hash,
+        beta=v_beta,
+        output_dim=qv_kv_dim,
+        output_offset=qv_q_dim + qv_kv_dim,
+    )
+    qv_actual = qv_base.clone()
+    triton_subspace_add_counter_qv_(
+        z,
+        seeds,
+        signs,
+        mapping,
+        qv_actual,
+        q_target_hash=target_hash,
+        v_target_hash=v_target_hash,
+        q_beta=beta,
+        v_beta=v_beta,
+        q_dim=qv_q_dim,
+        kv_dim=qv_kv_dim,
+    )
+    torch.cuda.synchronize()
+    qv_max_diff = float((qv_expected - qv_actual).to(dtype=torch.float32).abs().max().item())
+
     for _ in range(warmup):
         z = x @ basis.T
         _ = triton_subspace_expand(z, materialized_b, mapping)
         _ = triton_subspace_expand_counter(z, seeds, signs, mapping, target_hash=target_hash, beta=beta, output_dim=shape.output_dim)
         _ = base + triton_subspace_expand_counter(z, seeds, signs, mapping, target_hash=target_hash, beta=beta, output_dim=shape.output_dim)
         triton_subspace_add_counter_(z, seeds, signs, mapping, actual, target_hash=target_hash, beta=beta, output_dim=shape.output_dim)
+        triton_subspace_add_counter_qv_(z, seeds, signs, mapping, qv_actual, q_target_hash=target_hash, v_target_hash=v_target_hash, q_beta=beta, v_beta=v_beta, q_dim=qv_q_dim, kv_dim=qv_kv_dim)
 
     holder: dict[str, torch.Tensor] = {"z": z}
 
@@ -261,6 +349,47 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
             output_dim=shape.output_dim,
         )
 
+    def qv_split_inplace() -> None:
+        local_base = qv_base.clone()
+        triton_subspace_add_counter_(
+            holder["z"],
+            seeds,
+            signs,
+            mapping,
+            local_base,
+            target_hash=target_hash,
+            beta=beta,
+            output_dim=qv_q_dim,
+            output_offset=0,
+        )
+        triton_subspace_add_counter_(
+            holder["z"],
+            seeds,
+            signs,
+            mapping,
+            local_base,
+            target_hash=v_target_hash,
+            beta=v_beta,
+            output_dim=qv_kv_dim,
+            output_offset=qv_q_dim + qv_kv_dim,
+        )
+
+    def qv_packed_inplace() -> None:
+        local_base = qv_base.clone()
+        triton_subspace_add_counter_qv_(
+            holder["z"],
+            seeds,
+            signs,
+            mapping,
+            local_base,
+            q_target_hash=target_hash,
+            v_target_hash=v_target_hash,
+            q_beta=beta,
+            v_beta=v_beta,
+            q_dim=qv_q_dim,
+            kv_dim=qv_kv_dim,
+        )
+
     qx_ms = _time_cuda(qx, iters=iters)
     materialized_expand_ms = _time_cuda(materialized_expand, iters=iters)
     counter_expand_ms = _time_cuda(counter_expand, iters=iters)
@@ -268,6 +397,8 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
     counter_inplace_add_ms = _time_cuda(counter_inplace_add, iters=iters)
     total_counter_expand_plus_add_ms = _time_cuda(total_counter_expand_plus_add, iters=iters)
     total_counter_inplace_ms = _time_cuda(total_counter_inplace, iters=iters)
+    qv_split_inplace_ms = _time_cuda(qv_split_inplace, iters=iters)
+    qv_packed_inplace_ms = _time_cuda(qv_packed_inplace, iters=iters)
 
     return {
         "shape": shape.label,
@@ -290,6 +421,12 @@ def _benchmark_shape(shape: Shape, *, dtype: torch.dtype, input_dim: int, iters:
         "inplace_add_speedup": counter_expand_plus_add_ms / counter_inplace_add_ms,
         "total_inplace_speedup": total_counter_expand_plus_add_ms / total_counter_inplace_ms,
         "qx_fraction_of_inplace_total": qx_ms / total_counter_inplace_ms,
+        "qv_q_dim": qv_q_dim,
+        "qv_kv_dim": qv_kv_dim,
+        "qv_split_inplace_ms": qv_split_inplace_ms,
+        "qv_packed_inplace_ms": qv_packed_inplace_ms,
+        "qv_packed_speedup": qv_split_inplace_ms / qv_packed_inplace_ms,
+        "qv_max_diff": qv_max_diff,
     }
 
 
@@ -334,6 +471,7 @@ def main() -> int:
     _write_csv(args.out / "kernel_ablation.csv", rows)
     _plot(args.out / "kernel_ablation_latency.png", rows)
     _plot_speedup(args.out / "kernel_ablation_speedup.png", rows)
+    _plot_qv_speedup(args.out / "kernel_ablation_qv_speedup.png", rows)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 

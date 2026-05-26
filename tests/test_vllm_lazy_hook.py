@@ -696,6 +696,114 @@ def test_vllm_lazy_hook_triton_counter_inplace_cuda_matches_target_split_qkv_off
     assert torch.count_nonzero(actual[:, 14:] - base[:, 14:]) > 0
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+def test_vllm_lazy_hook_triton_counter_inplace_packed_qv_matches_split_qv_offsets():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.qkv_proj",
+        target_id="layer_0.self_attn.qkv_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="qkv_proj",
+        module=torch.nn.Linear(12, 20),
+        input_dim=12,
+        output_dim=20,
+        fused_qkv_slices=("q_proj", "v_proj"),
+        fused_q_out=8,
+        fused_kv_out=6,
+    )
+    torch.manual_seed(5)
+    basis = torch.randn((4, 12), dtype=torch.float32)
+    x = torch.randn((7, 12), device="cuda", dtype=torch.float32)
+    base = torch.randn((7, 20), device="cuda", dtype=torch.float32)
+    cand_a = replace(_candidate("a", 47), rng_version="counter_gaussian_v1", basis_rank=4, sign="+")
+    cand_b = replace(_candidate("b", 49), rng_version="counter_gaussian_v1", basis_rank=4, sign="-")
+    beta_by_target = {
+        "layer_0.self_attn.q_proj": 0.05,
+        "layer_0.self_attn.v_proj": 0.09,
+    }
+
+    split_runtime = LazyHookRuntime([target])
+    split_runtime.delta_backend = "triton-counter-inplace"
+    split_runtime.field_policy = "target-split"
+    split_runtime.qkv_kernel_policy = "split-launches"
+    split_runtime.compute_dtype_policy = "float32"
+    split_runtime.basis_by_site[target.site_id] = basis
+    split_runtime.beta_by_target.update(beta_by_target)
+    split_runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=1)
+    split_runtime.update_row_candidates(["0", "1"], [0, 3, 7])
+
+    packed_runtime = LazyHookRuntime([target])
+    packed_runtime.delta_backend = "triton-counter-inplace"
+    packed_runtime.field_policy = "target-split"
+    packed_runtime.qkv_kernel_policy = "packed-qkv"
+    packed_runtime.compute_dtype_policy = "float32"
+    packed_runtime.basis_by_site[target.site_id] = basis
+    packed_runtime.beta_by_target.update(beta_by_target)
+    packed_runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=1)
+    packed_runtime.update_row_candidates(["0", "1"], [0, 3, 7])
+
+    split_base = base.clone()
+    packed_base = base.clone()
+    expected = split_runtime.delta(target, x, split_base)
+    actual = packed_runtime.delta(target, x, packed_base)
+
+    assert split_runtime._last_delta_is_output
+    assert packed_runtime._last_delta_is_output
+    assert torch.allclose(actual, expected, atol=1e-5, rtol=1e-5)
+    assert torch.equal(actual[:, 8:14], base[:, 8:14])
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+def test_vllm_lazy_hook_triton_counter_packed_qv_matches_fused_qkv_exact_offsets():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.qkv_proj",
+        target_id="layer_0.self_attn.qkv_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="qkv_proj",
+        module=torch.nn.Linear(12, 20),
+        input_dim=12,
+        output_dim=20,
+        fused_qkv_slices=("q_proj", "v_proj"),
+        fused_q_out=8,
+        fused_kv_out=6,
+    )
+    torch.manual_seed(6)
+    basis = torch.randn((4, 12), dtype=torch.float32)
+    x = torch.randn((5, 12), device="cuda", dtype=torch.float32)
+    y = torch.zeros((5, 20), device="cuda", dtype=torch.float32)
+    cand = replace(_candidate("a", 53), rng_version="counter_gaussian_v1", basis_rank=4, sign="+")
+    beta_by_target = {
+        "layer_0.self_attn.q_proj": 0.03,
+        "layer_0.self_attn.v_proj": 0.07,
+    }
+
+    torch_runtime = LazyHookRuntime([target])
+    torch_runtime.delta_backend = "torch"
+    torch_runtime.field_policy = "fused-qkv-exact"
+    torch_runtime.compute_dtype_policy = "float32"
+    torch_runtime.basis_by_site[target.site_id] = basis
+    torch_runtime.beta_by_target.update(beta_by_target)
+    torch_runtime.set_candidate(cand)
+
+    packed_runtime = LazyHookRuntime([target])
+    packed_runtime.delta_backend = "triton-counter"
+    packed_runtime.field_policy = "fused-qkv-exact"
+    packed_runtime.qkv_kernel_policy = "packed-qkv"
+    packed_runtime.compute_dtype_policy = "float32"
+    packed_runtime.basis_by_site[target.site_id] = basis
+    packed_runtime.beta_by_target.update(beta_by_target)
+    packed_runtime.set_candidate(cand)
+
+    expected = torch_runtime.delta(target, x, y)
+    actual = packed_runtime.delta(target, x, y)
+
+    assert torch.allclose(actual, expected, atol=1e-5, rtol=1e-5)
+    assert torch.count_nonzero(actual[:, 8:14]) == 0
+
+
 class _FakeLazyRuntime:
     def __init__(self) -> None:
         self.active_candidate = None
