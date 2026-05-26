@@ -51,6 +51,12 @@ def _write_jsonl_overwrite(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
 
 
+def _flush_runtime_timing(runtime: Any) -> None:
+    flush = getattr(runtime, "flush_cuda_event_timing", None)
+    if flush is not None:
+        flush()
+
+
 def _candidate_map(source: Path, *, rng_version_override: str | None = None) -> dict[str, SubspaceCandidate]:
     out = {}
     for row in _jsonl(source / "candidates.jsonl"):
@@ -256,6 +262,7 @@ def _evaluate_candidates(
     total_row_mapping_cache_hits = 0
     total_row_mapping_cache_misses = 0
     total_delta = 0.0
+    total_delta_dispatch = 0.0
     total_stack = 0.0
     total_meta = 0.0
     total_kernel = 0.0
@@ -281,6 +288,7 @@ def _evaluate_candidates(
                 split = _split_candidate_outputs(outputs, candidate_chunk, examples[start_idx:end_idx])
                 for candidate_id, candidate_outputs in split.items():
                     outputs_by_candidate[candidate_id].extend(candidate_outputs)
+        _flush_runtime_timing(runtime)
         elapsed = time.perf_counter() - started
         if runtime.delta_rows <= 0:
             raise RuntimeError("vLLM lazy hook did not apply any perturbation rows; refusing to report true-lazy results")
@@ -290,6 +298,7 @@ def _evaluate_candidates(
         total_row_mapping_cache_hits += int(getattr(runtime, "row_mapping_cache_hits", 0))
         total_row_mapping_cache_misses += int(getattr(runtime, "row_mapping_cache_misses", 0))
         total_delta += runtime.delta_time_s
+        total_delta_dispatch += float(getattr(runtime, "delta_dispatch_time_s", 0.0))
         total_stack += runtime.stack_time_s
         total_meta += runtime.meta_time_s
         total_kernel += runtime.kernel_time_s
@@ -321,7 +330,9 @@ def _evaluate_candidates(
         "qx_cache_misses": total_qx_cache_misses,
         "row_mapping_cache_hits": total_row_mapping_cache_hits,
         "row_mapping_cache_misses": total_row_mapping_cache_misses,
+        "lazy_timing_mode": getattr(runtime, "timing_mode", "host"),
         "lazy_delta_time_s": total_delta,
+        "lazy_delta_dispatch_time_s": total_delta_dispatch,
         "lazy_stack_time_s": total_stack,
         "lazy_meta_time_s": total_meta,
         "lazy_kernel_time_s": total_kernel,

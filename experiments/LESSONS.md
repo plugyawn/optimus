@@ -123,3 +123,10 @@
   `7.369 -> 7.648 cand/s`. That is useful plumbing, but it confirms the real
   remaining work is still vLLM row-block/custom-op execution for one `Qx` per
   activation-site block plus scheduled counter add.
+- Per-phase sync timing is not an acceptable throughput gate. On L40S p128
+  cbs64 with the same `Qx + packed q/v counter add` path and exact prompt/score
+  parity, sync mode measured `6.236 cand/s`, while CUDA-event timing measured
+  `16.452 cand/s` and host timing measured `16.576 cand/s`. Use
+  `OPTIMUS_LAZY_TIMING_MODE=host` for max-throughput gates and
+  `OPTIMUS_LAZY_TIMING_MODE=cuda-events` for device-side attribution. Keep
+  sync mode only as a diagnostic.

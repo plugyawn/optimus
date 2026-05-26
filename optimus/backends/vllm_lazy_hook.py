@@ -82,7 +82,18 @@ class LazyHookRuntime:
     def __init__(self, targets: list[HookTarget], *, max_activation_rows_per_site: int = 4096, sync_timing: bool | None = None) -> None:
         self.targets = {target.module_name: target for target in targets}
         self.max_activation_rows_per_site = max_activation_rows_per_site
-        self.sync_timing = _env_flag("OPTIMUS_SYNC_LAZY_TIMING", default=False) if sync_timing is None else bool(sync_timing)
+        requested_sync_timing = _env_flag("OPTIMUS_SYNC_LAZY_TIMING", default=False) if sync_timing is None else bool(sync_timing)
+        timing_mode = os.environ.get("OPTIMUS_LAZY_TIMING_MODE")
+        if timing_mode is None:
+            timing_mode = "sync" if requested_sync_timing else "host"
+        timing_mode = timing_mode.strip().lower().replace("_", "-")
+        if timing_mode in {"event", "events", "cuda-event", "cuda-events"}:
+            timing_mode = "cuda-events"
+        if timing_mode not in {"host", "sync", "cuda-events"}:
+            raise ValueError(f"unknown OPTIMUS_LAZY_TIMING_MODE={timing_mode!r}")
+        self.timing_mode = timing_mode
+        self.sync_timing = timing_mode == "sync"
+        self.event_timing = timing_mode == "cuda-events"
         self.compute_dtype_policy = os.environ.get("OPTIMUS_LAZY_COMPUTE_DTYPE", "activation").strip().lower()
         self.delta_backend = os.environ.get("OPTIMUS_LAZY_DELTA_BACKEND", "torch").strip().lower() or "torch"
         self.field_policy = os.environ.get("OPTIMUS_LAZY_FIELD_POLICY", "target-split").strip().lower() or "target-split"
@@ -110,6 +121,7 @@ class LazyHookRuntime:
         self.row_mapping_cache_hits = 0
         self.row_mapping_cache_misses = 0
         self.delta_time_s = 0.0
+        self.delta_dispatch_time_s = 0.0
         self.stack_time_s = 0.0
         self.meta_time_s = 0.0
         self.kernel_time_s = 0.0
@@ -132,19 +144,85 @@ class LazyHookRuntime:
         self._qx_cache_size = max(0, int(os.environ.get("OPTIMUS_LAZY_QX_CACHE_SIZE", "8") or "0"))
         self._qx_cache: dict[tuple[Any, ...], tuple[torch.Tensor, torch.Tensor]] = {}
         self._row_mapping_generation = 0
+        self._pending_cuda_events: list[tuple[str, torch.cuda.Event, torch.cuda.Event]] = []
 
     def reset_timing(self) -> None:
+        self.flush_cuda_event_timing()
         self.qx_time_s = 0.0
         self.qx_cache_hits = 0
         self.qx_cache_misses = 0
         self.row_mapping_cache_hits = 0
         self.row_mapping_cache_misses = 0
         self.delta_time_s = 0.0
+        self.delta_dispatch_time_s = 0.0
         self.stack_time_s = 0.0
         self.meta_time_s = 0.0
         self.kernel_time_s = 0.0
         self.delta_rows = 0
         self.delta_calls = 0
+        self._pending_cuda_events.clear()
+
+    def _can_use_cuda_events(self, tensor: torch.Tensor) -> bool:
+        return bool(self.event_timing and torch.cuda.is_available() and tensor.is_cuda)
+
+    @contextmanager
+    def _time_phase(self, attr: str, tensor: torch.Tensor):
+        if self._can_use_cuda_events(tensor):
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+            stream = torch.cuda.current_stream(tensor.device)
+            start.record(stream)
+            try:
+                yield
+            finally:
+                end.record(stream)
+                self._pending_cuda_events.append((attr, start, end))
+            return
+        if self.sync_timing and torch.cuda.is_available() and tensor.is_cuda:
+            torch.cuda.synchronize(tensor.device)
+        started = time.perf_counter()
+        try:
+            yield
+        finally:
+            if self.sync_timing and torch.cuda.is_available() and tensor.is_cuda:
+                torch.cuda.synchronize(tensor.device)
+            setattr(self, attr, float(getattr(self, attr)) + time.perf_counter() - started)
+
+    def flush_cuda_event_timing(self) -> None:
+        if not self._pending_cuda_events:
+            if self.event_timing:
+                self.delta_time_s = max(
+                    self.delta_time_s,
+                    self.qx_time_s + self.stack_time_s + self.meta_time_s + self.kernel_time_s,
+                )
+            return
+        pending = self._pending_cuda_events
+        self._pending_cuda_events = []
+        for attr, start, end in pending:
+            end.synchronize()
+            setattr(self, attr, float(getattr(self, attr)) + float(start.elapsed_time(end)) / 1000.0)
+        if self.event_timing:
+            self.delta_time_s = max(
+                self.delta_time_s,
+                self.qx_time_s + self.stack_time_s + self.meta_time_s + self.kernel_time_s,
+            )
+
+    def _record_delta_dispatch(self, elapsed: float) -> None:
+        self.delta_dispatch_time_s += float(elapsed)
+        if not self.event_timing:
+            self.delta_time_s += float(elapsed)
+
+    @contextmanager
+    def _time_delta_dispatch(self, tensor: torch.Tensor):
+        if self.sync_timing and torch.cuda.is_available() and tensor.is_cuda:
+            torch.cuda.synchronize(tensor.device)
+        started = time.perf_counter()
+        try:
+            yield
+        finally:
+            if self.sync_timing and torch.cuda.is_available() and tensor.is_cuda:
+                torch.cuda.synchronize(tensor.device)
+            self._record_delta_dispatch(time.perf_counter() - started)
 
     def _clear_candidate_caches(self) -> None:
         self._field_cache.clear()
@@ -301,13 +379,8 @@ class LazyHookRuntime:
             self.qx_cache_hits += 1
             return cached[1]
         self.qx_cache_misses += 1
-        if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-            torch.cuda.synchronize(flat_x.device)
-        qx_start = time.perf_counter()
-        z = flat_x.to(dtype=compute_dtype) @ basis.T
-        if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-            torch.cuda.synchronize(flat_x.device)
-        self.qx_time_s += time.perf_counter() - qx_start
+        with self._time_phase("qx_time_s", flat_x):
+            z = flat_x.to(dtype=compute_dtype) @ basis.T
         if self._qx_cache_size > 0:
             if len(self._qx_cache) >= self._qx_cache_size:
                 self._qx_cache.clear()
@@ -700,10 +773,9 @@ class LazyHookRuntime:
         x_kernel = flat_x.to(dtype=dtype).contiguous()
         buffer = torch.empty((1, rows, rank), device=flat_x.device, dtype=torch.float32)
         delta = torch.zeros((rows, output_dim), device=flat_x.device, dtype=dtype)
-        kernel_started = time.perf_counter()
-        lora_shrink(x_kernel, (a_stack,), buffer, *meta.meta_args(rows, True), 1.0)
-        lora_expand(buffer, (b_stack,), delta, *meta.meta_args(rows, True), offset_start=0, add_inputs=True)
-        self.kernel_time_s += time.perf_counter() - kernel_started
+        with self._time_phase("kernel_time_s", flat_x):
+            lora_shrink(x_kernel, (a_stack,), buffer, *meta.meta_args(rows, True), 1.0)
+            lora_expand(buffer, (b_stack,), delta, *meta.meta_args(rows, True), offset_start=0, add_inputs=True)
         return delta
 
     def _vllm_lora_kernel_delta_for_qkv(
@@ -811,10 +883,9 @@ class LazyHookRuntime:
         x_kernel = flat_x.to(dtype=dtype).contiguous()
         buffer = torch.empty((3, rows, rank), device=flat_x.device, dtype=torch.float32)
         delta = torch.zeros((rows, output_dim), device=flat_x.device, dtype=dtype)
-        kernel_started = time.perf_counter()
-        lora_shrink(x_kernel, tuple(a_stacks), buffer, *meta.meta_args(rows, True), 1.0)
-        lora_expand(buffer, tuple(b_stacks), delta, *meta.meta_args(rows, True), offset_start=0, add_inputs=True)
-        self.kernel_time_s += time.perf_counter() - kernel_started
+        with self._time_phase("kernel_time_s", flat_x):
+            lora_shrink(x_kernel, tuple(a_stacks), buffer, *meta.meta_args(rows, True), 1.0)
+            lora_expand(buffer, tuple(b_stacks), delta, *meta.meta_args(rows, True), offset_start=0, add_inputs=True)
         return delta
 
     def _delta_vllm_lora_kernel(
@@ -937,9 +1008,8 @@ class LazyHookRuntime:
             field_slice=field_slice,
         )
         self.stack_time_s += time.perf_counter() - stack_started
-        kernel_started = time.perf_counter()
-        delta = triton_subspace_expand(z, b_stack, row_mapping)
-        self.kernel_time_s += time.perf_counter() - kernel_started
+        with self._time_phase("kernel_time_s", z):
+            delta = triton_subspace_expand(z, b_stack, row_mapping)
         return delta
 
     def _counter_candidate_tensors(
@@ -988,18 +1058,17 @@ class LazyHookRuntime:
             num_candidates=len(candidates),
         )
         self.stack_time_s += time.perf_counter() - stack_started
-        kernel_started = time.perf_counter()
-        delta = triton_subspace_expand_counter(
-            z.to(dtype=dtype),
-            seeds,
-            signs,
-            row_mapping_device,
-            target_hash=stable_u32(target_id),
-            beta=float(beta),
-            output_dim=output_dim,
-            output_offset=output_offset,
-        )
-        self.kernel_time_s += time.perf_counter() - kernel_started
+        with self._time_phase("kernel_time_s", z):
+            delta = triton_subspace_expand_counter(
+                z.to(dtype=dtype),
+                seeds,
+                signs,
+                row_mapping_device,
+                target_hash=stable_u32(target_id),
+                beta=float(beta),
+                output_dim=output_dim,
+                output_offset=output_offset,
+            )
         return delta
 
     def _triton_counter_add_for_target(
@@ -1027,20 +1096,19 @@ class LazyHookRuntime:
             num_candidates=len(candidates),
         )
         self.stack_time_s += time.perf_counter() - stack_started
-        kernel_started = time.perf_counter()
-        triton_subspace_add_counter_(
-            z,
-            seeds,
-            signs,
-            row_mapping_device,
-            output,
-            target_hash=stable_u32(target_id),
-            beta=float(beta),
-            output_dim=output_dim,
-            field_output_offset=field_output_offset,
-            output_offset=output_offset,
-        )
-        self.kernel_time_s += time.perf_counter() - kernel_started
+        with self._time_phase("kernel_time_s", z):
+            triton_subspace_add_counter_(
+                z,
+                seeds,
+                signs,
+                row_mapping_device,
+                output,
+                target_hash=stable_u32(target_id),
+                beta=float(beta),
+                output_dim=output_dim,
+                field_output_offset=field_output_offset,
+                output_offset=output_offset,
+            )
 
     def _triton_counter_add_qv_for_target(
         self,
@@ -1070,23 +1138,22 @@ class LazyHookRuntime:
             num_candidates=len(candidates),
         )
         self.stack_time_s += time.perf_counter() - stack_started
-        kernel_started = time.perf_counter()
-        triton_subspace_add_counter_qv_(
-            z,
-            seeds,
-            signs,
-            row_mapping_device,
-            output,
-            q_target_hash=stable_u32(q_target_id),
-            v_target_hash=stable_u32(v_target_id),
-            q_beta=float(q_beta),
-            v_beta=float(v_beta),
-            q_dim=int(q_dim),
-            kv_dim=int(kv_dim),
-            q_field_output_offset=int(q_field_output_offset),
-            v_field_output_offset=int(v_field_output_offset),
-        )
-        self.kernel_time_s += time.perf_counter() - kernel_started
+        with self._time_phase("kernel_time_s", z):
+            triton_subspace_add_counter_qv_(
+                z,
+                seeds,
+                signs,
+                row_mapping_device,
+                output,
+                q_target_hash=stable_u32(q_target_id),
+                v_target_hash=stable_u32(v_target_id),
+                q_beta=float(q_beta),
+                v_beta=float(v_beta),
+                q_dim=int(q_dim),
+                kv_dim=int(kv_dim),
+                q_field_output_offset=int(q_field_output_offset),
+                v_field_output_offset=int(v_field_output_offset),
+            )
 
     def _triton_counter_add_qv_from_x_for_target(
         self,
@@ -1117,24 +1184,23 @@ class LazyHookRuntime:
             num_candidates=len(candidates),
         )
         self.stack_time_s += time.perf_counter() - stack_started
-        kernel_started = time.perf_counter()
-        triton_subspace_add_counter_qv_from_x_(
-            flat_x,
-            basis,
-            seeds,
-            signs,
-            row_mapping_device,
-            output,
-            q_target_hash=stable_u32(q_target_id),
-            v_target_hash=stable_u32(v_target_id),
-            q_beta=float(q_beta),
-            v_beta=float(v_beta),
-            q_dim=int(q_dim),
-            kv_dim=int(kv_dim),
-            q_field_output_offset=int(q_field_output_offset),
-            v_field_output_offset=int(v_field_output_offset),
-        )
-        self.kernel_time_s += time.perf_counter() - kernel_started
+        with self._time_phase("kernel_time_s", flat_x):
+            triton_subspace_add_counter_qv_from_x_(
+                flat_x,
+                basis,
+                seeds,
+                signs,
+                row_mapping_device,
+                output,
+                q_target_hash=stable_u32(q_target_id),
+                v_target_hash=stable_u32(v_target_id),
+                q_beta=float(q_beta),
+                v_beta=float(v_beta),
+                q_dim=int(q_dim),
+                kv_dim=int(kv_dim),
+                q_field_output_offset=int(q_field_output_offset),
+                v_field_output_offset=int(v_field_output_offset),
+            )
 
     def _delta_triton_counter_inplace_qv_from_x(
         self,
@@ -1556,48 +1622,36 @@ class LazyHookRuntime:
             self.delta_calls += 1
             return torch.zeros_like(y)
         if self.delta_backend == "triton-counter-inplace" and self.qkv_kernel_policy == "packed-qkv-from-x":
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
-            delta_start = time.perf_counter()
-            fused = self._delta_triton_counter_inplace_qv_from_x(
-                target,
-                flat_x,
-                basis,
-                y,
-                candidate=candidate,
-                row_candidates=row_candidates,
-                row_candidate_indices=row_candidate_indices,
-                output_dim=output_dim,
-            )
+            with self._time_delta_dispatch(flat_x):
+                fused = self._delta_triton_counter_inplace_qv_from_x(
+                    target,
+                    flat_x,
+                    basis,
+                    y,
+                    candidate=candidate,
+                    row_candidates=row_candidates,
+                    row_candidate_indices=row_candidate_indices,
+                    output_dim=output_dim,
+                )
             if fused is not None:
                 delta, is_output = fused
-                if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                    torch.cuda.synchronize(flat_x.device)
                 self._last_delta_is_output = is_output
-                self.delta_time_s += time.perf_counter() - delta_start
                 self.delta_rows += int(flat_x.shape[0])
                 self.delta_calls += 1
                 return delta
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
         if self.delta_backend in {"vllm-lora", "vllm-lora-kernel"}:
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
-            delta_start = time.perf_counter()
-            delta = self._delta_vllm_lora_kernel(
-                target,
-                flat_x,
-                y,
-                candidate=candidate,
-                row_candidates=row_candidates,
-                row_candidate_indices=row_candidate_indices,
-                output_dim=output_dim,
-                rank=rank,
-                dtype=compute_dtype,
-            )
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
-            self.delta_time_s += time.perf_counter() - delta_start
+            with self._time_delta_dispatch(flat_x):
+                delta = self._delta_vllm_lora_kernel(
+                    target,
+                    flat_x,
+                    y,
+                    candidate=candidate,
+                    row_candidates=row_candidates,
+                    row_candidate_indices=row_candidate_indices,
+                    output_dim=output_dim,
+                    rank=rank,
+                    dtype=compute_dtype,
+                )
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return delta
@@ -1605,99 +1659,79 @@ class LazyHookRuntime:
             raise RuntimeError(f"unknown lazy delta backend {self.delta_backend!r}")
         z = self._project_qx(target, x, flat_x, basis, compute_dtype=compute_dtype)
         if self.delta_backend == "triton":
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
-            delta_start = time.perf_counter()
-            delta = self._delta_triton(
-                target,
-                z,
-                y,
-                candidate=candidate,
-                row_candidates=row_candidates,
-                row_candidate_indices=row_candidate_indices,
-                output_dim=output_dim,
-                rank=rank,
-                dtype=compute_dtype,
-            )
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
-            self.delta_time_s += time.perf_counter() - delta_start
+            with self._time_delta_dispatch(flat_x):
+                delta = self._delta_triton(
+                    target,
+                    z,
+                    y,
+                    candidate=candidate,
+                    row_candidates=row_candidates,
+                    row_candidate_indices=row_candidate_indices,
+                    output_dim=output_dim,
+                    rank=rank,
+                    dtype=compute_dtype,
+                )
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return delta
         if self.delta_backend == "triton-counter":
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
-            delta_start = time.perf_counter()
-            delta = self._delta_triton_counter(
-                target,
-                z,
-                y,
-                candidate=candidate,
-                row_candidates=row_candidates,
-                row_candidate_indices=row_candidate_indices,
-                output_dim=output_dim,
-                dtype=compute_dtype,
-            )
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
-            self.delta_time_s += time.perf_counter() - delta_start
+            with self._time_delta_dispatch(flat_x):
+                delta = self._delta_triton_counter(
+                    target,
+                    z,
+                    y,
+                    candidate=candidate,
+                    row_candidates=row_candidates,
+                    row_candidate_indices=row_candidate_indices,
+                    output_dim=output_dim,
+                    dtype=compute_dtype,
+                )
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return delta
         if self.delta_backend == "triton-counter-inplace":
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
-            delta_start = time.perf_counter()
-            delta, is_output = self._delta_triton_counter_inplace(
-                target,
-                z,
-                y,
-                candidate=candidate,
-                row_candidates=row_candidates,
-                row_candidate_indices=row_candidate_indices,
-                output_dim=output_dim,
-                dtype=compute_dtype,
-            )
-            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-                torch.cuda.synchronize(flat_x.device)
+            with self._time_delta_dispatch(flat_x):
+                delta, is_output = self._delta_triton_counter_inplace(
+                    target,
+                    z,
+                    y,
+                    candidate=candidate,
+                    row_candidates=row_candidates,
+                    row_candidate_indices=row_candidate_indices,
+                    output_dim=output_dim,
+                    dtype=compute_dtype,
+                )
             self._last_delta_is_output = is_output
-            self.delta_time_s += time.perf_counter() - delta_start
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return delta
-        if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-            torch.cuda.synchronize(flat_x.device)
-        delta_start = time.perf_counter()
-        if candidate is not None:
-            delta = self._candidate_delta_from_z(
-                target,
-                candidate,
-                output_dim=output_dim,
-                rank=rank,
-                device=flat_x.device,
-                dtype=compute_dtype,
-                z=z,
-            ).reshape(y.shape).to(dtype=y.dtype)
-        else:
-            delta_flat = torch.zeros((int(flat_x.shape[0]), output_dim), device=flat_x.device, dtype=compute_dtype)
-            for candidate_index, start, end in self._row_candidate_spans:
-                row_candidate = row_candidates[candidate_index]
-                if end <= start:
-                    continue
-                delta_flat[start:end] = self._candidate_delta_from_z(
+        with self._time_delta_dispatch(flat_x):
+            if candidate is not None:
+                delta = self._candidate_delta_from_z(
                     target,
-                    row_candidate,
+                    candidate,
                     output_dim=output_dim,
                     rank=rank,
                     device=flat_x.device,
                     dtype=compute_dtype,
-                    z=z[start:end],
-                )
-            delta = delta_flat.reshape(y.shape).to(dtype=y.dtype)
-        if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-            torch.cuda.synchronize(flat_x.device)
-        self.delta_time_s += time.perf_counter() - delta_start
+                    z=z,
+                ).reshape(y.shape).to(dtype=y.dtype)
+            else:
+                delta_flat = torch.zeros((int(flat_x.shape[0]), output_dim), device=flat_x.device, dtype=compute_dtype)
+                for candidate_index, start, end in self._row_candidate_spans:
+                    row_candidate = row_candidates[candidate_index]
+                    if end <= start:
+                        continue
+                    delta_flat[start:end] = self._candidate_delta_from_z(
+                        target,
+                        row_candidate,
+                        output_dim=output_dim,
+                        rank=rank,
+                        device=flat_x.device,
+                        dtype=compute_dtype,
+                        z=z[start:end],
+                    )
+                delta = delta_flat.reshape(y.shape).to(dtype=y.dtype)
         self.delta_rows += int(flat_x.shape[0])
         self.delta_calls += 1
         return delta
@@ -2192,6 +2226,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
         total_row_mapping_cache_hits = 0
         total_row_mapping_cache_misses = 0
         total_delta = 0.0
+        total_delta_dispatch = 0.0
         total_stack = 0.0
         total_meta = 0.0
         total_kernel = 0.0
@@ -2266,6 +2301,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             else:
                 with _candidate_batch_context(runtime, llm, candidate_chunk, len(screen)):
                     outputs = llm.generate(candidate_prompts, sampling, use_tqdm=False)
+            runtime.flush_cuda_event_timing()
             elapsed = time.perf_counter() - started
             if runtime.delta_rows <= 0:
                 raise RuntimeError("vLLM lazy hook did not apply any perturbation rows; refusing to report true-vLLM results")
@@ -2275,6 +2311,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             total_row_mapping_cache_hits += int(getattr(runtime, "row_mapping_cache_hits", 0))
             total_row_mapping_cache_misses += int(getattr(runtime, "row_mapping_cache_misses", 0))
             total_delta += runtime.delta_time_s
+            total_delta_dispatch += float(getattr(runtime, "delta_dispatch_time_s", 0.0))
             total_stack += runtime.stack_time_s
             total_meta += runtime.meta_time_s
             total_kernel += runtime.kernel_time_s
@@ -2326,6 +2363,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             runtime.set_candidate(candidate)
             holdout_started = time.perf_counter()
             holdout_outputs = llm.generate(holdout_prompts_inputs, sampling, use_tqdm=False)
+            runtime.flush_cuda_event_timing()
             holdout_elapsed = time.perf_counter() - holdout_started
             if runtime.delta_rows <= 0:
                 raise RuntimeError("vLLM lazy hook did not apply any perturbation rows during promoted holdout")
@@ -2336,6 +2374,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             total_row_mapping_cache_hits += int(getattr(runtime, "row_mapping_cache_hits", 0))
             total_row_mapping_cache_misses += int(getattr(runtime, "row_mapping_cache_misses", 0))
             total_delta += runtime.delta_time_s
+            total_delta_dispatch += float(getattr(runtime, "delta_dispatch_time_s", 0.0))
             total_stack += runtime.stack_time_s
             total_meta += runtime.meta_time_s
             total_kernel += runtime.kernel_time_s
@@ -2515,6 +2554,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             "warmup_policy": "vllm_calibration_generate",
             "cuda_sync_policy": "synchronize_around_qx_and_delta" if runtime.sync_timing else "no_per_delta_synchronize",
             "sync_lazy_timing": runtime.sync_timing,
+            "lazy_timing_mode": runtime.timing_mode,
             "lazy_compute_dtype_policy": runtime.compute_dtype_policy,
             "model_id_or_path": args.model or "Qwen/Qwen3-4B",
             "population": population,
@@ -2544,6 +2584,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             "row_mapping_cache_hits": total_row_mapping_cache_hits,
             "row_mapping_cache_misses": total_row_mapping_cache_misses,
             "lazy_delta_time_s": total_delta,
+            "lazy_delta_dispatch_time_s": total_delta_dispatch,
             "lazy_stack_time_s": total_stack,
             "lazy_meta_time_s": total_meta,
             "lazy_kernel_time_s": total_kernel,
@@ -2733,7 +2774,9 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
                     "qx_cache_misses": total_qx_cache_misses,
                     "row_mapping_cache_hits": total_row_mapping_cache_hits,
                     "row_mapping_cache_misses": total_row_mapping_cache_misses,
+                    "lazy_timing_mode": runtime.timing_mode,
                     "lazy_delta_time_s": total_delta,
+                    "lazy_delta_dispatch_time_s": total_delta_dispatch,
                     "delta_rows": total_delta_rows,
                     "delta_calls": total_delta_calls,
                 }

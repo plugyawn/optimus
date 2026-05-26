@@ -107,6 +107,31 @@ def test_vllm_lazy_hook_internal_policy_env_validation(monkeypatch):
         LazyHookRuntime([])
 
 
+def test_vllm_lazy_hook_cuda_event_timing_mode_env(monkeypatch):
+    monkeypatch.setenv("OPTIMUS_SYNC_LAZY_TIMING", "1")
+    monkeypatch.setenv("OPTIMUS_LAZY_TIMING_MODE", "cuda-events")
+
+    runtime = LazyHookRuntime([])
+    runtime.qx_time_s = 0.25
+    runtime.kernel_time_s = 0.5
+    runtime.stack_time_s = 0.125
+    runtime.delta_dispatch_time_s = 0.01
+    runtime.flush_cuda_event_timing()
+
+    assert runtime.timing_mode == "cuda-events"
+    assert runtime.event_timing is True
+    assert runtime.sync_timing is False
+    assert runtime.delta_time_s == pytest.approx(0.875)
+    assert runtime.delta_dispatch_time_s == pytest.approx(0.01)
+
+
+def test_vllm_lazy_hook_rejects_unknown_timing_mode(monkeypatch):
+    monkeypatch.setenv("OPTIMUS_LAZY_TIMING_MODE", "bad")
+
+    with pytest.raises(ValueError, match="OPTIMUS_LAZY_TIMING_MODE"):
+        LazyHookRuntime([])
+
+
 def test_vllm_lazy_hook_row_candidate_batch_matches_serial_deltas():
     target = HookTarget(
         module_name="model.layers.0.self_attn.q_proj",

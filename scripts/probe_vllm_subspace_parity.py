@@ -588,6 +588,7 @@ def _run_lazy_signatures(
                 capture.current_candidate_id = candidate.candidate_id
             runtime.reset_timing()
             outputs = llm.generate(prompt_inputs, sampling, use_tqdm=False)
+            runtime.flush_cuda_event_timing()
             if runtime.delta_rows <= 0:
                 raise RuntimeError("lazy parity probe did not apply any delta rows")
             rows.extend(
@@ -612,7 +613,9 @@ def _run_lazy_signatures(
         "qx_cache_misses": runtime.qx_cache_misses,
         "row_mapping_cache_hits": runtime.row_mapping_cache_hits,
         "row_mapping_cache_misses": runtime.row_mapping_cache_misses,
+        "lazy_timing_mode": runtime.timing_mode,
         "lazy_delta_time_s": runtime.delta_time_s,
+        "lazy_delta_dispatch_time_s": runtime.delta_dispatch_time_s,
         "lazy_stack_time_s": runtime.stack_time_s,
         "lazy_meta_time_s": runtime.meta_time_s,
         "lazy_kernel_time_s": runtime.kernel_time_s,

@@ -76,6 +76,12 @@ def _summary_row(label: str, run: Path) -> dict[str, Any]:
     summary = _json(run / "summary.json")
     systems = _json(run / "systems_report.json") if (run / "systems_report.json").exists() else {}
     merged = {**summary, **systems}
+    lazy = summary.get("lazy_timing") or systems.get("lazy_timing") or {}
+    elapsed_s = _first_not_none(lazy.get("elapsed_s"), merged.get("elapsed_s"))
+    output_tokens = _first_not_none(lazy.get("output_tokens"), merged.get("output_tokens"))
+    output_tokens_per_sec = merged.get("output_tokens_per_sec")
+    if output_tokens_per_sec is None and elapsed_s and output_tokens is not None:
+        output_tokens_per_sec = float(output_tokens) / float(elapsed_s)
     return {
         "label": label,
         "run_dir": str(run),
@@ -85,21 +91,23 @@ def _summary_row(label: str, run: Path) -> dict[str, Any]:
         "candidate_batch_size": merged.get("candidate_batch_size"),
         "basis_rank": merged.get("basis_rank"),
         "target_preset": merged.get("target_preset") or summary.get("target_preset"),
-        "candidates_per_sec": merged.get("candidates_per_sec"),
+        "candidates_per_sec": _first_not_none(merged.get("candidates_per_sec"), summary.get("mixed_candidate_sec"), lazy.get("mixed_candidate_sec")),
         "prompts_per_sec": merged.get("prompts_per_sec"),
-        "output_tokens_per_sec": merged.get("output_tokens_per_sec"),
-        "lazy_delta_time_s": merged.get("lazy_delta_time_s"),
-        "lazy_kernel_time_s": merged.get("lazy_kernel_time_s"),
-        "lazy_stack_time_s": merged.get("lazy_stack_time_s"),
-        "lazy_meta_time_s": merged.get("lazy_meta_time_s"),
-        "qx_time_s": merged.get("qx_time_s"),
-        "delta_calls": merged.get("delta_calls"),
-        "delta_rows": merged.get("delta_rows"),
+        "output_tokens_per_sec": output_tokens_per_sec,
+        "lazy_timing_mode": _first_not_none(merged.get("lazy_timing_mode"), lazy.get("lazy_timing_mode")),
+        "lazy_delta_time_s": _first_not_none(merged.get("lazy_delta_time_s"), lazy.get("lazy_delta_time_s")),
+        "lazy_delta_dispatch_time_s": _first_not_none(merged.get("lazy_delta_dispatch_time_s"), lazy.get("lazy_delta_dispatch_time_s")),
+        "lazy_kernel_time_s": _first_not_none(merged.get("lazy_kernel_time_s"), lazy.get("lazy_kernel_time_s")),
+        "lazy_stack_time_s": _first_not_none(merged.get("lazy_stack_time_s"), lazy.get("lazy_stack_time_s")),
+        "lazy_meta_time_s": _first_not_none(merged.get("lazy_meta_time_s"), lazy.get("lazy_meta_time_s")),
+        "qx_time_s": _first_not_none(merged.get("qx_time_s"), lazy.get("qx_time_s")),
+        "delta_calls": _first_not_none(merged.get("delta_calls"), lazy.get("delta_calls")),
+        "delta_rows": _first_not_none(merged.get("delta_rows"), lazy.get("delta_rows")),
         "scoring_time_s": merged.get("scoring_time_s"),
         "base_screen_score": merged.get("base_screen_score"),
         "base_holdout_score": merged.get("base_holdout_score"),
-        "screen_score": _first_not_none(merged.get("screen_score"), summary.get("best_screen_score")),
-        "holdout_score": _first_not_none(merged.get("holdout_score"), summary.get("selected_holdout_score")),
+        "screen_score": _first_not_none(merged.get("screen_score"), summary.get("best_screen_score"), summary.get("best_candidate_final_score")),
+        "holdout_score": _first_not_none(merged.get("holdout_score"), summary.get("selected_holdout_score"), summary.get("confirmed_best_candidate_final_score")),
         "best_ensemble_holdout_exact": merged.get("best_ensemble_holdout_exact"),
         "best_strict_ensemble_holdout_exact": merged.get("best_strict_ensemble_holdout_exact"),
     }
@@ -298,7 +306,9 @@ def main() -> int:
         "rng_version",
         "candidates_per_sec",
         "output_tokens_per_sec",
+        "lazy_timing_mode",
         "lazy_delta_time_s",
+        "lazy_delta_dispatch_time_s",
         "lazy_kernel_time_s",
         "lazy_stack_time_s",
         "qx_time_s",

@@ -265,6 +265,19 @@ Current L40S end-to-end `triton-counter-inplace` evidence:
 | warm p128 | triton-counter-inplace | p128/8 | 64 | best p128 | `13.924` | `2.818` | `0.821` | `0.578` |
 | warm p1024 | triton-counter-inplace | p1024/8 | 64 | pass | `13.808` | `5.756` | `2.744` | `1.940` |
 
+Timing-mode correction for the same p128 cbs64 shape:
+
+| timing mode | candidates/sec | lazy delta s | lazy kernel s | stack s | Qx s | parity |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| sync | `6.236` | `13.988` | `13.663` | `0.087` | `0.176` | reference |
+| cuda-events | `16.452` | `2.686` | `2.540` | `0.089` | `0.058` | exact score and prompt parity |
+| host | `16.576` | `1.108` | `0.888` | `0.081` | `0.103` | exact score and prompt parity |
+
+The old per-phase sync timer was itself a throughput bottleneck. Future
+max-throughput gates should use `OPTIMUS_LAZY_TIMING_MODE=host`; device-side
+attribution should use `OPTIMUS_LAZY_TIMING_MODE=cuda-events`. Sync timing is
+only a diagnostic mode.
+
 Artifacts:
 
 - `results/remote_lazy_kernel_validation/l40s_counter_inplace/inplace_counter/p128_cbs64/`
@@ -272,6 +285,9 @@ Artifacts:
 - `results/remote_lazy_kernel_validation/l40s_counter_inplace/plots_inplace_vs_counter/throughput.png`
 - `results/remote_lazy_kernel_validation/l40s_counter_inplace/plots_inplace_vs_counter/lazy_timing_breakdown.png`
 - `results/remote_lazy_kernel_validation/l40s_counter_inplace/plots_inplace_batch_parity/validation_summary.md`
+- `results/remote_lazy_kernel_validation/l40s_eventtiming/plots/throughput.png`
+- `results/remote_lazy_kernel_validation/l40s_eventtiming/plots/lazy_timing_breakdown.png`
+- `results/remote_lazy_kernel_validation/l40s_eventtiming/plots/validation_summary.md`
 
 This is the first end-to-end positive fused-add result. Relative to the
 previous best p128 out-of-place counter run, p128 cbs64 improves from
