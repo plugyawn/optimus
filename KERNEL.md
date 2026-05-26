@@ -187,6 +187,37 @@ The vLLM hook defaults to `torch_generator_field_v1` for materialized bridge
 backends and to `counter_gaussian_v1` for `triton-counter`, so the old bridge
 does not fall onto the slow Python SHA materialization path.
 
+Current L40S end-to-end `triton-counter` evidence:
+
+| run | backend | population/prompts | candidate batch | status | candidates/sec | lazy kernel s | stack s | Qx s |
+| --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| cold p16 | triton-counter, rows constexpr | p16/4 | 16 | compile-tax dominated | `0.223` | `102.861` | `0.131` | `0.209` |
+| warm p16 | triton-counter, rows constexpr | p16/4 | 16 | warmed | `8.352` | `1.073` | `0.130` | `0.212` |
+| warm p128 | triton-counter, rows constexpr | p128/8 | 16 | shape churn regression | `0.368` | `388.131` | `0.665` | `1.065` |
+| warm p16 | triton-counter, runtime rows | p16/4 | 16 | pass | `11.112` | `0.501` | `0.123` | `0.208` |
+| warm p128 | triton-counter, runtime rows | p128/8 | 16 | pass | `4.997` | `13.679` | `0.589` | `1.013` |
+| same-host bridge | vLLM LoRA-kernel bridge | p128/8 | 16 | pass | `6.110` | `6.169` | `8.739` | `0.000` |
+| warm p128 | triton-counter, runtime rows | p128/8 | 32 | best p128 | `12.422` | `7.661` | `0.492` | `0.847` |
+| same-host bridge | vLLM LoRA-kernel bridge | p128/8 | 32 | OOM on L40S | n/a | n/a | n/a | n/a |
+| warm p128 | triton-counter, runtime rows | p128/8 | 64 | pass, not faster | `12.225` | `1.556` | `0.539` | `0.855` |
+| warm p1024 | triton-counter, runtime rows | p1024/8 | 32 | pass | `12.234` | `3.694` | `1.385` | `2.014` |
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/p128_row_runtime_cbs32/`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/p1024_row_runtime_cbs32/`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/counter_end_to_end_throughput.png`
+
+The key systems bug was treating `rows` as a Triton constexpr. vLLM decode
+scheduling changes row counts frequently, so this caused excessive compilation
+or specialization churn at p128. `rows` must remain a runtime scalar. After
+that fix, the stateless counter path is viable at larger candidate batches on
+L40S because it does not carry candidate B stacks; cbs32 is the current best
+measured point. The remaining bottleneck is the counter expand kernel itself:
+the bridge still has a faster kernel phase at cbs16, so a production custom op
+needs either a faster RNG/delta kernel or integration that removes more launch
+and hook overhead.
+
 The p128/32-prompt L40S shape also OOMed under vLLM after many candidate
 chunks, despite smaller per-chunk scheduling, because the run became a KV/cache
 capacity stress test. The p128 speed gate above uses 8 prompts to compare

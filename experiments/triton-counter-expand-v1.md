@@ -65,3 +65,28 @@ y += delta
 The current backend still computes `z = Qx` separately and still runs through
 Python hook scheduling, so it should not be treated as final p128/p1024
 throughput evidence.
+
+## Follow-up End-to-End Gate
+
+The first p128 end-to-end run exposed a specialization bug: the Triton kernels
+treated `rows` as a constexpr, so decode-time row-count variation caused
+excessive specialization churn. After changing `rows` to a runtime scalar:
+
+| run | backend | population/prompts | candidate batch | result |
+| --- | --- | ---: | ---: | ---: |
+| p16 warm | triton-counter | p16/4 | 16 | `11.112 cand/s` |
+| p128 warm | triton-counter | p128/8 | 16 | `4.997 cand/s` |
+| p128 warm | vLLM LoRA-kernel bridge | p128/8 | 16 | `6.110 cand/s` |
+| p128 warm | triton-counter | p128/8 | 32 | `12.422 cand/s` |
+| p128 warm | vLLM LoRA-kernel bridge | p128/8 | 32 | OOM on L40S |
+| p128 warm | triton-counter | p128/8 | 64 | `12.225 cand/s` |
+| p1024 warm | triton-counter | p1024/8 | 32 | `12.234 cand/s` |
+
+The current best measured setting is cbs32. cbs64 reduces kernel time but does
+not improve overall candidate/sec on this workload.
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/p128_row_runtime_cbs32/`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/p1024_row_runtime_cbs32/`
+- `results/remote_lazy_kernel_validation/l40s_counterp128/counter_p128/counter_end_to_end_throughput.png`

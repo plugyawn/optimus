@@ -32,6 +32,17 @@
   materialized `B` stacks at realistic output/rank sizes. This does not close
   the job: `Qx` is still a separate matmul and Python hook scheduling is still
   outside the kernel.
+- Kernel specialization keys matter as much as arithmetic. Marking `rows` as
+  `tl.constexpr` made p128 collapse from a warmed p16 `8.35 cand/s` to
+  `0.37 cand/s`, because vLLM decode produces many row-count shapes. Keeping
+  `rows` as a runtime scalar raised the best p128 result to `12.42 cand/s`.
+- The stateless counter backend now has a viable end-to-end operating point:
+  p128/8 cbs32 reaches `12.42 cand/s`, and p1024/8 cbs32 holds
+  `12.23 cand/s` on L40S. Same-host vLLM LoRA-kernel bridge at cbs16 reaches
+  `6.11 cand/s`, while cbs32 OOMs. The remaining weakness is kernel-phase
+  efficiency: at cbs16 the bridge kernel is still faster, so the next kernel
+  work should target RNG/delta throughput and lower launch/hook overhead rather
+  than B-stack handling.
 - p128 throughput tests on 48GB L40S need a scheduling cap. The p128/32-prompt
   run can OOM after many candidate chunks because vLLM retains or fragments
   enough KV/cache state that the measurement stops being about lazy-delta
