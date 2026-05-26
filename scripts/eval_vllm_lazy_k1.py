@@ -51,10 +51,12 @@ def _write_jsonl_overwrite(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows))
 
 
-def _candidate_map(source: Path) -> dict[str, SubspaceCandidate]:
+def _candidate_map(source: Path, *, rng_version_override: str | None = None) -> dict[str, SubspaceCandidate]:
     out = {}
     for row in _jsonl(source / "candidates.jsonl"):
         candidate = SubspaceCandidate(**row)
+        if rng_version_override:
+            candidate = replace(candidate, rng_version=str(rng_version_override))
         out[candidate.candidate_id] = candidate
     return out
 
@@ -399,7 +401,7 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     source_summary = json.loads((source / "summary.json").read_text())
-    candidates = _candidate_map(source)
+    candidates = _candidate_map(source, rng_version_override=source_summary.get("rng_version"))
     candidate_ids = list(args.candidate_id or [])
     for item in args.candidate_id_file or []:
         candidate_ids.extend(line.strip() for line in Path(item).read_text().splitlines() if line.strip())

@@ -39,6 +39,10 @@ candidate-keyed whenever q/k/v perturbations are active.
 - Current GPU bridge: `OPTIMUS_LAZY_DELTA_BACKEND=vllm-lora-kernel`, which
   reuses vLLM Triton LoRA shrink/expand kernels with cached `A=Q` and
   `B=beta*G` factor stacks.
+- Native stateless expand scaffold:
+  `OPTIMUS_LAZY_DELTA_BACKEND=triton-counter`, which requires
+  `counter_gaussian_v1` candidates and generates `G_t,c` inside the Triton
+  expand kernel instead of materializing `B` stacks.
 - Native adapter baseline: `scripts/eval_vllm_subspace_adapter_k1.py`.
 - Signature parity probe: `scripts/probe_vllm_subspace_parity.py`.
 
@@ -153,6 +157,35 @@ expand kernel plus materialized `B` stacks are still too expensive. The next
 kernel milestone must generate and apply the deterministic random field inside
 the fused op, or otherwise eliminate `B` stack construction and the scalar-rank
 expand loop.
+
+Current L40S stateless-counter expand evidence:
+
+| condition | backend | shape | correctness | mean latency |
+| --- | --- | --- | --- | ---: |
+| microbench | Triton stateless counter expand | rows=37 rank=16 out=96 candidates=5 | exact vs CPU counter reference, max diff `0.0` | `0.0270 ms` |
+| A/B | materialized B expand | rows=64 rank=64 out=1024 candidates=16 | exact scaffold path | `0.0465 ms` |
+| A/B | stateless counter expand | rows=64 rank=64 out=1024 candidates=16 | kernel law guarded by CUDA parity tests | `0.0500 ms` |
+| A/B | materialized B expand | rows=256 rank=64 out=1024 candidates=16 | exact scaffold path | `0.1850 ms` |
+| A/B | stateless counter expand | rows=256 rank=64 out=1024 candidates=16 | kernel law guarded by CUDA parity tests | `0.0935 ms` |
+| A/B | materialized B expand | rows=256 rank=128 out=4096 candidates=16 | exact scaffold path | `1.2810 ms` |
+| A/B | stateless counter expand | rows=256 rank=128 out=4096 candidates=16 | kernel law guarded by CUDA parity tests | `0.4008 ms` |
+| A/B | materialized B expand | rows=512 rank=128 out=4096 candidates=16 | exact scaffold path | `2.7291 ms` |
+| A/B | stateless counter expand | rows=512 rank=128 out=4096 candidates=16 | kernel law guarded by CUDA parity tests | `0.7207 ms` |
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/l40s_counterkernel/counter_kernel_probe/microbench_summary.json`
+- `results/remote_lazy_kernel_validation/l40s_counterkernel/counter_kernel_probe/expand_ab_summary.json`
+- `results/remote_lazy_kernel_validation/l40s_counterkernel/counter_kernel_probe/expand_ab_latency.png`
+
+This is the first evidence that the final lever is plausibly the fused kernel:
+the stateless expand stage removes the `B`-stack memory traffic and beats the
+cached/materialized expand at larger shapes. It is still only the expand stage.
+`Qx` is computed separately in the hook path, and end-to-end p128/p1024
+throughput still needs a fused shrink+expand or vLLM custom-op integration.
+The vLLM hook defaults to `torch_generator_field_v1` for materialized bridge
+backends and to `counter_gaussian_v1` for `triton-counter`, so the old bridge
+does not fall onto the slow Python SHA materialization path.
 
 The p128/32-prompt L40S shape also OOMed under vLLM after many candidate
 chunks, despite smaller per-chunk scheduling, because the run became a KV/cache

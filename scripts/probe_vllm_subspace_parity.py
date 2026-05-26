@@ -439,7 +439,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--logprobs", type=int, default=20)
     parser.add_argument("--prompt-logprobs", type=int, default=20)
     parser.add_argument("--prompt-tail-tokens", type=int, default=8)
-    parser.add_argument("--lazy-delta-backend", default="vllm-lora-kernel", choices=["torch", "triton", "vllm-lora-kernel", "vllm-lora"])
+    parser.add_argument("--lazy-delta-backend", default="vllm-lora-kernel", choices=["torch", "triton", "triton-counter", "vllm-lora-kernel", "vllm-lora"])
     parser.add_argument("--lazy-field-policy", default="target-split", choices=["target-split", "fused-qkv-exact"])
     parser.add_argument("--lazy-qkv-kernel-policy", default="split-launches", choices=["split-launches", "packed-qkv"])
     parser.add_argument("--lazy-compute-dtype", default="bfloat16")
@@ -471,7 +471,7 @@ def main() -> int:
     prompt_variant = (args.prompt_variants or ",".join(source_summary.get("prompt_variants") or ["tight"])).split(",", 1)[0].strip() or "tight"
     use_chat_template = bool(source_summary.get("use_chat_template", False)) if args.use_chat_template is None else bool(args.use_chat_template)
     targets = _parse_targets(args.targets or ",".join(_default_adapter_targets(source_summary, args.adapter_policy)), source_summary)
-    candidates = load_subspace_candidates(source / "candidates.jsonl", _wanted(args))
+    candidates = load_subspace_candidates(source / "candidates.jsonl", _wanted(args), rng_version_override=source_summary.get("rng_version"))
     if args.candidate_id is None and args.candidate_id_file is None:
         candidates = candidates[:1]
     basis_rank = int(candidates[0].basis_rank)

@@ -12,7 +12,7 @@ from optimus.core.perturbations import PerturbationSpec
 from optimus.modeling.subspace_lora import subspace_lora_tensors
 from optimus.modeling.noise import lora_noise_tensors
 from optimus.search.ensemble import majority_vote_evaluation
-from optimus.subspace import SubspaceCandidate
+from optimus.subspace import SubspaceCandidate, counter_gaussian_v1, gaussian_hash_v1, stable_u32
 from optimus.tasks.countdown import CountdownExample
 from scripts.eval_vllm_lazy_k1 import _filter_targets, _load_betas
 
@@ -379,6 +379,147 @@ def test_vllm_lazy_hook_triton_backend_fails_closed_on_cpu():
 
     with pytest.raises(RuntimeError, match="triton|CUDA"):
         runtime.delta(target, torch.ones((2, 2)), torch.zeros((2, 3)))
+
+
+def test_vllm_lazy_hook_triton_counter_backend_fails_closed_on_cpu():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+        input_dim=2,
+        output_dim=3,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.delta_backend = "triton-counter"
+    runtime.compute_dtype_policy = "bfloat16"
+    runtime.basis_by_site[target.site_id] = torch.eye(2)
+    runtime.beta_by_target[target.target_id] = 0.25
+    runtime.set_candidate(replace(_candidate("a", 11), rng_version="counter_gaussian_v1"))
+
+    with pytest.raises(RuntimeError, match="triton|CUDA"):
+        runtime.delta(target, torch.ones((2, 2)), torch.zeros((2, 3)))
+
+
+def test_vllm_lazy_hook_triton_counter_rejects_non_counter_rng_on_cpu():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+        input_dim=2,
+        output_dim=3,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.delta_backend = "triton-counter"
+    runtime.compute_dtype_policy = "bfloat16"
+    runtime.basis_by_site[target.site_id] = torch.eye(2)
+    runtime.beta_by_target[target.target_id] = 0.25
+    runtime.set_candidate(replace(_candidate("a", 11), rng_version="gaussian_hash_v1"))
+
+    with pytest.raises(RuntimeError, match="counter_gaussian_v1"):
+        runtime.delta(target, torch.ones((2, 2)), torch.zeros((2, 3)))
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+def test_vllm_lazy_hook_triton_counter_cuda_matches_torch_counter_rng():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(16, 20),
+        input_dim=16,
+        output_dim=20,
+    )
+    torch.manual_seed(0)
+    basis = torch.randn((4, 16), dtype=torch.float32)
+    x = torch.randn((7, 16), device="cuda", dtype=torch.float32)
+    y = torch.zeros((7, 20), device="cuda", dtype=torch.float32)
+    cand_a = replace(_candidate("a", 11), rng_version="counter_gaussian_v1", basis_rank=4, sign="+")
+    cand_b = replace(_candidate("b", 29), rng_version="counter_gaussian_v1", basis_rank=4, sign="-")
+
+    torch_runtime = LazyHookRuntime([target])
+    torch_runtime.delta_backend = "torch"
+    torch_runtime.compute_dtype_policy = "float32"
+    torch_runtime.basis_by_site[target.site_id] = basis
+    torch_runtime.beta_by_target[target.target_id] = 0.125
+    torch_runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=1)
+    torch_runtime.update_row_candidates(["0", "1"], [0, 3, 7])
+
+    triton_runtime = LazyHookRuntime([target])
+    triton_runtime.delta_backend = "triton-counter"
+    triton_runtime.compute_dtype_policy = "float32"
+    triton_runtime.basis_by_site[target.site_id] = basis
+    triton_runtime.beta_by_target[target.target_id] = 0.125
+    triton_runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=1)
+    triton_runtime.update_row_candidates(["0", "1"], [0, 3, 7])
+
+    expected = torch_runtime.delta(target, x, y)
+    actual = triton_runtime.delta(target, x, y)
+
+    assert torch.allclose(actual, expected, atol=1e-5, rtol=1e-5)
+    assert triton_runtime.delta_rows == 7
+    assert triton_runtime.delta_calls == 1
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+def test_vllm_lazy_hook_triton_counter_cuda_matches_fused_qkv_exact_offsets():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.qkv_proj",
+        target_id="layer_0.self_attn.qkv_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="qkv_proj",
+        module=torch.nn.Linear(12, 20),
+        input_dim=12,
+        output_dim=20,
+        fused_qkv_slices=("q_proj", "v_proj"),
+        fused_q_out=8,
+        fused_kv_out=6,
+    )
+    torch.manual_seed(1)
+    basis = torch.randn((4, 12), dtype=torch.float32)
+    x = torch.randn((5, 12), device="cuda", dtype=torch.float32)
+    y = torch.zeros((5, 20), device="cuda", dtype=torch.float32)
+    cand = replace(_candidate("a", 41), rng_version="counter_gaussian_v1", basis_rank=4, sign="-")
+    beta_by_target = {
+        "layer_0.self_attn.q_proj": 0.03,
+        "layer_0.self_attn.v_proj": 0.07,
+    }
+
+    torch_runtime = LazyHookRuntime([target])
+    torch_runtime.delta_backend = "torch"
+    torch_runtime.field_policy = "fused-qkv-exact"
+    torch_runtime.compute_dtype_policy = "float32"
+    torch_runtime.basis_by_site[target.site_id] = basis
+    torch_runtime.beta_by_target.update(beta_by_target)
+    torch_runtime.set_candidate(cand)
+
+    triton_runtime = LazyHookRuntime([target])
+    triton_runtime.delta_backend = "triton-counter"
+    triton_runtime.field_policy = "fused-qkv-exact"
+    triton_runtime.compute_dtype_policy = "float32"
+    triton_runtime.basis_by_site[target.site_id] = basis
+    triton_runtime.beta_by_target.update(beta_by_target)
+    triton_runtime.set_candidate(cand)
+
+    expected = torch_runtime.delta(target, x, y)
+    actual = triton_runtime.delta(target, x, y)
+
+    assert torch.allclose(actual, expected, atol=1e-5, rtol=1e-5)
+    assert torch.count_nonzero(actual[:, 8:14]) == 0
+    assert torch.count_nonzero(actual[:, :8]) > 0
+    assert torch.count_nonzero(actual[:, 14:]) > 0
 
 
 class _FakeLazyRuntime:
@@ -1004,6 +1145,43 @@ def test_vllm_lazy_replay_bfloat16_scales_field_before_matmul_like_adapter():
     expected = (x @ a.T) @ b.T
 
     assert torch.equal(delta, expected)
+
+
+def test_vllm_lazy_replay_honors_gaussian_hash_candidate_rng():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+    )
+    candidate = replace(_subspace_candidate_for_adapter(), rng_version="gaussian_hash_v1", basis_rank=2)
+    runtime = LazyHookRuntime([target])
+    field = runtime.field(target, candidate, output_dim=3, rank=2, device=torch.device("cpu"), dtype=torch.float32)
+
+    expected = torch.tensor(
+        [
+            [
+                gaussian_hash_v1(direction_seed=11, target_id=target.target_id, output_index=out_idx, basis_index=basis_idx)
+                for basis_idx in range(2)
+            ]
+            for out_idx in range(3)
+        ],
+        dtype=torch.float32,
+    )
+    assert torch.equal(field, expected)
+
+
+def test_counter_gaussian_v1_field_is_candidate_order_independent():
+    target_hash = stable_u32("layer_0.self_attn.q_proj")
+    first = counter_gaussian_v1(direction_seed=11, target_hash=target_hash, output_index=3, basis_index=1)
+    second = counter_gaussian_v1(direction_seed=11, target_hash=target_hash, output_index=3, basis_index=1)
+    opposite = counter_gaussian_v1(direction_seed=11, target_hash=target_hash, output_index=3, basis_index=1, sign="-")
+
+    assert first == second
+    assert opposite == -first
 
 
 def test_vllm_lazy_random_field_is_device_independent_when_cuda_available():

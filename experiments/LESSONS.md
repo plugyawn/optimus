@@ -25,6 +25,13 @@
   materialized `B` stacks are not the production shape. The next real speed
   attempt must fuse deterministic random-field generation/application and
   eliminate per-target `B` stack construction from the hot path.
+- `counter_gaussian_v1` is the right kernel-facing random-field law for the
+  next implementation stage. It gives deterministic replay from candidate id
+  metadata without SHA256 or `torch.Generator` state in the hot path, and the
+  L40S expand A/B shows that generating the field in-kernel can beat loading
+  materialized `B` stacks at realistic output/rank sizes. This does not close
+  the job: `Qx` is still a separate matmul and Python hook scheduling is still
+  outside the kernel.
 - p128 throughput tests on 48GB L40S need a scheduling cap. The p128/32-prompt
   run can OOM after many candidate chunks because vLLM retains or fragments
   enough KV/cache state that the measurement stops being about lazy-delta

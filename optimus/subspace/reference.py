@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import math
+import os
 import platform
 import subprocess
 import sys
@@ -23,7 +24,7 @@ from optimus.subspace import (
     ScaleMode,
     SubspaceCandidate,
     TargetModule,
-    gaussian_hash_v1,
+    random_field_tensor,
 )
 from optimus.tasks.countdown import CountdownExample, load_examples, semantic_example_key
 
@@ -55,20 +56,16 @@ class CandidateRandomField:
     salt: str = ""
 
     def tensor(self, output_dim: int, basis_dim: int, *, dtype: torch.dtype = torch.float32) -> torch.Tensor:
-        values = [
-            gaussian_hash_v1(
-                direction_seed=self.direction_seed,
-                target_id=self.target_id,
-                output_index=out_idx,
-                basis_index=basis_idx,
-                sign=self.sign,
-                rng_version=self.rng_version,
-                salt=self.salt,
-            )
-            for out_idx in range(output_dim)
-            for basis_idx in range(basis_dim)
-        ]
-        return torch.tensor(values, dtype=dtype).reshape(output_dim, basis_dim)
+        return random_field_tensor(
+            direction_seed=self.direction_seed,
+            sign=self.sign,  # type: ignore[arg-type]
+            target_id=self.target_id,
+            output_dim=output_dim,
+            basis_rank=basis_dim,
+            rng_version=self.rng_version,
+            dtype=dtype,
+            salt=self.salt,
+        )
 
 
 @dataclass(frozen=True)
@@ -512,6 +509,7 @@ def make_candidates(
     basis_rank: int,
     prompt_scoring_config_hash: str,
     backend: str,
+    rng_version: str = "gaussian_hash_v1",
 ) -> list[SubspaceCandidate]:
     out = []
     for idx in range(population):
@@ -538,9 +536,19 @@ def make_candidates(
                 worker_id=f"{backend}-reference-worker0",
                 device_id="cuda:0" if torch.cuda.is_available() else "cpu",
                 prompt_scoring_config_hash=prompt_scoring_config_hash,
+                rng_version=rng_version,
             )
         )
     return out
+
+
+def requested_rng_version(args: Any | None = None, *, default: str = "gaussian_hash_v1") -> str:
+    value = getattr(args, "rng_version", None) if args is not None else None
+    value = value or os.environ.get("OPTIMUS_SUBSPACE_RNG_VERSION") or default
+    value = str(value).strip()
+    if value not in {"gaussian_hash_v1", "torch_generator_field_v1", "counter_gaussian_v1"}:
+        raise ValueError(f"unsupported subspace rng_version {value!r}")
+    return value
 
 
 def candidate_score(
@@ -766,6 +774,7 @@ def run_reference_search(args: Any, *, backend: str) -> dict[str, Any]:
     prompt_ids_hash = examples_hash(screen, label="screen_prompt_ids")
     sample_set_hash = config_hash({"screen": screen_hash, "holdout": holdout_hash})
     prompt_scoring_config_hash = config_hash({"scorer": "reference_countdown_subspace", "prompt_ids_hash": prompt_ids_hash})
+    rng_version = requested_rng_version(args)
     input_dim = max(16, min(256, max(basis_rank, 8)))
     output_dim = max(8, min(64, input_dim))
     setup_start = time.perf_counter()
@@ -797,6 +806,7 @@ def run_reference_search(args: Any, *, backend: str) -> dict[str, Any]:
         basis_rank=basis_rank,
         prompt_scoring_config_hash=prompt_scoring_config_hash,
         backend=backend,
+        rng_version=rng_version,
     )
     setup_time_s = time.perf_counter() - setup_start
     selection_rule_hash = config_hash({"rule": "screen_top_k_fixed_config", "K": locked_k, "radius": locked_radius})
@@ -875,6 +885,7 @@ def run_reference_search(args: Any, *, backend: str) -> dict[str, Any]:
             "scale_mode": scale_mode,
             "radius": locked_radius,
             "budget_hash": budget_hash,
+            "rng_version": rng_version,
             "candidate_routing": "row_candidate_id",
         }
     )
@@ -897,7 +908,7 @@ def run_reference_search(args: Any, *, backend: str) -> dict[str, Any]:
         "budget_policy": budget_policy,
         "target_set_hash": state.target_set_hash,
         "candidate_scores_hash": scores_hash,
-        "rng_version": "gaussian_hash_v1",
+        "rng_version": rng_version,
         "scorer_version": "reference_countdown_subspace_v1",
         "prompt_ids_hash": prompt_ids_hash,
         "sample_set_hash": sample_set_hash,
@@ -1050,7 +1061,7 @@ def run_reference_search(args: Any, *, backend: str) -> dict[str, Any]:
         "rho_grid": rho_grid,
         "sigma_w_grid": sigma_w_grid,
         "budget_policy": budget_policy,
-        "rng_version": "gaussian_hash_v1",
+        "rng_version": rng_version,
         "candidate_routing": "row_candidate_id",
         "prefix_cache_policy": "disabled-for-search",
         "scorer_name": "reference_countdown_subspace",

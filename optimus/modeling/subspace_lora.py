@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import re
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -11,7 +10,7 @@ import torch
 
 from optimus.modeling.lora import AdapterSpec, adapter_config, write_adapter_json
 from optimus.modeling.qwen import qwen_lora_shapes
-from optimus.subspace import SubspaceCandidate, sign_value
+from optimus.subspace import SubspaceCandidate, random_field_tensor, sign_value
 
 
 _LAYER_RE = re.compile(r"\.layers\.(\d+)\.")
@@ -53,7 +52,7 @@ def subspace_candidate_from_record(row: dict[str, Any]) -> SubspaceCandidate:
     )
 
 
-def load_subspace_candidates(path: Path, wanted: set[str] | None = None) -> list[SubspaceCandidate]:
+def load_subspace_candidates(path: Path, wanted: set[str] | None = None, *, rng_version_override: str | None = None) -> list[SubspaceCandidate]:
     candidates: list[SubspaceCandidate] = []
     for line in path.read_text().splitlines():
         if not line.strip():
@@ -61,6 +60,8 @@ def load_subspace_candidates(path: Path, wanted: set[str] | None = None) -> list
         candidate = subspace_candidate_from_record(json.loads(line))
         if wanted is not None and candidate.candidate_id not in wanted:
             continue
+        if rng_version_override:
+            candidate = replace(candidate, rng_version=rng_version_override)
         candidates.append(candidate)
     if not candidates:
         raise ValueError(f"no subspace candidates selected from {path}")
@@ -119,22 +120,25 @@ def _qkv_slice(suffix: str, *, q_out: int, kv_out: int) -> slice:
     raise ValueError(f"not a fused qkv suffix: {suffix!r}")
 
 
-def _torch_generator_field(
+def _candidate_field(
     *,
-    direction_seed: int,
-    sign: str,
+    candidate: SubspaceCandidate,
     target_id: str,
     output_dim: int,
     basis_rank: int,
     dtype: torch.dtype = torch.float32,
+    output_offset: int = 0,
 ) -> torch.Tensor:
-    seed_payload = f"{int(direction_seed)}\0{target_id}\0torch_generator_field_v1".encode("utf-8")
-    seed = int(hashlib.sha256(seed_payload).hexdigest()[:16], 16) % (2**63 - 1)
-    gen = torch.Generator(device="cpu").manual_seed(seed)
-    field = torch.randn((int(output_dim), int(basis_rank)), generator=gen, dtype=torch.float32)
-    if sign_value(sign) < 0:
-        field = -field
-    return field.to(dtype=dtype)
+    return random_field_tensor(
+        direction_seed=candidate.direction_seed,
+        sign=candidate.sign,
+        target_id=target_id,
+        output_dim=output_dim,
+        basis_rank=basis_rank,
+        rng_version=candidate.rng_version,
+        dtype=dtype,
+        output_offset=output_offset,
+    )
 
 
 def _scale_by_target(summary: dict[str, Any], radius: float) -> dict[str, float]:
@@ -220,19 +224,27 @@ def subspace_lora_tensors(
             fused_target = fused_qkv_target_id_for_lora_module(module_name)
             assert fused_target is not None
             total = q_out + 2 * kv_out
-            field = _torch_generator_field(
-                direction_seed=candidate.direction_seed,
-                sign=candidate.sign,
-                target_id=fused_target,
-                output_dim=total,
-                basis_rank=source_rank,
-            )[_qkv_slice(suffix, q_out=q_out, kv_out=kv_out), : int(q.shape[0])]
+            output_slice = _qkv_slice(suffix, q_out=q_out, kv_out=kv_out)
+            if candidate.rng_version == "torch_generator_field_v1":
+                field = _candidate_field(
+                    candidate=candidate,
+                    target_id=fused_target,
+                    output_dim=total,
+                    basis_rank=source_rank,
+                )[output_slice, : int(q.shape[0])]
+            else:
+                field = _candidate_field(
+                    candidate=candidate,
+                    target_id=fused_target,
+                    output_dim=output_slice.stop - output_slice.start,
+                    basis_rank=source_rank,
+                    output_offset=output_slice.start,
+                )[:, : int(q.shape[0])]
             beta = beta_by_target[fused_target]
         else:
             target_id = split_target_id_for_lora_module(module_name)
-            field = _torch_generator_field(
-                direction_seed=candidate.direction_seed,
-                sign=candidate.sign,
+            field = _candidate_field(
+                candidate=candidate,
                 target_id=target_id,
                 output_dim=int(out_features),
                 basis_rank=source_rank,

@@ -25,7 +25,17 @@ from optimus.serving.runtime import (
     write_json,
     write_jsonl,
 )
-from optimus.subspace import ActivationSite, BasisKind, BudgetPolicy, ScaleMode, SubspaceCandidate, TargetModule
+from optimus.subspace import (
+    ActivationSite,
+    BasisKind,
+    BudgetPolicy,
+    ScaleMode,
+    SubspaceCandidate,
+    TargetModule,
+    random_field_tensor,
+    sign_value,
+    stable_u32,
+)
 from optimus.subspace.reference import (
     ReferenceState,
     TargetRuntime,
@@ -38,6 +48,7 @@ from optimus.subspace.reference import (
     parse_float_grid,
     parse_int_grid,
     parse_layers,
+    requested_rng_version,
     resolve_target_scales,
     sha256_bytes,
     sha256_json,
@@ -100,8 +111,8 @@ class LazyHookRuntime:
         self.kernel_time_s = 0.0
         self.delta_rows = 0
         self.delta_calls = 0
-        self._field_cache: dict[tuple[str, str, str, torch.dtype, int, int, int], torch.Tensor] = {}
-        self._scaled_field_cache: dict[tuple[str, str, str, torch.dtype, int, int, int, float], torch.Tensor] = {}
+        self._field_cache: dict[tuple[str, str, str, str, torch.dtype, int, int, int], torch.Tensor] = {}
+        self._scaled_field_cache: dict[tuple[str, str, str, str, torch.dtype, int, int, int, float], torch.Tensor] = {}
         self._basis_cache: dict[tuple[str, str, torch.dtype], torch.Tensor] = {}
         self._vllm_meta_cache: dict[tuple[str, int, int], Any] = {}
         self._vllm_meta_prepared_keys: dict[tuple[str, int, int], tuple[Any, ...]] = {}
@@ -111,6 +122,7 @@ class LazyHookRuntime:
             tuple[str, tuple[tuple[str, int], ...], str, torch.dtype, int, int, tuple[int, int] | None, int, int, float],
             torch.Tensor,
         ] = {}
+        self._counter_candidate_cache: dict[tuple[tuple[tuple[str, int, str], ...], str], tuple[torch.Tensor, torch.Tensor]] = {}
         self._row_mapping_generation = 0
 
     def reset_timing(self) -> None:
@@ -129,6 +141,7 @@ class LazyHookRuntime:
         self._vllm_b_stack_cache.clear()
         self._vllm_meta_prepared_keys.clear()
         self._vllm_mapping_cache.clear()
+        self._counter_candidate_cache.clear()
         self._row_mapping_generation += 1
 
     def set_candidate(self, candidate: SubspaceCandidate | None) -> None:
@@ -282,19 +295,22 @@ class LazyHookRuntime:
     ) -> torch.Tensor:
         source_rank = max(int(rank), int(candidate.basis_rank))
         field_target_id = target.target_id if target_id is None else target_id
-        key = (field_target_id, candidate.candidate_id, str(device), dtype, output_dim, source_rank, rank)
+        rng_version = str(candidate.rng_version)
+        key = (field_target_id, candidate.candidate_id, rng_version, str(device), dtype, output_dim, source_rank, rank)
         cached = self._field_cache.get(key)
         if cached is not None:
             return cached
-        seed_payload = f"{candidate.direction_seed}\0{field_target_id}\0torch_generator_field_v1".encode("utf-8")
-        seed = int(hashlib.sha256(seed_payload).hexdigest()[:16], 16) % (2**63 - 1)
-        gen = torch.Generator(device="cpu").manual_seed(seed)
-        field = torch.randn((output_dim, source_rank), generator=gen, dtype=torch.float32).to(device)
-        if candidate.sign == "-":
-            field = -field
-        field = field[:, : int(rank)].contiguous()
-        if dtype != torch.float32:
-            field = field.to(dtype=dtype)
+        field = random_field_tensor(
+            direction_seed=candidate.direction_seed,
+            sign=candidate.sign,
+            target_id=field_target_id,
+            output_dim=output_dim,
+            basis_rank=rank,
+            source_rank=source_rank,
+            rng_version=rng_version,
+            device=device,
+            dtype=dtype,
+        )
         self._field_cache[key] = field
         return field
 
@@ -312,7 +328,8 @@ class LazyHookRuntime:
     ) -> torch.Tensor:
         source_rank = max(int(rank), int(candidate.basis_rank))
         field_target_id = target.target_id if target_id is None else target_id
-        key = (field_target_id, candidate.candidate_id, str(device), dtype, output_dim, source_rank, rank, float(beta))
+        rng_version = str(candidate.rng_version)
+        key = (field_target_id, candidate.candidate_id, rng_version, str(device), dtype, output_dim, source_rank, rank, float(beta))
         cached = self._scaled_field_cache.get(key)
         if cached is not None:
             return cached
@@ -850,6 +867,133 @@ class LazyHookRuntime:
         self.kernel_time_s += time.perf_counter() - kernel_started
         return delta
 
+    def _counter_candidate_tensors(
+        self,
+        candidates: list[SubspaceCandidate],
+        *,
+        device: torch.device,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        for candidate in candidates:
+            if str(candidate.rng_version) != "counter_gaussian_v1":
+                raise RuntimeError(
+                    "triton-counter lazy delta backend requires counter_gaussian_v1 candidates; "
+                    f"{candidate.candidate_id} has rng_version={candidate.rng_version!r}"
+                )
+        key = (tuple((candidate.candidate_id, int(candidate.direction_seed), candidate.sign) for candidate in candidates), str(device))
+        cached = self._counter_candidate_cache.get(key)
+        if cached is not None:
+            return cached
+        seeds = torch.tensor([int(candidate.direction_seed) & 0xFFFFFFFF for candidate in candidates], dtype=torch.int64, device=device)
+        signs = torch.tensor([sign_value(candidate.sign) for candidate in candidates], dtype=torch.int32, device=device)
+        cached = (seeds.contiguous(), signs.contiguous())
+        self._counter_candidate_cache[key] = cached
+        return cached
+
+    def _triton_counter_delta_for_target(
+        self,
+        target: HookTarget,
+        candidates: list[SubspaceCandidate],
+        row_mapping: torch.Tensor,
+        z: torch.Tensor,
+        *,
+        output_dim: int,
+        dtype: torch.dtype,
+        beta: float,
+        target_id: str,
+        output_offset: int = 0,
+    ) -> torch.Tensor:
+        from optimus.kernels import triton_subspace_expand_counter
+
+        stack_started = time.perf_counter()
+        seeds, signs = self._counter_candidate_tensors(candidates, device=z.device)
+        row_mapping_device = row_mapping.to(device=z.device, dtype=torch.int32, non_blocking=True).contiguous()
+        self.stack_time_s += time.perf_counter() - stack_started
+        kernel_started = time.perf_counter()
+        delta = triton_subspace_expand_counter(
+            z.to(dtype=dtype),
+            seeds,
+            signs,
+            row_mapping_device,
+            target_hash=stable_u32(target_id),
+            beta=float(beta),
+            output_dim=output_dim,
+            output_offset=output_offset,
+        )
+        self.kernel_time_s += time.perf_counter() - kernel_started
+        return delta
+
+    def _delta_triton_counter(
+        self,
+        target: HookTarget,
+        z: torch.Tensor,
+        y: torch.Tensor,
+        *,
+        candidate: SubspaceCandidate | None,
+        row_candidates: list[SubspaceCandidate],
+        row_candidate_indices: torch.Tensor | None,
+        output_dim: int,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if candidate is not None:
+            candidates = [candidate]
+            row_mapping = torch.zeros((int(z.shape[0]),), dtype=torch.int32)
+        else:
+            if row_candidate_indices is None or not row_candidates:
+                raise RuntimeError("missing row-candidate routing for triton-counter lazy delta backend")
+            candidates = row_candidates
+            row_mapping = row_candidate_indices.to(dtype=torch.int32)
+            if row_mapping.numel():
+                min_index = int(row_mapping.min().item())
+                max_index = int(row_mapping.max().item())
+                if min_index < 0 or max_index >= len(candidates):
+                    raise RuntimeError(
+                        "Triton-counter lazy hook row-candidate mapping is out of bounds: "
+                        f"min={min_index} max={max_index} candidates={len(candidates)}"
+                    )
+
+        if target.suffix == "qkv_proj" and target.fused_qkv_slices:
+            delta = torch.zeros((int(z.shape[0]), output_dim), device=z.device, dtype=dtype)
+            for suffix in target.fused_qkv_slices:
+                beta = self._beta_for_split(target, suffix)
+                if beta is None or float(beta) == 0.0:
+                    continue
+                output_slice = self._qkv_slice_for(target, suffix, output_dim)
+                width = int(output_slice.stop - output_slice.start)
+                if self.field_policy == "fused-qkv-exact":
+                    field_target_id = target.target_id
+                    output_offset = int(output_slice.start)
+                else:
+                    field_target_id = self._split_target_id(target, suffix)
+                    output_offset = 0
+                split = self._triton_counter_delta_for_target(
+                    target,
+                    candidates,
+                    row_mapping,
+                    z,
+                    output_dim=width,
+                    dtype=dtype,
+                    beta=float(beta),
+                    target_id=field_target_id,
+                    output_offset=output_offset,
+                )
+                delta[:, output_slice] = split
+            return delta.reshape(y.shape).to(dtype=y.dtype)
+
+        beta = self._beta_for_split(target)
+        if beta is None or float(beta) == 0.0:
+            return torch.zeros_like(y)
+        delta = self._triton_counter_delta_for_target(
+            target,
+            candidates,
+            row_mapping,
+            z,
+            output_dim=output_dim,
+            dtype=dtype,
+            beta=float(beta),
+            target_id=target.target_id,
+        )
+        return delta.reshape(y.shape).to(dtype=y.dtype)
+
     def _delta_triton(
         self,
         target: HookTarget,
@@ -982,7 +1126,7 @@ class LazyHookRuntime:
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return delta
-        if self.delta_backend not in {"torch", "triton"}:
+        if self.delta_backend not in {"torch", "triton", "triton-counter"}:
             raise RuntimeError(f"unknown lazy delta backend {self.delta_backend!r}")
         if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
             torch.cuda.synchronize(flat_x.device)
@@ -1004,6 +1148,26 @@ class LazyHookRuntime:
                 row_candidate_indices=row_candidate_indices,
                 output_dim=output_dim,
                 rank=rank,
+                dtype=compute_dtype,
+            )
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
+            self.delta_time_s += time.perf_counter() - delta_start
+            self.delta_rows += int(flat_x.shape[0])
+            self.delta_calls += 1
+            return delta
+        if self.delta_backend == "triton-counter":
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
+            delta_start = time.perf_counter()
+            delta = self._delta_triton_counter(
+                target,
+                z,
+                y,
+                candidate=candidate,
+                row_candidates=row_candidates,
+                row_candidate_indices=row_candidate_indices,
+                output_dim=output_dim,
                 dtype=compute_dtype,
             )
             if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
@@ -1506,6 +1670,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
         for scale in scales:
             runtime.beta_by_target[scale.target_id] = scale.beta_t_by_radius[f"{locked_radius:g}"]
         budget_hash = config_hash({"budget_policy": budget_policy, "target_set_hash": state.target_set_hash})
+        default_rng_version = "counter_gaussian_v1" if runtime.delta_backend == "triton-counter" else "torch_generator_field_v1"
+        rng_version = requested_rng_version(args, default=default_rng_version)
         candidates = make_candidates(
             population=population,
             seed=int(args.seed or 0),
@@ -1520,6 +1686,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             basis_rank=basis_rank,
             prompt_scoring_config_hash=prompt_scoring_config_hash,
             backend="vllm",
+            rng_version=rng_version,
         )
         score_rows = []
         candidate_score_rows = []
@@ -1646,6 +1813,10 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
         promote_count = min(population, max(max(ensemble_k_values), int(args.promote or locked_k)))
         promoted_candidates = [candidate_by_id[row["candidate_id"]] for row in ranked[:promote_count]]
         top_candidates = promoted_candidates[:locked_k]
+        rng_versions = sorted({str(candidate.rng_version) for candidate in candidates})
+        if len(rng_versions) != 1:
+            raise RuntimeError(f"mixed subspace candidate rng_version values are not supported: {rng_versions}")
+        rng_version = rng_versions[0]
         holdout_elapsed_total = 0.0
         holdout_score_rows = []
         for holdout_index, candidate in enumerate(promoted_candidates):
@@ -1727,7 +1898,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
                 "scale_mode": scale_mode,
                 "radius": locked_radius,
                 "budget_hash": budget_hash,
-        "candidate_routing": "row_candidate_id",
+                "rng_version": rng_version,
+                "candidate_routing": "row_candidate_id",
             }
         )
         created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -1809,7 +1981,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             "target_set_hash": state.target_set_hash,
             "candidate_scores_hash": scores_hash,
             "ensemble_scores_hash": ensemble_scores_hash,
-            "rng_version": "torch_generator_field_v1",
+            "rng_version": rng_version,
             "scorer_version": "vllm_lazy_hook_countdown_v1",
             "prompt_ids_hash": prompt_ids_hash,
             "sample_set_hash": sample_set_hash,
@@ -1983,7 +2155,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             "sigma_w_grid": radius_grid if scale_mode == "projected-dense" else None,
             "budget_policy": budget_policy,
             "resolved_target_scales": [asdict(scale) for scale in scales],
-            "rng_version": "torch_generator_field_v1",
+            "rng_version": rng_version,
             "candidate_routing": "row_candidate_id",
             "prefix_cache_policy": "disabled-for-search",
             "kernel": args.kernel or "custom-op",
