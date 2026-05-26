@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import torch
 
 from optimus.backends.vllm_lazy_hook import HookTarget, LazyHookRuntime
@@ -9,6 +11,7 @@ from optimus.modeling.noise import lora_noise_tensors
 from optimus.search.ensemble import majority_vote_evaluation
 from optimus.subspace import SubspaceCandidate
 from optimus.tasks.countdown import CountdownExample
+from scripts.eval_vllm_lazy_k1 import _load_betas
 
 
 def test_vllm_lazy_hook_ensemble_rows_normalize_candidate_id():
@@ -418,3 +421,72 @@ def test_subspace_adapter_bridge_target_split_uses_requested_targets_only():
     assert "base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight" in tensors
     assert "base_model.model.model.layers.0.self_attn.v_proj.lora_B.weight" in tensors
     assert not any(".k_proj." in key for key in tensors)
+
+
+def test_vllm_lazy_replay_expands_fused_qkv_betas_and_scales():
+    source_summary = {
+        "resolved_target_scales": [
+            {
+                "target_id": "layer_0.self_attn.qkv_proj",
+                "beta_t_by_radius": {"0.4": 0.25},
+            }
+        ]
+    }
+
+    betas = _load_betas(source_summary, radius=0.4, scale_multiplier=2.0)
+
+    assert betas["layer_0.self_attn.qkv_proj"] == 0.5
+    assert betas["layer_0.self_attn.q_proj"] == 0.5
+    assert betas["layer_0.self_attn.k_proj"] == 0.5
+    assert betas["layer_0.self_attn.v_proj"] == 0.5
+
+
+def test_vllm_lazy_replay_matches_target_split_subspace_adapter_rank_and_scale():
+    basis = torch.eye(4)[:3].contiguous()
+    state_payload = {"basis_tensors": {"basis/layer_0.attn_in": basis}}
+    state_summary = {"activation_sites": [{"site_id": "layer_0.attn_in", "basis_tensor_key": "basis/layer_0.attn_in"}]}
+    source_summary = {
+        "resolved_target_scales": [
+            {
+                "target_id": "layer_0.self_attn.qkv_proj",
+                "beta_t_by_radius": {"0.4": 0.25},
+            }
+        ]
+    }
+    candidate = replace(_subspace_candidate_for_adapter(), basis_rank=3)
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(4, 4),
+        input_dim=4,
+        output_dim=4,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.basis_by_site[target.site_id] = basis[:2].contiguous()
+    runtime.beta_by_target.update(_load_betas(source_summary, radius=0.4, scale_multiplier=2.0))
+    runtime.set_candidate(candidate)
+    x = torch.tensor([[1.0, -2.0, 0.5, 3.0], [0.25, 1.5, -1.0, 2.0]])
+    y = torch.zeros((2, 4))
+
+    delta = runtime.delta(target, x, y)
+    tensors = subspace_lora_tensors(
+        config=_TinyQwenConfig(),
+        state_payload=state_payload,
+        state_summary=state_summary,
+        source_summary=source_summary,
+        candidate=candidate,
+        targets=["q_proj"],
+        policy="target-split",
+        tensor_dtype="float32",
+        adapter_rank=2,
+        scale_multiplier=2.0,
+    )
+    a = tensors["base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight"]
+    b = tensors["base_model.model.model.layers.0.self_attn.q_proj.lora_B.weight"]
+    expected = (x @ a.T) @ b.T
+
+    assert torch.allclose(delta, expected)

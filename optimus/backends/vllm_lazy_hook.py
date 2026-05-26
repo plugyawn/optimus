@@ -85,7 +85,7 @@ class LazyHookRuntime:
         self.delta_time_s = 0.0
         self.delta_rows = 0
         self.delta_calls = 0
-        self._field_cache: dict[tuple[str, str, str, torch.dtype, int, int], torch.Tensor] = {}
+        self._field_cache: dict[tuple[str, str, str, torch.dtype, int, int, int], torch.Tensor] = {}
         self._basis_cache: dict[tuple[str, str, torch.dtype], torch.Tensor] = {}
 
     def reset_timing(self) -> None:
@@ -203,7 +203,8 @@ class LazyHookRuntime:
         device: torch.device,
         dtype: torch.dtype,
     ) -> torch.Tensor:
-        key = (target.target_id, candidate.candidate_id, str(device), dtype, output_dim, rank)
+        source_rank = max(int(rank), int(candidate.basis_rank))
+        key = (target.target_id, candidate.candidate_id, str(device), dtype, output_dim, source_rank, rank)
         cached = self._field_cache.get(key)
         if cached is not None:
             return cached
@@ -211,12 +212,13 @@ class LazyHookRuntime:
         seed = int(hashlib.sha256(seed_payload).hexdigest()[:16], 16) % (2**63 - 1)
         try:
             gen = torch.Generator(device=device).manual_seed(seed)
-            field = torch.randn((output_dim, rank), generator=gen, device=device, dtype=torch.float32)
+            field = torch.randn((output_dim, source_rank), generator=gen, device=device, dtype=torch.float32)
         except Exception:
             gen = torch.Generator(device="cpu").manual_seed(seed)
-            field = torch.randn((output_dim, rank), generator=gen, dtype=torch.float32).to(device)
+            field = torch.randn((output_dim, source_rank), generator=gen, dtype=torch.float32).to(device)
         if candidate.sign == "-":
             field = -field
+        field = field[:, : int(rank)].contiguous()
         if dtype != torch.float32:
             field = field.to(dtype=dtype)
         self._field_cache[key] = field
