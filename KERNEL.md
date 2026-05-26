@@ -530,6 +530,40 @@ work is still `Qx + counter add`, but it must be a first-class vLLM
 row-block/custom-op scheduling path that removes Python hook dispatch and
 coordinates one activation-site projection with packed counter add.
 
+Current A6000 row-mapping cache evidence:
+
+The stateless counter backends now reuse the same row-candidate mapping cache
+used by the vLLM LoRA-kernel bridge. This avoids repeatedly copying the same
+stable `row_candidate_id` tensor to device for decode shapes that recur under
+vLLM scheduling. `OPTIMUS_LAZY_ROW_MAPPING_CACHE_SIZE=0` disables the cache for
+A/B testing.
+
+Remote validation:
+
+| check | result |
+| --- | --- |
+| local focused hook/kernel suite | `43 passed`, `9` CUDA skips on Mac |
+| remote A6000 focused hook/kernel suite | `52 passed` |
+| p128 cache-on row-map hits/misses | `4760/136` |
+| p128 cache-off row-map hits/misses | `0/4896` |
+
+p128 replay on A6000, cbs64, 8 prompts, rank64 q/v, packed q/v counter add:
+
+| row-map cache | candidates/sec | sec/candidate | lazy delta s | kernel s | stack s | Qx s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| on | `7.648` | `0.1308` | `5.990` | `0.607` | `0.163` | `0.398` |
+| off | `7.369` | `0.1357` | `6.188` | `0.628` | `0.321` | `0.431` |
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/a6000_rowmap/p128_cbs64_cache_on/summary.json`
+- `results/remote_lazy_kernel_validation/a6000_rowmap/p128_cbs64_cache_off/summary.json`
+
+This is worth keeping but it is not the main lever. It trims metadata movement
+and stack time, while the broader throughput gap remains in Python hook
+dispatch, vLLM scheduling, and the absence of a first-class row-block custom
+operator for `Qx + counter add`.
+
 ## Benchmark Ladder
 
 All benchmark rows must record hardware, vLLM version, FlashInfer version,

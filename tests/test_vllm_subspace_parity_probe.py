@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from types import SimpleNamespace
 
 import torch
@@ -136,3 +137,25 @@ def test_compare_capture_rows_tracks_missing_adapter_rows() -> None:
     assert rows == []
     assert summary["missing_adapter_count"] == 1
     assert summary["comparisons"] == 0
+
+
+def test_parse_args_accepts_qx_counter_probe_policy(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "probe_vllm_subspace_parity.py",
+            "--source-run",
+            "source",
+            "--out",
+            "out",
+            "--data",
+            "data.json",
+            "--lazy-qkv-kernel-policy",
+            "packed-qkv-from-x",
+        ],
+    )
+
+    args = probe.parse_args()
+
+    assert args.lazy_qkv_kernel_policy == "packed-qkv-from-x"

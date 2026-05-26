@@ -116,3 +116,10 @@
   `0.465s`). The next useful work remains a first-class vLLM
   row-block/custom-op path for `Qx + counter add`, not sibling-module cache
   tuning.
+- Row-mapping caching is a correct small cleanup, not the missing throughput
+  lever. On A6000 p128 cbs64 with packed q/v counter add, enabling the cache
+  gives `4760/4896` row-map hits, halves measured stack time
+  (`0.321s -> 0.163s`), and improves replay throughput
+  `7.369 -> 7.648 cand/s`. That is useful plumbing, but it confirms the real
+  remaining work is still vLLM row-block/custom-op execution for one `Qx` per
+  activation-site block plus scheduled counter add.

@@ -610,6 +610,8 @@ def _run_lazy_signatures(
         "qx_time_s": runtime.qx_time_s,
         "qx_cache_hits": runtime.qx_cache_hits,
         "qx_cache_misses": runtime.qx_cache_misses,
+        "row_mapping_cache_hits": runtime.row_mapping_cache_hits,
+        "row_mapping_cache_misses": runtime.row_mapping_cache_misses,
         "lazy_delta_time_s": runtime.delta_time_s,
         "lazy_stack_time_s": runtime.stack_time_s,
         "lazy_meta_time_s": runtime.meta_time_s,
@@ -657,7 +659,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt-tail-tokens", type=int, default=8)
     parser.add_argument("--lazy-delta-backend", default="vllm-lora-kernel", choices=["torch", "triton", "triton-counter", "triton-counter-inplace", "vllm-lora-kernel", "vllm-lora"])
     parser.add_argument("--lazy-field-policy", default="target-split", choices=["target-split", "fused-qkv-exact"])
-    parser.add_argument("--lazy-qkv-kernel-policy", default="split-launches", choices=["split-launches", "packed-qkv"])
+    parser.add_argument(
+        "--lazy-qkv-kernel-policy",
+        default="split-launches",
+        choices=["split-launches", "packed-qkv", "packed-qkv-from-x"],
+    )
     parser.add_argument("--lazy-compute-dtype", default="bfloat16")
     parser.add_argument("--sync-lazy-timing", action="store_true")
     parser.add_argument("--capture-target-outputs", action="store_true")

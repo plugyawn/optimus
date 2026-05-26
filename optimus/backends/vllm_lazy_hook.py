@@ -107,6 +107,8 @@ class LazyHookRuntime:
         self.qx_time_s = 0.0
         self.qx_cache_hits = 0
         self.qx_cache_misses = 0
+        self.row_mapping_cache_hits = 0
+        self.row_mapping_cache_misses = 0
         self.delta_time_s = 0.0
         self.stack_time_s = 0.0
         self.meta_time_s = 0.0
@@ -126,6 +128,7 @@ class LazyHookRuntime:
             torch.Tensor,
         ] = {}
         self._counter_candidate_cache: dict[tuple[tuple[tuple[str, int, str], ...], str], tuple[torch.Tensor, torch.Tensor]] = {}
+        self._row_mapping_cache_size = max(0, int(os.environ.get("OPTIMUS_LAZY_ROW_MAPPING_CACHE_SIZE", "64") or "0"))
         self._qx_cache_size = max(0, int(os.environ.get("OPTIMUS_LAZY_QX_CACHE_SIZE", "8") or "0"))
         self._qx_cache: dict[tuple[Any, ...], tuple[torch.Tensor, torch.Tensor]] = {}
         self._row_mapping_generation = 0
@@ -134,6 +137,8 @@ class LazyHookRuntime:
         self.qx_time_s = 0.0
         self.qx_cache_hits = 0
         self.qx_cache_misses = 0
+        self.row_mapping_cache_hits = 0
+        self.row_mapping_cache_misses = 0
         self.delta_time_s = 0.0
         self.stack_time_s = 0.0
         self.meta_time_s = 0.0
@@ -499,6 +504,30 @@ class LazyHookRuntime:
     def _mapping_cache_key(self, *, device: torch.device, rows: int, num_loras: int) -> tuple[Any, ...]:
         return (int(self._row_mapping_generation), str(device), int(rows), int(num_loras))
 
+    def _row_mapping_for(
+        self,
+        row_mapping: torch.Tensor,
+        *,
+        device: torch.device,
+        rows: int,
+        num_candidates: int,
+    ) -> tuple[torch.Tensor, tuple[Any, ...]]:
+        key = self._mapping_cache_key(device=device, rows=rows, num_loras=num_candidates)
+        if self._row_mapping_cache_size <= 0:
+            self.row_mapping_cache_misses += 1
+            token_mapping = row_mapping.to(device=device, dtype=torch.int32, non_blocking=True).contiguous()
+            return token_mapping, (*key, "uncached", int(token_mapping.data_ptr()) if token_mapping.numel() else id(token_mapping))
+        cached = self._vllm_mapping_cache.get(key)
+        if cached is not None:
+            self.row_mapping_cache_hits += 1
+            return cached, key
+        self.row_mapping_cache_misses += 1
+        token_mapping = row_mapping.to(device=device, dtype=torch.int32, non_blocking=True).contiguous()
+        if len(self._vllm_mapping_cache) >= self._row_mapping_cache_size:
+            self._vllm_mapping_cache.clear()
+        self._vllm_mapping_cache[key] = token_mapping
+        return token_mapping, key
+
     def _token_mapping_for(
         self,
         row_mapping: torch.Tensor,
@@ -507,13 +536,7 @@ class LazyHookRuntime:
         rows: int,
         num_loras: int,
     ) -> tuple[torch.Tensor, tuple[Any, ...]]:
-        key = self._mapping_cache_key(device=device, rows=rows, num_loras=num_loras)
-        cached = self._vllm_mapping_cache.get(key)
-        if cached is not None:
-            return cached, key
-        token_mapping = row_mapping.to(device=device, dtype=torch.int32, non_blocking=True).contiguous()
-        self._vllm_mapping_cache[key] = token_mapping
-        return token_mapping, key
+        return self._row_mapping_for(row_mapping, device=device, rows=rows, num_candidates=num_loras)
 
     def _prepare_vllm_meta(
         self,
@@ -958,7 +981,12 @@ class LazyHookRuntime:
 
         stack_started = time.perf_counter()
         seeds, signs = self._counter_candidate_tensors(candidates, device=z.device)
-        row_mapping_device = row_mapping.to(device=z.device, dtype=torch.int32, non_blocking=True).contiguous()
+        row_mapping_device, _ = self._row_mapping_for(
+            row_mapping,
+            device=z.device,
+            rows=int(z.shape[0]),
+            num_candidates=len(candidates),
+        )
         self.stack_time_s += time.perf_counter() - stack_started
         kernel_started = time.perf_counter()
         delta = triton_subspace_expand_counter(
@@ -992,7 +1020,12 @@ class LazyHookRuntime:
 
         stack_started = time.perf_counter()
         seeds, signs = self._counter_candidate_tensors(candidates, device=z.device)
-        row_mapping_device = row_mapping.to(device=z.device, dtype=torch.int32, non_blocking=True).contiguous()
+        row_mapping_device, _ = self._row_mapping_for(
+            row_mapping,
+            device=z.device,
+            rows=int(z.shape[0]),
+            num_candidates=len(candidates),
+        )
         self.stack_time_s += time.perf_counter() - stack_started
         kernel_started = time.perf_counter()
         triton_subspace_add_counter_(
@@ -1030,7 +1063,12 @@ class LazyHookRuntime:
 
         stack_started = time.perf_counter()
         seeds, signs = self._counter_candidate_tensors(candidates, device=z.device)
-        row_mapping_device = row_mapping.to(device=z.device, dtype=torch.int32, non_blocking=True).contiguous()
+        row_mapping_device, _ = self._row_mapping_for(
+            row_mapping,
+            device=z.device,
+            rows=int(z.shape[0]),
+            num_candidates=len(candidates),
+        )
         self.stack_time_s += time.perf_counter() - stack_started
         kernel_started = time.perf_counter()
         triton_subspace_add_counter_qv_(
@@ -1072,7 +1110,12 @@ class LazyHookRuntime:
 
         stack_started = time.perf_counter()
         seeds, signs = self._counter_candidate_tensors(candidates, device=flat_x.device)
-        row_mapping_device = row_mapping.to(device=flat_x.device, dtype=torch.int32, non_blocking=True).contiguous()
+        row_mapping_device, _ = self._row_mapping_for(
+            row_mapping,
+            device=flat_x.device,
+            rows=int(flat_x.shape[0]),
+            num_candidates=len(candidates),
+        )
         self.stack_time_s += time.perf_counter() - stack_started
         kernel_started = time.perf_counter()
         triton_subspace_add_counter_qv_from_x_(
@@ -2146,6 +2189,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
         total_qx = 0.0
         total_qx_cache_hits = 0
         total_qx_cache_misses = 0
+        total_row_mapping_cache_hits = 0
+        total_row_mapping_cache_misses = 0
         total_delta = 0.0
         total_stack = 0.0
         total_meta = 0.0
@@ -2227,6 +2272,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             total_qx += runtime.qx_time_s
             total_qx_cache_hits += int(getattr(runtime, "qx_cache_hits", 0))
             total_qx_cache_misses += int(getattr(runtime, "qx_cache_misses", 0))
+            total_row_mapping_cache_hits += int(getattr(runtime, "row_mapping_cache_hits", 0))
+            total_row_mapping_cache_misses += int(getattr(runtime, "row_mapping_cache_misses", 0))
             total_delta += runtime.delta_time_s
             total_stack += runtime.stack_time_s
             total_meta += runtime.meta_time_s
@@ -2286,6 +2333,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             total_qx += runtime.qx_time_s
             total_qx_cache_hits += int(getattr(runtime, "qx_cache_hits", 0))
             total_qx_cache_misses += int(getattr(runtime, "qx_cache_misses", 0))
+            total_row_mapping_cache_hits += int(getattr(runtime, "row_mapping_cache_hits", 0))
+            total_row_mapping_cache_misses += int(getattr(runtime, "row_mapping_cache_misses", 0))
             total_delta += runtime.delta_time_s
             total_stack += runtime.stack_time_s
             total_meta += runtime.meta_time_s
@@ -2492,6 +2541,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             "qx_time_s": total_qx,
             "qx_cache_hits": total_qx_cache_hits,
             "qx_cache_misses": total_qx_cache_misses,
+            "row_mapping_cache_hits": total_row_mapping_cache_hits,
+            "row_mapping_cache_misses": total_row_mapping_cache_misses,
             "lazy_delta_time_s": total_delta,
             "lazy_stack_time_s": total_stack,
             "lazy_meta_time_s": total_meta,
@@ -2680,6 +2731,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
                     "qx_time_s": total_qx,
                     "qx_cache_hits": total_qx_cache_hits,
                     "qx_cache_misses": total_qx_cache_misses,
+                    "row_mapping_cache_hits": total_row_mapping_cache_hits,
+                    "row_mapping_cache_misses": total_row_mapping_cache_misses,
                     "lazy_delta_time_s": total_delta,
                     "delta_rows": total_delta_rows,
                     "delta_calls": total_delta_calls,

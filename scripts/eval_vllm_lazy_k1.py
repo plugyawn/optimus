@@ -253,6 +253,8 @@ def _evaluate_candidates(
     total_qx = 0.0
     total_qx_cache_hits = 0
     total_qx_cache_misses = 0
+    total_row_mapping_cache_hits = 0
+    total_row_mapping_cache_misses = 0
     total_delta = 0.0
     total_stack = 0.0
     total_meta = 0.0
@@ -285,6 +287,8 @@ def _evaluate_candidates(
         total_qx += runtime.qx_time_s
         total_qx_cache_hits += int(getattr(runtime, "qx_cache_hits", 0))
         total_qx_cache_misses += int(getattr(runtime, "qx_cache_misses", 0))
+        total_row_mapping_cache_hits += int(getattr(runtime, "row_mapping_cache_hits", 0))
+        total_row_mapping_cache_misses += int(getattr(runtime, "row_mapping_cache_misses", 0))
         total_delta += runtime.delta_time_s
         total_stack += runtime.stack_time_s
         total_meta += runtime.meta_time_s
@@ -315,6 +319,8 @@ def _evaluate_candidates(
         "qx_time_s": total_qx,
         "qx_cache_hits": total_qx_cache_hits,
         "qx_cache_misses": total_qx_cache_misses,
+        "row_mapping_cache_hits": total_row_mapping_cache_hits,
+        "row_mapping_cache_misses": total_row_mapping_cache_misses,
         "lazy_delta_time_s": total_delta,
         "lazy_stack_time_s": total_stack,
         "lazy_meta_time_s": total_meta,

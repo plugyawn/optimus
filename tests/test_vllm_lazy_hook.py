@@ -405,12 +405,63 @@ def test_vllm_lazy_hook_reuses_prepared_vllm_kernel_metadata():
     runtime._prepare_vllm_meta(meta, token_mapping, meta_key=meta_key, mapping_key=mapping_key)
 
     assert meta.calls == 1
+    assert runtime.row_mapping_cache_misses == 1
+    assert runtime.row_mapping_cache_hits == 0
     token_mapping_again, mapping_key_again = runtime._token_mapping_for(mapping, device=torch.device("cpu"), rows=4, num_loras=2)
     assert token_mapping.data_ptr() == token_mapping_again.data_ptr()
     assert mapping_key == mapping_key_again
+    assert runtime.row_mapping_cache_misses == 1
+    assert runtime.row_mapping_cache_hits == 1
     runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=1)
     runtime.update_row_candidates(["0", "1"], [0, 2, 4])
     assert runtime._mapping_cache_key(device=torch.device("cpu"), rows=4, num_loras=2) != mapping_key
+
+
+def test_vllm_lazy_hook_reuses_counter_row_mapping_cache_on_cpu():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+    )
+    runtime = LazyHookRuntime([target])
+    mapping = torch.tensor([0, 0, 1, 1], dtype=torch.int16)
+
+    first, first_key = runtime._row_mapping_for(mapping, device=torch.device("cpu"), rows=4, num_candidates=2)
+    second, second_key = runtime._row_mapping_for(mapping, device=torch.device("cpu"), rows=4, num_candidates=2)
+
+    assert torch.equal(first, mapping.to(dtype=torch.int32))
+    assert first.data_ptr() == second.data_ptr()
+    assert first_key == second_key
+    assert runtime.row_mapping_cache_misses == 1
+    assert runtime.row_mapping_cache_hits == 1
+
+
+def test_vllm_lazy_hook_can_disable_counter_row_mapping_cache_on_cpu(monkeypatch):
+    monkeypatch.setenv("OPTIMUS_LAZY_ROW_MAPPING_CACHE_SIZE", "0")
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+    )
+    runtime = LazyHookRuntime([target])
+    mapping = torch.tensor([0, 0, 1, 1], dtype=torch.int16)
+
+    first, first_key = runtime._row_mapping_for(mapping, device=torch.device("cpu"), rows=4, num_candidates=2)
+    second, second_key = runtime._row_mapping_for(mapping, device=torch.device("cpu"), rows=4, num_candidates=2)
+
+    assert torch.equal(first, second)
+    assert first.data_ptr() != second.data_ptr()
+    assert first_key != second_key
+    assert runtime.row_mapping_cache_misses == 2
+    assert runtime.row_mapping_cache_hits == 0
 
 
 def test_vllm_lazy_hook_vllm_kernel_backend_fails_closed_on_cpu():
