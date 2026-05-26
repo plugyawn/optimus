@@ -141,9 +141,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return int(vllm_lora_main(passthrough) or 0)
 
     if ns.backend == "vllm" and ns.method == "subspace":
-        from optimus.backends.vllm_subspace import run_eager_smoke
+        from optimus.backends.vllm_subspace import run_custom_op, run_eager_smoke
 
-        run_eager_smoke(ns)
+        if ns.kernel == "custom-op":
+            run_custom_op(ns)
+        else:
+            run_eager_smoke(ns)
         return 0
 
     raise SystemExit(f"unsupported search route: backend={ns.backend!r}, method={ns.method!r}")

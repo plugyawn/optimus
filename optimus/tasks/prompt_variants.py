@@ -123,7 +123,15 @@ def render_prompt_text(
         if tokenizer is None:
             raise ValueError("use_chat_template=True requires a tokenizer")
         if getattr(tokenizer, "chat_template", None):
-            return tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+            try:
+                return tokenizer.apply_chat_template(
+                    messages,
+                    add_generation_prompt=True,
+                    tokenize=False,
+                    enable_thinking=False,
+                )
+            except TypeError:
+                return tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
     return "\n".join(message["content"] for message in messages) + ("\n" if system_content else "")
 
 

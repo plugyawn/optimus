@@ -146,7 +146,9 @@ def tensor_sha256(tensor: torch.Tensor) -> str:
             "shape": list(tensor.shape),
         }
     )
-    return sha256_bytes(header + b"\n" + bytes(tensor.untyped_storage()))
+    buffer = io.BytesIO()
+    tensor.untyped_storage()._write_file(buffer, False, False, tensor.element_size())
+    return sha256_bytes(header + b"\n" + buffer.getvalue())
 
 
 def torch_payload_bytes(payload: dict[str, Any]) -> bytes:
