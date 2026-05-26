@@ -20,6 +20,12 @@ Current saved state, 2026-05-26:
   native adapter deltas at the injection site to bf16 tolerance. Further work
   should target the fused lazy delta/random-field kernel rather than additional
   Python-hook variants.
+- A first Triton cached-field expand backend now exists as a guarded scaffold.
+  It preserves the current candidate law by materializing scaled `B` stacks and
+  applying `B_c @ Qx` with explicit row-candidate routing. It wins a warmed p16
+  L40S replay against the vLLM LoRA-kernel bridge, but loses the p128/8 L40S
+  speed gate. Treat it as correctness infrastructure for the fused kernel, not
+  as the final systems path.
 - The final production fused/custom-op kernel is not implemented yet. Do not
   claim production fused-kernel readiness until the strict signature parity
   probe, p128 speed gate, and fused/custom-op benchmark ladder in `KERNEL.md`

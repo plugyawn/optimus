@@ -136,6 +136,29 @@ probe for the fused/custom-op path. The viable next lever is a custom fused
 delta/random-field kernel that removes factor-stack construction, vLLM LoRA
 metadata prep, and separate shrink/expand launches.
 
+Current L40S cached-field Triton evidence:
+
+| condition | backend | population/prompts | candidates/sec | lazy delta s | kernel s | stack s | result |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| microbench | Triton cached-field expand | synthetic | 43,319 it/s | n/a | n/a | n/a | exact vs torch |
+| warmed replay | Triton cached-field expand | p16/32 | 3.843 | 2.573 | 0.994 | 1.401 | faster than vLLM bridge |
+| replay | vLLM LoRA-kernel bridge | p16/32 | 3.200 | 3.465 | 1.091 | 1.360 | baseline |
+| replay | Triton cached-field expand | p128/8 | 6.375 | 14.859 | 5.708 | 8.525 | slower than vLLM bridge |
+| replay | vLLM LoRA-kernel bridge | p128/8 | 7.256 | 12.327 | 2.658 | 8.284 | current p128 winner |
+
+The cached-field Triton kernel is therefore a correctness scaffold and an
+Amdahl probe, not the production kernel. It removes the vLLM LoRA metadata
+path and can win at warmed p16, but p128 shows the naive candidate-routed
+expand kernel plus materialized `B` stacks are still too expensive. The next
+kernel milestone must generate and apply the deterministic random field inside
+the fused op, or otherwise eliminate `B` stack construction and the scalar-rank
+expand loop.
+
+The p128/32-prompt L40S shape also OOMed under vLLM after many candidate
+chunks, despite smaller per-chunk scheduling, because the run became a KV/cache
+capacity stress test. The p128 speed gate above uses 8 prompts to compare
+candidate routing and lazy-delta cost without changing the subspace math.
+
 ## Benchmark Ladder
 
 All benchmark rows must record hardware, vLLM version, FlashInfer version,

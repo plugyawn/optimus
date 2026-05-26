@@ -21,6 +21,15 @@ overhead rather than adapter-file generation or qkv packing. Public claims
 still require closing that semantic gap and then landing the fused/custom-op
 follow-up described in `KERNEL.md`.
 
+A guarded Triton cached-field expand backend also exists as of the current
+kernel pass. It computes `B_c @ Qx` directly from materialized candidate
+factor stacks and explicit row-candidate ids, so it is useful for CUDA
+correctness and Amdahl accounting. It is not the final RandOpt kernel because
+it still constructs `B` stacks in the hot path and loses the p128 L40S speed
+gate to the vLLM LoRA-kernel bridge. The production follow-up must fuse
+deterministic random-field generation with delta application, or otherwise
+remove materialized candidate stacks from the hot path.
+
 Existing LoRA adapter serving code is legacy baseline infrastructure and is not
 the subspace search hot path. The current bridge may reuse vLLM's LoRA Triton
 shrink/expand kernels internally, but it does not load or swap adapters for

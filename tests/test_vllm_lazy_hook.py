@@ -358,6 +358,29 @@ def test_vllm_lazy_hook_vllm_kernel_backend_fails_closed_on_cpu():
         runtime.delta(target, torch.ones((2, 2)), torch.zeros((2, 3)))
 
 
+def test_vllm_lazy_hook_triton_backend_fails_closed_on_cpu():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+        input_dim=2,
+        output_dim=3,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.delta_backend = "triton"
+    runtime.compute_dtype_policy = "bfloat16"
+    runtime.basis_by_site[target.site_id] = torch.eye(2)
+    runtime.beta_by_target[target.target_id] = 0.25
+    runtime.set_candidate(_candidate("a", 11))
+
+    with pytest.raises(RuntimeError, match="triton|CUDA"):
+        runtime.delta(target, torch.ones((2, 2)), torch.zeros((2, 3)))
+
+
 class _FakeLazyRuntime:
     def __init__(self) -> None:
         self.active_candidate = None

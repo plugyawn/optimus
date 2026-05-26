@@ -814,6 +814,120 @@ class LazyHookRuntime:
         )
         return delta.reshape(y.shape).to(dtype=y.dtype)
 
+    def _triton_expand_delta_for_target(
+        self,
+        target: HookTarget,
+        candidates: list[SubspaceCandidate],
+        row_mapping: torch.Tensor,
+        z: torch.Tensor,
+        *,
+        output_dim: int,
+        rank: int,
+        dtype: torch.dtype,
+        beta: float,
+        target_id: str,
+        field_output_dim: int | None = None,
+        field_slice: slice | None = None,
+    ) -> torch.Tensor:
+        from optimus.kernels import triton_subspace_expand
+
+        stack_started = time.perf_counter()
+        b_stack = self._vllm_b_stack(
+            target,
+            candidates,
+            output_dim=output_dim,
+            rank=rank,
+            device=z.device,
+            dtype=dtype,
+            beta=float(beta),
+            target_id=target_id,
+            field_output_dim=field_output_dim,
+            field_slice=field_slice,
+        )
+        self.stack_time_s += time.perf_counter() - stack_started
+        kernel_started = time.perf_counter()
+        delta = triton_subspace_expand(z, b_stack, row_mapping)
+        self.kernel_time_s += time.perf_counter() - kernel_started
+        return delta
+
+    def _delta_triton(
+        self,
+        target: HookTarget,
+        z: torch.Tensor,
+        y: torch.Tensor,
+        *,
+        candidate: SubspaceCandidate | None,
+        row_candidates: list[SubspaceCandidate],
+        row_candidate_indices: torch.Tensor | None,
+        output_dim: int,
+        rank: int,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if candidate is not None:
+            candidates = [candidate]
+            row_mapping = torch.zeros((int(z.shape[0]),), dtype=torch.int32)
+        else:
+            if row_candidate_indices is None or not row_candidates:
+                raise RuntimeError("missing row-candidate routing for triton lazy delta backend")
+            candidates = row_candidates
+            row_mapping = row_candidate_indices.to(dtype=torch.int32)
+            if row_mapping.numel():
+                min_index = int(row_mapping.min().item())
+                max_index = int(row_mapping.max().item())
+                if min_index < 0 or max_index >= len(candidates):
+                    raise RuntimeError(
+                        "Triton lazy hook row-candidate mapping is out of bounds: "
+                        f"min={min_index} max={max_index} candidates={len(candidates)}"
+                    )
+
+        if target.suffix == "qkv_proj" and target.fused_qkv_slices:
+            delta = torch.zeros((int(z.shape[0]), output_dim), device=z.device, dtype=dtype)
+            for suffix in target.fused_qkv_slices:
+                beta = self._beta_for_split(target, suffix)
+                if beta is None or float(beta) == 0.0:
+                    continue
+                output_slice = self._qkv_slice_for(target, suffix, output_dim)
+                width = int(output_slice.stop - output_slice.start)
+                if self.field_policy == "fused-qkv-exact":
+                    field_target_id = target.target_id
+                    field_output_dim = output_dim
+                    field_slice = output_slice
+                else:
+                    field_target_id = self._split_target_id(target, suffix)
+                    field_output_dim = None
+                    field_slice = None
+                split = self._triton_expand_delta_for_target(
+                    target,
+                    candidates,
+                    row_mapping,
+                    z,
+                    output_dim=width,
+                    rank=rank,
+                    dtype=dtype,
+                    beta=float(beta),
+                    target_id=field_target_id,
+                    field_output_dim=field_output_dim,
+                    field_slice=field_slice,
+                )
+                delta[:, output_slice] = split
+            return delta.reshape(y.shape).to(dtype=y.dtype)
+
+        beta = self._beta_for_split(target)
+        if beta is None or float(beta) == 0.0:
+            return torch.zeros_like(y)
+        delta = self._triton_expand_delta_for_target(
+            target,
+            candidates,
+            row_mapping,
+            z,
+            output_dim=output_dim,
+            rank=rank,
+            dtype=dtype,
+            beta=float(beta),
+            target_id=target.target_id,
+        )
+        return delta.reshape(y.shape).to(dtype=y.dtype)
+
     def delta(self, target: HookTarget, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor | None:
         candidate = self.active_candidate
         row_candidate_indices = self._row_candidate_indices_cpu
@@ -868,7 +982,7 @@ class LazyHookRuntime:
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return delta
-        if self.delta_backend != "torch":
+        if self.delta_backend not in {"torch", "triton"}:
             raise RuntimeError(f"unknown lazy delta backend {self.delta_backend!r}")
         if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
             torch.cuda.synchronize(flat_x.device)
@@ -877,6 +991,27 @@ class LazyHookRuntime:
         if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
             torch.cuda.synchronize(flat_x.device)
         self.qx_time_s += time.perf_counter() - qx_start
+        if self.delta_backend == "triton":
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
+            delta_start = time.perf_counter()
+            delta = self._delta_triton(
+                target,
+                z,
+                y,
+                candidate=candidate,
+                row_candidates=row_candidates,
+                row_candidate_indices=row_candidate_indices,
+                output_dim=output_dim,
+                rank=rank,
+                dtype=compute_dtype,
+            )
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
+            self.delta_time_s += time.perf_counter() - delta_start
+            self.delta_rows += int(flat_x.shape[0])
+            self.delta_calls += 1
+            return delta
         if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
             torch.cuda.synchronize(flat_x.device)
         delta_start = time.perf_counter()

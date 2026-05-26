@@ -439,7 +439,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--logprobs", type=int, default=20)
     parser.add_argument("--prompt-logprobs", type=int, default=20)
     parser.add_argument("--prompt-tail-tokens", type=int, default=8)
-    parser.add_argument("--lazy-delta-backend", default="vllm-lora-kernel", choices=["torch", "vllm-lora-kernel", "vllm-lora"])
+    parser.add_argument("--lazy-delta-backend", default="vllm-lora-kernel", choices=["torch", "triton", "vllm-lora-kernel", "vllm-lora"])
     parser.add_argument("--lazy-field-policy", default="target-split", choices=["target-split", "fused-qkv-exact"])
     parser.add_argument("--lazy-qkv-kernel-policy", default="split-launches", choices=["split-launches", "packed-qkv"])
     parser.add_argument("--lazy-compute-dtype", default="bfloat16")
