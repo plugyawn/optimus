@@ -92,3 +92,10 @@
   production step is still a vLLM custom-op/scheduling path that computes one
   `Qx` per activation site and applies packed counter add without Python
   per-target overhead.
+- Fixed-basis p128/p1024 replay makes the packed q/v Amdahl limit explicit.
+  Packed q/v is exact against split launches after dropping timing fields. At
+  p128 it improves replay throughput from `4.51` to `7.19 cand/s`, but at
+  p1024 it only improves `15.92` to `16.03 cand/s` despite cutting lazy delta
+  time from `10.39s` to `5.47s`. Past this point the next material lever is
+  not another q/v add microkernel; it is reducing model-rollout, hook, and
+  scheduling overhead around the kernel.

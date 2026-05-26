@@ -425,19 +425,33 @@ End-to-end p16 replay on L40S:
 | split launches | `1.755` | `26.737` | `26.559` | `0.087` | `0.052` |
 | packed q/v | `0.868` | `12.680` | `12.560` | `0.048` | `0.050` |
 
+Fixed-basis p128/p1024 replay on L40S:
+
+| population | qkv policy | candidates/sec | candidate replay sec | lazy delta s | lazy kernel s | stack s | Qx s | parity |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 128 | split launches | `4.511` | `0.222` | `22.466` | `21.892` | `0.405` | `0.171` | reference |
+| 128 | packed q/v | `7.195` | `0.139` | `11.457` | `11.158` | `0.162` | `0.131` | exact |
+| 1024 | split launches | `15.924` | `0.063` | `10.388` | `5.807` | `3.343` | `1.627` | reference |
+| 1024 | packed q/v | `16.034` | `0.062` | `5.466` | `3.125` | `1.321` | `1.066` | exact |
+
+The p128 and p1024 packed replays are exact against split launches for both
+`candidate_scores.jsonl` and `per_prompt.jsonl` after dropping timing fields.
+
 Artifacts:
 
 - `results/remote_lazy_kernel_validation/l40s_qvpack/fp32/kernel_ablation_qv_speedup.png`
 - `results/remote_lazy_kernel_validation/l40s_qvpack/bf16/kernel_ablation_qv_speedup.png`
 - `results/remote_lazy_kernel_validation/l40s_qvpack/vllm_p16_split-launches/summary.json`
 - `results/remote_lazy_kernel_validation/l40s_qvpack/vllm_p16_packed-qkv/summary.json`
+- `results/remote_lazy_kernel_validation/l40s_qvpack_p128/plots_packed_replay/throughput.png`
+- `results/remote_lazy_kernel_validation/l40s_qvpack_p128/plots_packed_replay/lazy_timing_breakdown.png`
 
 This is a real kernel-aligned improvement and it removes one obvious launch
-overhead in the q/v target preset. It is not the final Amdahl lever. At larger
-rank/output shapes, isolated packed q/v speedup is close to neutral, so the
-production path still needs a vLLM custom-op/scheduling integration that
-computes one `Qx` per activation site and applies packed counter add without
-Python per-target hook overhead.
+overhead in the q/v target preset. It is not the final Amdahl lever. At p1024,
+packed q/v halves lazy-delta time but improves end-to-end fixed-basis replay
+only from `15.924` to `16.034 cand/s`, because model rollout and scheduling now
+dominate. The production path still needs a vLLM custom-op/scheduling
+integration that reduces work around the kernel, not only a faster q/v add.
 
 ## Benchmark Ladder
 

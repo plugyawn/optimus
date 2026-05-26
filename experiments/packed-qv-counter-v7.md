@@ -41,9 +41,9 @@ PYTHONPATH=. pytest tests/test_vllm_lazy_hook.py tests/test_subspace_delta_kerne
 
 Result: `40 passed in 5.21s`.
 
-The p16 vLLM split-launch and packed-qkv runs have exact
-`candidate_scores.jsonl` and `per_prompt.jsonl` parity after dropping timing
-fields.
+The p16, p128, and p1024 vLLM split-launch and packed-qkv replay runs have
+exact `candidate_scores.jsonl` and `per_prompt.jsonl` parity after dropping
+timing fields.
 
 ## Kernel A/B
 
@@ -71,17 +71,44 @@ Artifacts:
 
 - `results/remote_lazy_kernel_validation/l40s_qvpack/vllm_p16_split-launches/summary.json`
 - `results/remote_lazy_kernel_validation/l40s_qvpack/vllm_p16_packed-qkv/summary.json`
+- `results/remote_lazy_kernel_validation/l40s_qvpack_p128/replay_p128_split_cbs64/summary.json`
+- `results/remote_lazy_kernel_validation/l40s_qvpack_p128/replay_p128_packed_cbs64/summary.json`
+- `results/remote_lazy_kernel_validation/l40s_qvpack_p128/replay_p1024_split_cbs64/summary.json`
+- `results/remote_lazy_kernel_validation/l40s_qvpack_p128/replay_p1024_packed_cbs64/summary.json`
+- `results/remote_lazy_kernel_validation/l40s_qvpack_p128/plots_packed_replay/throughput.png`
+- `results/remote_lazy_kernel_validation/l40s_qvpack_p128/plots_packed_replay/lazy_timing_breakdown.png`
 
 | qkv policy | candidate replay sec | lazy delta s | lazy kernel s | stack s | Qx s |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | split launches | `1.755` | `26.737` | `26.559` | `0.087` | `0.052` |
 | packed q/v | `0.868` | `12.680` | `12.560` | `0.048` | `0.050` |
 
+Fixed-basis p128/p1024 replay:
+
+| population | qkv policy | candidates/sec | candidate replay sec | lazy delta s | lazy kernel s | stack s | Qx s | parity |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 128 | split launches | `4.511` | `0.222` | `22.466` | `21.892` | `0.405` | `0.171` | reference |
+| 128 | packed q/v | `7.195` | `0.139` | `11.457` | `11.158` | `0.162` | `0.131` | exact |
+| 1024 | split launches | `15.924` | `0.063` | `10.388` | `5.807` | `3.343` | `1.627` | reference |
+| 1024 | packed q/v | `16.034` | `0.062` | `5.466` | `3.125` | `1.321` | `1.066` | exact |
+
+The full-search p128/p1024 warmed packed runs also completed:
+
+| population | candidates/sec | lazy delta s | lazy kernel s | stack s | Qx s |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 128 | `15.180` | `2.948` | `2.126` | `0.468` | `0.360` |
+| 1024 | `14.884` | `6.778` | `3.943` | `1.697` | `1.352` |
+
+The full-search p1024 row is not a strict split-vs-packed parity comparison,
+because regenerating the basis changed the basis hash. Use the fixed-basis
+replay rows for parity claims.
+
 ## Conclusion
 
 This is a useful launch-fusion step and it directly supports the final kernel
 path. It also narrows the remaining Amdahl target: q/v packing is strong in
-small-row regimes but nearly neutral at larger rank/output shapes. The next
-production lever is still a vLLM custom-op/scheduling path that computes one
-`Qx` per activation site and applies packed counter add without Python
-per-target hook overhead.
+small-row and p128 replay regimes, and it halves p1024 lazy-delta time, but
+p1024 end-to-end candidate throughput barely moves because model rollout and
+scheduling dominate. The next production lever is still a vLLM custom-op or
+scheduler-integrated path that reduces work around the kernel, not just another
+q/v add microkernel.
