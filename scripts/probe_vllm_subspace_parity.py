@@ -608,6 +608,8 @@ def _run_lazy_signatures(
         remove_model_runner_routing(route_handle)
     timing = {
         "qx_time_s": runtime.qx_time_s,
+        "qx_cache_hits": runtime.qx_cache_hits,
+        "qx_cache_misses": runtime.qx_cache_misses,
         "lazy_delta_time_s": runtime.delta_time_s,
         "lazy_stack_time_s": runtime.stack_time_s,
         "lazy_meta_time_s": runtime.meta_time_s,

@@ -232,6 +232,83 @@ def test_vllm_lazy_hook_zero_radius_counts_rows_and_returns_zero_delta():
     assert runtime.delta_calls == 1
 
 
+def test_vllm_lazy_hook_reuses_qx_for_same_site_tensor_identity():
+    q_target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+        input_dim=2,
+        output_dim=3,
+    )
+    v_target = HookTarget(
+        module_name="model.layers.0.self_attn.v_proj",
+        target_id="layer_0.self_attn.v_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="v_proj",
+        module=torch.nn.Linear(2, 4),
+        input_dim=2,
+        output_dim=4,
+    )
+    runtime = LazyHookRuntime([q_target, v_target])
+    runtime.basis_by_site[q_target.site_id] = torch.eye(2)
+    runtime.beta_by_target[q_target.target_id] = 0.25
+    runtime.beta_by_target[v_target.target_id] = 0.5
+    runtime.set_candidate(_candidate("same-x", 11))
+    x = torch.tensor([[1.0, 0.0], [2.0, 1.0], [0.5, 1.5]])
+
+    q_delta = runtime.delta(q_target, x, torch.zeros((3, 3)))
+    v_delta = runtime.delta(v_target, x, torch.zeros((3, 4)))
+
+    assert q_delta is not None
+    assert v_delta is not None
+    assert runtime.qx_cache_misses == 1
+    assert runtime.qx_cache_hits == 1
+    assert runtime.delta_calls == 2
+
+
+def test_vllm_lazy_hook_qx_cache_does_not_reuse_different_tensor_object():
+    q_target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+        input_dim=2,
+        output_dim=3,
+    )
+    v_target = HookTarget(
+        module_name="model.layers.0.self_attn.v_proj",
+        target_id="layer_0.self_attn.v_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="v_proj",
+        module=torch.nn.Linear(2, 4),
+        input_dim=2,
+        output_dim=4,
+    )
+    runtime = LazyHookRuntime([q_target, v_target])
+    runtime.basis_by_site[q_target.site_id] = torch.eye(2)
+    runtime.beta_by_target[q_target.target_id] = 0.25
+    runtime.beta_by_target[v_target.target_id] = 0.5
+    runtime.set_candidate(_candidate("view-x", 11))
+    x = torch.tensor([[1.0, 0.0], [2.0, 1.0], [0.5, 1.5]])
+
+    runtime.delta(q_target, x, torch.zeros((3, 3)))
+    runtime.delta(v_target, x.view_as(x), torch.zeros((3, 4)))
+
+    assert runtime.qx_cache_misses == 2
+    assert runtime.qx_cache_hits == 0
+
+
 def test_vllm_lazy_hook_reuses_vllm_kernel_factor_stacks():
     target = HookTarget(
         module_name="model.layers.0.self_attn.q_proj",
@@ -932,6 +1009,8 @@ class _FakeLazyRuntime:
         self.active_candidates = []
         self._order_prompt_count = 0
         self.qx_time_s = 0.0
+        self.qx_cache_hits = 0
+        self.qx_cache_misses = 0
         self.delta_time_s = 0.0
         self.stack_time_s = 0.0
         self.meta_time_s = 0.0
@@ -941,6 +1020,8 @@ class _FakeLazyRuntime:
 
     def reset_timing(self) -> None:
         self.qx_time_s = 0.0
+        self.qx_cache_hits = 0
+        self.qx_cache_misses = 0
         self.delta_time_s = 0.0
         self.stack_time_s = 0.0
         self.meta_time_s = 0.0

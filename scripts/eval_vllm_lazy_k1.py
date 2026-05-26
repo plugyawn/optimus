@@ -251,6 +251,8 @@ def _evaluate_candidates(
     per_prompt_rows: list[dict[str, Any]] = []
     total_tokens = 0
     total_qx = 0.0
+    total_qx_cache_hits = 0
+    total_qx_cache_misses = 0
     total_delta = 0.0
     total_stack = 0.0
     total_meta = 0.0
@@ -281,6 +283,8 @@ def _evaluate_candidates(
         if runtime.delta_rows <= 0:
             raise RuntimeError("vLLM lazy hook did not apply any perturbation rows; refusing to report true-lazy results")
         total_qx += runtime.qx_time_s
+        total_qx_cache_hits += int(getattr(runtime, "qx_cache_hits", 0))
+        total_qx_cache_misses += int(getattr(runtime, "qx_cache_misses", 0))
         total_delta += runtime.delta_time_s
         total_stack += runtime.stack_time_s
         total_meta += runtime.meta_time_s
@@ -309,6 +313,8 @@ def _evaluate_candidates(
         "elapsed_s": elapsed_all,
         "output_tokens": total_tokens,
         "qx_time_s": total_qx,
+        "qx_cache_hits": total_qx_cache_hits,
+        "qx_cache_misses": total_qx_cache_misses,
         "lazy_delta_time_s": total_delta,
         "lazy_stack_time_s": total_stack,
         "lazy_meta_time_s": total_meta,

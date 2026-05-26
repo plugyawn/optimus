@@ -105,6 +105,8 @@ class LazyHookRuntime:
         self.beta_by_target: dict[str, float] = {}
         self.activation_rows: dict[str, list[torch.Tensor]] = {}
         self.qx_time_s = 0.0
+        self.qx_cache_hits = 0
+        self.qx_cache_misses = 0
         self.delta_time_s = 0.0
         self.stack_time_s = 0.0
         self.meta_time_s = 0.0
@@ -124,10 +126,14 @@ class LazyHookRuntime:
             torch.Tensor,
         ] = {}
         self._counter_candidate_cache: dict[tuple[tuple[tuple[str, int, str], ...], str], tuple[torch.Tensor, torch.Tensor]] = {}
+        self._qx_cache_size = max(0, int(os.environ.get("OPTIMUS_LAZY_QX_CACHE_SIZE", "8") or "0"))
+        self._qx_cache: dict[tuple[Any, ...], tuple[torch.Tensor, torch.Tensor]] = {}
         self._row_mapping_generation = 0
 
     def reset_timing(self) -> None:
         self.qx_time_s = 0.0
+        self.qx_cache_hits = 0
+        self.qx_cache_misses = 0
         self.delta_time_s = 0.0
         self.stack_time_s = 0.0
         self.meta_time_s = 0.0
@@ -143,6 +149,7 @@ class LazyHookRuntime:
         self._vllm_meta_prepared_keys.clear()
         self._vllm_mapping_cache.clear()
         self._counter_candidate_cache.clear()
+        self._qx_cache.clear()
         self._row_mapping_generation += 1
 
     def set_candidate(self, candidate: SubspaceCandidate | None) -> None:
@@ -193,6 +200,7 @@ class LazyHookRuntime:
             self._row_candidate_indices_cpu = None
             self._row_candidate_spans = []
             self._row_candidate_indices_len = 0
+            self._qx_cache.clear()
             return
         if torch.is_tensor(query_start_loc):
             loc = query_start_loc.detach().cpu().tolist()
@@ -237,6 +245,7 @@ class LazyHookRuntime:
             self._row_candidate_indices_cpu = None
             self._row_candidate_spans = []
             self._row_candidate_indices_len = 0
+            self._qx_cache.clear()
             return
         row_indices = torch.cat(pieces, dim=0).contiguous()
         self._row_candidate_indices_cpu = row_indices
@@ -244,6 +253,7 @@ class LazyHookRuntime:
         self._row_candidate_indices_len = int(row_indices.numel())
         self._vllm_meta_prepared_keys.clear()
         self._vllm_mapping_cache.clear()
+        self._qx_cache.clear()
         self._row_mapping_generation += 1
 
     def basis_for(self, site_id: str, *, device: torch.device, dtype: torch.dtype) -> torch.Tensor | None:
@@ -257,6 +267,47 @@ class LazyHookRuntime:
         moved = basis.to(device=device, dtype=dtype, non_blocking=True)
         self._basis_cache[key] = moved
         return moved
+
+    def _project_qx(
+        self,
+        target: HookTarget,
+        x: torch.Tensor,
+        flat_x: torch.Tensor,
+        basis: torch.Tensor,
+        *,
+        compute_dtype: torch.dtype,
+    ) -> torch.Tensor:
+        """Project activation rows into a site basis with sibling-target reuse."""
+
+        cache_key = (
+            target.site_id,
+            id(x),
+            str(flat_x.device),
+            compute_dtype,
+            tuple(int(value) for value in flat_x.shape),
+            tuple(int(value) for value in flat_x.stride()),
+            int(flat_x.storage_offset()),
+            int(flat_x.data_ptr()) if flat_x.numel() else 0,
+            int(basis.data_ptr()) if basis.numel() else 0,
+            tuple(int(value) for value in basis.shape),
+        )
+        cached = self._qx_cache.get(cache_key) if self._qx_cache_size > 0 else None
+        if cached is not None and cached[0] is x:
+            self.qx_cache_hits += 1
+            return cached[1]
+        self.qx_cache_misses += 1
+        if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+            torch.cuda.synchronize(flat_x.device)
+        qx_start = time.perf_counter()
+        z = flat_x.to(dtype=compute_dtype) @ basis.T
+        if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+            torch.cuda.synchronize(flat_x.device)
+        self.qx_time_s += time.perf_counter() - qx_start
+        if self._qx_cache_size > 0:
+            if len(self._qx_cache) >= self._qx_cache_size:
+                self._qx_cache.clear()
+            self._qx_cache[cache_key] = (x, z)
+        return z
 
     def collect(self, target: HookTarget, x: torch.Tensor, y: torch.Tensor) -> None:
         flat_x = x.detach().reshape(-1, x.shape[-1]).float().cpu()
@@ -1509,13 +1560,7 @@ class LazyHookRuntime:
             return delta
         if self.delta_backend not in {"torch", "triton", "triton-counter", "triton-counter-inplace"}:
             raise RuntimeError(f"unknown lazy delta backend {self.delta_backend!r}")
-        if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-            torch.cuda.synchronize(flat_x.device)
-        qx_start = time.perf_counter()
-        z = flat_x.to(dtype=compute_dtype) @ basis.T
-        if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
-            torch.cuda.synchronize(flat_x.device)
-        self.qx_time_s += time.perf_counter() - qx_start
+        z = self._project_qx(target, x, flat_x, basis, compute_dtype=compute_dtype)
         if self.delta_backend == "triton":
             if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
                 torch.cuda.synchronize(flat_x.device)
@@ -2099,6 +2144,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
         per_prompt_rows = []
         total_output_tokens = 0
         total_qx = 0.0
+        total_qx_cache_hits = 0
+        total_qx_cache_misses = 0
         total_delta = 0.0
         total_stack = 0.0
         total_meta = 0.0
@@ -2178,6 +2225,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             if runtime.delta_rows <= 0:
                 raise RuntimeError("vLLM lazy hook did not apply any perturbation rows; refusing to report true-vLLM results")
             total_qx += runtime.qx_time_s
+            total_qx_cache_hits += int(getattr(runtime, "qx_cache_hits", 0))
+            total_qx_cache_misses += int(getattr(runtime, "qx_cache_misses", 0))
             total_delta += runtime.delta_time_s
             total_stack += runtime.stack_time_s
             total_meta += runtime.meta_time_s
@@ -2235,6 +2284,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
                 raise RuntimeError("vLLM lazy hook did not apply any perturbation rows during promoted holdout")
             holdout_score, holdout_tokens, holdout_rows = _score_outputs(holdout, holdout_outputs, max_new_tokens=int(args.max_new_tokens or 32))
             total_qx += runtime.qx_time_s
+            total_qx_cache_hits += int(getattr(runtime, "qx_cache_hits", 0))
+            total_qx_cache_misses += int(getattr(runtime, "qx_cache_misses", 0))
             total_delta += runtime.delta_time_s
             total_stack += runtime.stack_time_s
             total_meta += runtime.meta_time_s
@@ -2439,6 +2490,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             "delta_calls": total_delta_calls,
             "base_model_time_s": max(scoring_time_s + holdout_elapsed_total - total_qx - total_delta, 1e-9),
             "qx_time_s": total_qx,
+            "qx_cache_hits": total_qx_cache_hits,
+            "qx_cache_misses": total_qx_cache_misses,
             "lazy_delta_time_s": total_delta,
             "lazy_stack_time_s": total_stack,
             "lazy_meta_time_s": total_meta,
@@ -2625,6 +2678,8 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
                     "promoted_holdout_elapsed_s": holdout_elapsed_total,
                     "cuda_synchronized": runtime.sync_timing,
                     "qx_time_s": total_qx,
+                    "qx_cache_hits": total_qx_cache_hits,
+                    "qx_cache_misses": total_qx_cache_misses,
                     "lazy_delta_time_s": total_delta,
                     "delta_rows": total_delta_rows,
                     "delta_calls": total_delta_calls,

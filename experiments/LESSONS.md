@@ -107,3 +107,12 @@
   each output tile. A viable production path must compute one `Qx` per
   activation-site row block, then schedule counter add without materialized
   adapters or Python per-target overhead.
+- Identity-guarded `Qx` caching is correct but not the main Qwen/vLLM qv
+  throughput lever. The p128 A6000 cache-on/off gate showed
+  `qx_cache_hits=0` and `qx_cache_misses=4752` in both cases, because vLLM
+  exposes Qwen q/k/v through fused `qkv_proj` and the packed q/v backend
+  already computes one `Qx` per fused-qkv hook. Warm cache-on and cache-off
+  replay are effectively identical (`9.400` vs `9.383 cand/s`, `Qx` about
+  `0.465s`). The next useful work remains a first-class vLLM
+  row-block/custom-op path for `Qx + counter add`, not sibling-module cache
+  tuning.

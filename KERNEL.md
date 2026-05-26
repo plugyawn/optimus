@@ -498,6 +498,38 @@ one `Qx` computation per activation-site row block followed by scheduled
 counter add, likely as a vLLM custom-op/two-stage shrink-expand pipeline with
 explicit row-candidate routing.
 
+Current A6000 shared-`Qx` cache evidence:
+
+The hook runtime now has an identity-guarded `Qx` cache for sibling target
+modules that read the exact same activation tensor and activation site. Local
+tests prove reuse for separate q/v modules and prove that different tensor
+objects do not alias through the cache.
+
+Remote validation:
+
+| check | result |
+| --- | --- |
+| local focused hook/kernel suite | `35 passed`, `9` CUDA skips on Mac |
+| remote A6000 focused hook/kernel suite | `44 passed` |
+| p128 cache-on warm qv replay | `9.400 cand/s`, `qx_cache_hits=0`, `qx_cache_misses=4752` |
+| p128 cache-off qv replay | `9.383 cand/s`, `qx_cache_hits=0`, `qx_cache_misses=4752` |
+| p128 cache-on warm `Qx` time | `0.465s` inside `13.617s` candidate replay |
+| p128 cache-on warm lazy-kernel time | `2.140s` |
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/a6000_qxcache/p128_cache_on/summary.json`
+- `results/remote_lazy_kernel_validation/a6000_qxcache/p128_cache_off/summary.json`
+- `results/remote_lazy_kernel_validation/a6000_qxcache/p128_cache_on_warm/summary.json`
+
+This is a negative for Qwen/vLLM qv throughput, not a correctness failure.
+Qwen's vLLM path exposes q/k/v as one fused `qkv_proj`, and the packed q/v
+counter backend already computes `Qx` once per fused-qkv hook. Therefore the
+sibling-cache lever has no hits on the main p128 qv path. The remaining useful
+work is still `Qx + counter add`, but it must be a first-class vLLM
+row-block/custom-op scheduling path that removes Python hook dispatch and
+coordinates one activation-site projection with packed counter add.
+
 ## Benchmark Ladder
 
 All benchmark rows must record hardware, vLLM version, FlashInfer version,
