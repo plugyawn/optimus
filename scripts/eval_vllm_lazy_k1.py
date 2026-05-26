@@ -210,6 +210,26 @@ def _candidate_score_record(
     }
 
 
+def _prompt_slices(count: int, batch_size: int | None) -> list[tuple[int, int]]:
+    if batch_size is None or batch_size <= 0 or batch_size >= count:
+        return [(0, count)]
+    return [(start, min(start + batch_size, count)) for start in range(0, count, batch_size)]
+
+
+def _generate_in_prompt_batches(
+    llm: Any,
+    prompt_inputs: list[Any],
+    sampling: Any,
+    *,
+    prompt_batch_size: int | None,
+) -> tuple[list[Any], float]:
+    outputs: list[Any] = []
+    started = time.perf_counter()
+    for start, end in _prompt_slices(len(prompt_inputs), prompt_batch_size):
+        outputs.extend(llm.generate(prompt_inputs[start:end], sampling, use_tqdm=False))
+    return outputs, time.perf_counter() - started
+
+
 def _evaluate_candidates(
     *,
     llm: Any,
@@ -219,6 +239,7 @@ def _evaluate_candidates(
     prompt_inputs: list[Any],
     candidates: list[SubspaceCandidate],
     candidate_batch_size: int,
+    prompt_batch_size: int | None,
     max_new_tokens: int,
     base_score: float,
     stage: str,
@@ -235,17 +256,22 @@ def _evaluate_candidates(
     for candidate_chunk in _chunked(candidates, max(1, int(candidate_batch_size))):
         runtime.reset_timing()
         started = time.perf_counter()
+        outputs_by_candidate: dict[str, list[Any]] = {candidate.candidate_id: [] for candidate in candidate_chunk}
         if len(candidate_chunk) == 1:
             runtime.set_candidate(candidate_chunk[0])
-            outputs = llm.generate(prompt_inputs, sampling, use_tqdm=False)
-            outputs_by_candidate = {candidate_chunk[0].candidate_id: outputs}
+            for start_idx, end_idx in _prompt_slices(len(prompt_inputs), prompt_batch_size):
+                outputs = llm.generate(prompt_inputs[start_idx:end_idx], sampling, use_tqdm=False)
+                outputs_by_candidate[candidate_chunk[0].candidate_id].extend(outputs)
         else:
-            batched_prompts = []
-            for _candidate in candidate_chunk:
-                batched_prompts.extend(prompt_inputs)
-            with _candidate_batch_context(runtime, llm, candidate_chunk, len(examples)):
-                outputs = llm.generate(batched_prompts, sampling, use_tqdm=False)
-            outputs_by_candidate = _split_candidate_outputs(outputs, candidate_chunk, examples)
+            for start_idx, end_idx in _prompt_slices(len(prompt_inputs), prompt_batch_size):
+                batched_prompts = []
+                for _candidate in candidate_chunk:
+                    batched_prompts.extend(prompt_inputs[start_idx:end_idx])
+                with _candidate_batch_context(runtime, llm, candidate_chunk, end_idx - start_idx):
+                    outputs = llm.generate(batched_prompts, sampling, use_tqdm=False)
+                split = _split_candidate_outputs(outputs, candidate_chunk, examples[start_idx:end_idx])
+                for candidate_id, candidate_outputs in split.items():
+                    outputs_by_candidate[candidate_id].extend(candidate_outputs)
         elapsed = time.perf_counter() - started
         if runtime.delta_rows <= 0:
             raise RuntimeError("vLLM lazy hook did not apply any perturbation rows; refusing to report true-lazy results")
@@ -323,6 +349,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--scale-multiplier", type=float, default=1.0)
     parser.add_argument("--targets")
     parser.add_argument("--candidate-batch-size", type=int, default=1)
+    parser.add_argument(
+        "--prompt-batch-size",
+        type=int,
+        default=0,
+        help="Split each candidate replay into prompt microbatches; 0 means all prompts in one vLLM call.",
+    )
     parser.add_argument("--confirm-top-k", type=int, default=0)
     parser.add_argument("--model")
     parser.add_argument("--data", required=True)
@@ -440,10 +472,15 @@ def main() -> int:
         score_rows = []
         per_prompt_rows = []
         total_tokens = 0
+        prompt_batch_size = int(args.prompt_batch_size or 0)
+        prompt_batch_size_or_none = prompt_batch_size if prompt_batch_size > 0 else None
         runtime.set_candidate(None)
-        base_started = time.perf_counter()
-        base_outputs = llm.generate(prompt_inputs, sampling, use_tqdm=False)
-        base_elapsed = time.perf_counter() - base_started
+        base_outputs, base_elapsed = _generate_in_prompt_batches(
+            llm,
+            prompt_inputs,
+            sampling,
+            prompt_batch_size=prompt_batch_size_or_none,
+        )
         base_score, base_tokens, base_prompt_rows = _score_outputs(examples, base_outputs, max_new_tokens=max_new_tokens)
         total_tokens += base_tokens
         per_prompt_rows.extend({"split": "final", "candidate_id": "__base__", **row} for row in base_prompt_rows)
@@ -467,6 +504,7 @@ def main() -> int:
             prompt_inputs=prompt_inputs,
             candidates=selected,
             candidate_batch_size=int(args.candidate_batch_size),
+            prompt_batch_size=prompt_batch_size_or_none,
             max_new_tokens=max_new_tokens,
             base_score=base_score,
             stage="k1_final_replay",
@@ -488,6 +526,7 @@ def main() -> int:
                 prompt_inputs=prompt_inputs,
                 candidates=confirm_candidates,
                 candidate_batch_size=1,
+                prompt_batch_size=prompt_batch_size_or_none,
                 max_new_tokens=max_new_tokens,
                 base_score=base_score,
                 stage="k1_final_confirmed_chunk1",
@@ -528,6 +567,7 @@ def main() -> int:
             "targets": target_suffixes,
             "dtype": dtype,
             "candidate_batch_size": int(args.candidate_batch_size),
+            "prompt_batch_size": prompt_batch_size,
             "routing_patch": routing_handle is not None,
             "lazy_delta_backend": runtime.delta_backend,
             "candidate_ids": [candidate.candidate_id for candidate in selected],

@@ -1,10 +1,12 @@
 from dataclasses import replace
+from types import SimpleNamespace
 
 import torch
 import pytest
 
 from optimus.backends.vllm_lazy_hook import HookTarget, LazyHookRuntime
 from optimus.backends.vllm_lazy_hook import _ensemble_input_rows
+from scripts import eval_vllm_lazy_k1 as lazy_k1
 from optimus.backends.vllm_lora_hook import FusedQKVSpec, LazyLoraHookRuntime
 from optimus.core.perturbations import PerturbationSpec
 from optimus.modeling.subspace_lora import subspace_lora_tensors
@@ -236,6 +238,110 @@ def test_vllm_lazy_hook_vllm_kernel_backend_fails_closed_on_cpu():
 
     with pytest.raises(RuntimeError, match="requires CUDA tensors"):
         runtime.delta(target, torch.ones((2, 2)), torch.zeros((2, 3)))
+
+
+class _FakeLazyRuntime:
+    def __init__(self) -> None:
+        self.active_candidate = None
+        self.active_candidates = []
+        self._order_prompt_count = 0
+        self.qx_time_s = 0.0
+        self.delta_time_s = 0.0
+        self.delta_rows = 0
+        self.delta_calls = 0
+
+    def reset_timing(self) -> None:
+        self.qx_time_s = 0.0
+        self.delta_time_s = 0.0
+        self.delta_rows = 0
+        self.delta_calls = 0
+
+    def set_candidate(self, candidate) -> None:
+        self.active_candidate = candidate
+        self.active_candidates = []
+        self._order_prompt_count = 0
+
+    def set_candidate_batch_by_order(self, candidates, *, prompt_count: int) -> None:
+        self.active_candidate = None
+        self.active_candidates = list(candidates)
+        self._order_prompt_count = int(prompt_count)
+
+
+class _FakeLLM:
+    def __init__(self, runtime: _FakeLazyRuntime) -> None:
+        self.runtime = runtime
+        self.calls: list[list[str]] = []
+
+    def generate(self, prompts, sampling, use_tqdm=False):
+        del sampling, use_tqdm
+        prompts = list(prompts)
+        self.calls.append(prompts)
+        self.runtime.delta_rows += len(prompts)
+        self.runtime.delta_calls += 1
+        outputs = []
+        if self.runtime.active_candidate is not None:
+            for prompt in prompts:
+                text = f"{self.runtime.active_candidate.candidate_id}:{prompt}"
+                outputs.append(SimpleNamespace(outputs=[SimpleNamespace(text=text, token_ids=[1])]))
+            return outputs
+        prompt_count = self.runtime._order_prompt_count
+        for index, prompt in enumerate(prompts):
+            candidate = self.runtime.active_candidates[index // prompt_count]
+            text = f"{candidate.candidate_id}:{prompt}"
+            outputs.append(SimpleNamespace(outputs=[SimpleNamespace(text=text, token_ids=[1])]))
+        return outputs
+
+
+def test_vllm_lazy_k1_prompt_microbatch_preserves_candidate_output_order(monkeypatch):
+    cand_a = _candidate("a", 11)
+    cand_b = _candidate("b", 29)
+    runtime = _FakeLazyRuntime()
+    llm = _FakeLLM(runtime)
+    examples = [SimpleNamespace(id=index) for index in range(5)]
+    prompt_inputs = [f"p{index}" for index in range(5)]
+
+    def fake_score_outputs(examples_arg, outputs, *, max_new_tokens):
+        del max_new_tokens
+        rows = [
+            {"example_id": example.id, "text": output.outputs[0].text, "output_tokens": 1, "exact": 1.0}
+            for example, output in zip(examples_arg, outputs)
+        ]
+        return 1.0, len(rows), rows
+
+    monkeypatch.setattr(lazy_k1, "_score_outputs", fake_score_outputs)
+
+    score_rows, per_prompt_rows, timing = lazy_k1._evaluate_candidates(
+        llm=llm,
+        sampling=object(),
+        runtime=runtime,
+        examples=examples,
+        prompt_inputs=prompt_inputs,
+        candidates=[cand_a, cand_b],
+        candidate_batch_size=2,
+        prompt_batch_size=2,
+        max_new_tokens=8,
+        base_score=0.0,
+        stage="test",
+        source="source",
+    )
+
+    assert [len(call) for call in llm.calls] == [4, 4, 2]
+    assert [row["candidate_id"] for row in score_rows] == ["a", "b"]
+    assert [row["text"] for row in per_prompt_rows if row["candidate_id"] == "a"] == [
+        "a:p0",
+        "a:p1",
+        "a:p2",
+        "a:p3",
+        "a:p4",
+    ]
+    assert [row["text"] for row in per_prompt_rows if row["candidate_id"] == "b"] == [
+        "b:p0",
+        "b:p1",
+        "b:p2",
+        "b:p3",
+        "b:p4",
+    ]
+    assert timing["delta_rows"] == 10
 
 
 def test_vllm_lora_hook_matches_canonical_lora_delta():
