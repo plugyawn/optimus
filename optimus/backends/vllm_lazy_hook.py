@@ -111,6 +111,7 @@ class LazyHookRuntime:
         self.kernel_time_s = 0.0
         self.delta_rows = 0
         self.delta_calls = 0
+        self._last_delta_is_output = False
         self._field_cache: dict[tuple[str, str, str, str, torch.dtype, int, int, int], torch.Tensor] = {}
         self._scaled_field_cache: dict[tuple[str, str, str, str, torch.dtype, int, int, int, float], torch.Tensor] = {}
         self._basis_cache: dict[tuple[str, str, torch.dtype], torch.Tensor] = {}
@@ -922,6 +923,41 @@ class LazyHookRuntime:
         self.kernel_time_s += time.perf_counter() - kernel_started
         return delta
 
+    def _triton_counter_add_for_target(
+        self,
+        target: HookTarget,
+        candidates: list[SubspaceCandidate],
+        row_mapping: torch.Tensor,
+        z: torch.Tensor,
+        output: torch.Tensor,
+        *,
+        output_dim: int,
+        beta: float,
+        target_id: str,
+        field_output_offset: int = 0,
+        output_offset: int = 0,
+    ) -> None:
+        from optimus.kernels import triton_subspace_add_counter_
+
+        stack_started = time.perf_counter()
+        seeds, signs = self._counter_candidate_tensors(candidates, device=z.device)
+        row_mapping_device = row_mapping.to(device=z.device, dtype=torch.int32, non_blocking=True).contiguous()
+        self.stack_time_s += time.perf_counter() - stack_started
+        kernel_started = time.perf_counter()
+        triton_subspace_add_counter_(
+            z,
+            seeds,
+            signs,
+            row_mapping_device,
+            output,
+            target_hash=stable_u32(target_id),
+            beta=float(beta),
+            output_dim=output_dim,
+            field_output_offset=field_output_offset,
+            output_offset=output_offset,
+        )
+        self.kernel_time_s += time.perf_counter() - kernel_started
+
     def _delta_triton_counter(
         self,
         target: HookTarget,
@@ -993,6 +1029,95 @@ class LazyHookRuntime:
             target_id=target.target_id,
         )
         return delta.reshape(y.shape).to(dtype=y.dtype)
+
+    def _delta_triton_counter_inplace(
+        self,
+        target: HookTarget,
+        z: torch.Tensor,
+        y: torch.Tensor,
+        *,
+        candidate: SubspaceCandidate | None,
+        row_candidates: list[SubspaceCandidate],
+        row_candidate_indices: torch.Tensor | None,
+        output_dim: int,
+        dtype: torch.dtype,
+    ) -> tuple[torch.Tensor, bool]:
+        if not y.is_cuda or not y.is_contiguous():
+            return (
+                self._delta_triton_counter(
+                    target,
+                    z,
+                    y,
+                    candidate=candidate,
+                    row_candidates=row_candidates,
+                    row_candidate_indices=row_candidate_indices,
+                    output_dim=output_dim,
+                    dtype=dtype,
+                ),
+                False,
+            )
+        flat_y = y.reshape(-1, y.shape[-1])
+
+        if candidate is not None:
+            candidates = [candidate]
+            row_mapping = torch.zeros((int(z.shape[0]),), dtype=torch.int32)
+        else:
+            if row_candidate_indices is None or not row_candidates:
+                raise RuntimeError("missing row-candidate routing for triton-counter-inplace lazy delta backend")
+            candidates = row_candidates
+            row_mapping = row_candidate_indices.to(dtype=torch.int32)
+            if row_mapping.numel():
+                min_index = int(row_mapping.min().item())
+                max_index = int(row_mapping.max().item())
+                if min_index < 0 or max_index >= len(candidates):
+                    raise RuntimeError(
+                        "Triton-counter-inplace lazy hook row-candidate mapping is out of bounds: "
+                        f"min={min_index} max={max_index} candidates={len(candidates)}"
+                    )
+
+        if target.suffix == "qkv_proj" and target.fused_qkv_slices:
+            for suffix in target.fused_qkv_slices:
+                beta = self._beta_for_split(target, suffix)
+                if beta is None or float(beta) == 0.0:
+                    continue
+                output_slice = self._qkv_slice_for(target, suffix, output_dim)
+                width = int(output_slice.stop - output_slice.start)
+                if self.field_policy == "fused-qkv-exact":
+                    field_target_id = target.target_id
+                    field_output_offset = int(output_slice.start)
+                    output_offset = int(output_slice.start)
+                else:
+                    field_target_id = self._split_target_id(target, suffix)
+                    field_output_offset = 0
+                    output_offset = int(output_slice.start)
+                self._triton_counter_add_for_target(
+                    target,
+                    candidates,
+                    row_mapping,
+                    z.to(dtype=dtype),
+                    flat_y,
+                    output_dim=width,
+                    beta=float(beta),
+                    target_id=field_target_id,
+                    field_output_offset=field_output_offset,
+                    output_offset=output_offset,
+                )
+            return y, True
+
+        beta = self._beta_for_split(target)
+        if beta is None or float(beta) == 0.0:
+            return torch.zeros_like(y), False
+        self._triton_counter_add_for_target(
+            target,
+            candidates,
+            row_mapping,
+            z.to(dtype=dtype),
+            flat_y,
+            output_dim=output_dim,
+            beta=float(beta),
+            target_id=target.target_id,
+        )
+        return y, True
 
     def _delta_triton(
         self,
@@ -1073,6 +1198,7 @@ class LazyHookRuntime:
         return delta.reshape(y.shape).to(dtype=y.dtype)
 
     def delta(self, target: HookTarget, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor | None:
+        self._last_delta_is_output = False
         candidate = self.active_candidate
         row_candidate_indices = self._row_candidate_indices_cpu
         row_candidates = self.active_candidates
@@ -1126,7 +1252,7 @@ class LazyHookRuntime:
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return delta
-        if self.delta_backend not in {"torch", "triton", "triton-counter"}:
+        if self.delta_backend not in {"torch", "triton", "triton-counter", "triton-counter-inplace"}:
             raise RuntimeError(f"unknown lazy delta backend {self.delta_backend!r}")
         if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
             torch.cuda.synchronize(flat_x.device)
@@ -1172,6 +1298,27 @@ class LazyHookRuntime:
             )
             if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
                 torch.cuda.synchronize(flat_x.device)
+            self.delta_time_s += time.perf_counter() - delta_start
+            self.delta_rows += int(flat_x.shape[0])
+            self.delta_calls += 1
+            return delta
+        if self.delta_backend == "triton-counter-inplace":
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
+            delta_start = time.perf_counter()
+            delta, is_output = self._delta_triton_counter_inplace(
+                target,
+                z,
+                y,
+                candidate=candidate,
+                row_candidates=row_candidates,
+                row_candidate_indices=row_candidate_indices,
+                output_dim=output_dim,
+                dtype=compute_dtype,
+            )
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
+            self._last_delta_is_output = is_output
             self.delta_time_s += time.perf_counter() - delta_start
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
@@ -1381,6 +1528,10 @@ def install_hooks(runtime: LazyHookRuntime) -> list[tuple[torch.nn.Module, Any]]
             delta = runtime.delta(__target, x, main)
             if delta is None:
                 return y
+            if runtime._last_delta_is_output:
+                if isinstance(y, tuple):
+                    return (delta, *y[1:])
+                return delta
             if isinstance(y, tuple):
                 return (main + delta, *y[1:])
             return main + delta
@@ -1670,7 +1821,7 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
         for scale in scales:
             runtime.beta_by_target[scale.target_id] = scale.beta_t_by_radius[f"{locked_radius:g}"]
         budget_hash = config_hash({"budget_policy": budget_policy, "target_set_hash": state.target_set_hash})
-        default_rng_version = "counter_gaussian_v1" if runtime.delta_backend == "triton-counter" else "torch_generator_field_v1"
+        default_rng_version = "counter_gaussian_v1" if runtime.delta_backend in {"triton-counter", "triton-counter-inplace"} else "torch_generator_field_v1"
         rng_version = requested_rng_version(args, default=default_rng_version)
         candidates = make_candidates(
             population=population,

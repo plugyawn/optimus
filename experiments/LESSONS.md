@@ -48,3 +48,10 @@
   enough KV/cache state that the measurement stops being about lazy-delta
   throughput. Use the documented p128/8 prompt shape for kernel A/B on L40S,
   or move the full prompt-count gate to an 80GB card.
+- In-place counter add is a useful but limited fused-kernel staging point.
+  Post-fix CUDA hook tests pass `35/35`, and synthetic L40S A/B is exact, but
+  the isolated in-place add only wins strongly on small output shapes
+  (`1.52x` at rows=64/rank=64/out=1024) and is neutral at larger rank/output
+  shapes (`0.98-1.01x` at rank=128/out=4096). The production lever is not
+  further Python hook polish or only replacing `main + delta`; it is fusing or
+  scheduling `Qx`, counter expansion, and output addition inside vLLM routing.

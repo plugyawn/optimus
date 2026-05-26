@@ -43,6 +43,11 @@ candidate-keyed whenever q/k/v perturbations are active.
   `OPTIMUS_LAZY_DELTA_BACKEND=triton-counter`, which requires
   `counter_gaussian_v1` candidates and generates `G_t,c` inside the Triton
   expand kernel instead of materializing `B` stacks.
+- Native stateless in-place add scaffold:
+  `OPTIMUS_LAZY_DELTA_BACKEND=triton-counter-inplace`, which uses the same
+  counter random field but writes `y += beta * G_t,c z` directly into the
+  vLLM linear output buffer. It still computes `z = Qx` separately, but avoids
+  the full delta allocation, q/v slice assignment, and final PyTorch add.
 - Native adapter baseline: `scripts/eval_vllm_subspace_adapter_k1.py`.
 - Signature parity probe: `scripts/probe_vllm_subspace_parity.py`.
 
@@ -249,6 +254,59 @@ The p128/32-prompt L40S shape also OOMed under vLLM after many candidate
 chunks, despite smaller per-chunk scheduling, because the run became a KV/cache
 capacity stress test. The p128 speed gate above uses 8 prompts to compare
 candidate routing and lazy-delta cost without changing the subspace math.
+
+Current L40S end-to-end `triton-counter-inplace` evidence:
+
+| run | backend | population/prompts | candidate batch | status | candidates/sec | lazy kernel s | stack s | Qx s |
+| --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| cold p16 | triton-counter-inplace | p16/4 | 16 | compile-tax dominated | `0.801` | `28.761` | `0.165` | `0.129` |
+| warm p16 | triton-counter-inplace | p16/4 | 16 | pass | `11.434` | `0.740` | `0.164` | `0.129` |
+| warm p128 | triton-counter-inplace | p128/8 | 32 | pass | `13.647` | `2.851` | `0.787` | `0.578` |
+| warm p128 | triton-counter-inplace | p128/8 | 64 | best p128 | `13.924` | `2.818` | `0.821` | `0.578` |
+| warm p1024 | triton-counter-inplace | p1024/8 | 64 | pass | `13.808` | `5.756` | `2.744` | `1.940` |
+
+Artifacts:
+
+- `results/remote_lazy_kernel_validation/l40s_counter_inplace/inplace_counter/p128_cbs64/`
+- `results/remote_lazy_kernel_validation/l40s_counter_inplace/inplace_counter/p1024_cbs64/`
+- `results/remote_lazy_kernel_validation/l40s_counter_inplace/plots_inplace_vs_counter/throughput.png`
+- `results/remote_lazy_kernel_validation/l40s_counter_inplace/plots_inplace_vs_counter/lazy_timing_breakdown.png`
+- `results/remote_lazy_kernel_validation/l40s_counter_inplace/plots_inplace_batch_parity/validation_summary.md`
+
+This is the first end-to-end positive fused-add result. Relative to the
+previous best p128 out-of-place counter run, p128 cbs64 improves from
+`12.225 cand/s` to `13.924 cand/s`; relative to the previous p1024 cbs32 run,
+p1024 improves from `12.234 cand/s` to `13.808 cand/s`. The gain is about
+`13-14%`, so it is useful but not the whole production answer.
+
+Replay caveat: in-place cbs64 has exact score and prompt-output replay between
+p128 and the p1024 prefix subset. Against the old out-of-place cbs32 reference,
+the in-place path has two score mismatches out of 128 common candidates and
+max score diff `0.125`. Treat it as numerically close but not a strict
+replacement until the decode determinism gate is tightened. That old comparison
+also predates the target-split q/v field-offset fix; the post-fix CUDA hook
+suite passes `35/35`, including the regression test that local q/v field
+indices write into the correct fused qkv output slices.
+
+Post-fix synthetic L40S kernel A/B:
+
+| rows | rank | output dim | max diff | expand+add ms | in-place add ms | speedup |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 64 | 64 | 1024 | `0.0` | `0.0463` | `0.0304` | `1.52x` |
+| 256 | 64 | 1024 | `0.0` | `0.0523` | `0.0491` | `1.06x` |
+| 256 | 128 | 4096 | `0.0` | `0.3672` | `0.3763` | `0.98x` |
+| 512 | 128 | 4096 | `0.0` | `0.7196` | `0.7156` | `1.01x` |
+
+This confirms that the narrow fused-add optimization is not the whole lever:
+at realistic larger rank/output shapes it is neutral on the isolated kernel.
+The production path must fuse or schedule the shrink `Qx`, counter expansion,
+and output addition under vLLM routing, not merely remove `main + delta`.
+
+The updated Amdahl read is that eliminating the final add/allocation helps,
+but the remaining p1024 lazy path still spends `10.56s` in lazy-delta work
+inside `90.57s` scoring. The next production lever remains deeper vLLM
+integration: remove hook dispatch and route `Qx`, counter expand, and in-place
+add as a first-class operator under vLLM scheduling.
 
 ## Benchmark Ladder
 

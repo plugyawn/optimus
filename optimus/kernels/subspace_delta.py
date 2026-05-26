@@ -83,6 +83,7 @@ if triton is not None and tl is not None:  # pragma: no branch - import guard.
         rank: tl.constexpr,
         target_hash: tl.constexpr,
         beta: tl.constexpr,
+        field_output_offset: tl.constexpr,
         output_offset: tl.constexpr,
         BLOCK_N: tl.constexpr,
         BLOCK_M: tl.constexpr,
@@ -100,13 +101,52 @@ if triton is not None and tl is not None:  # pragma: no branch - import guard.
         acc = tl.zeros((BLOCK_N, BLOCK_M), dtype=tl.float32)
         for r in range(rank):
             z = tl.load(z_ptr + offs_n * rank + r, mask=row_mask, other=0.0).to(tl.float32)
-            normal = _normal_from_counter(seed[:, None], target_hash, output_offset + offs_m[None, :], r)
+            normal = _normal_from_counter(seed[:, None], target_hash, field_output_offset + offs_m[None, :], r)
             acc += z[:, None] * normal * sign[:, None] * beta
 
         tl.store(out_ptr + offs_n[:, None] * output_dim + offs_m[None, :], acc, mask=row_mask[:, None] & col_mask[None, :])
+
+    @triton.jit
+    def _subspace_counter_add_kernel(
+        z_ptr,
+        seed_ptr,
+        sign_ptr,
+        row_candidate_ptr,
+        out_ptr,
+        rows,
+        output_stride,
+        output_dim: tl.constexpr,
+        rank: tl.constexpr,
+        target_hash: tl.constexpr,
+        beta: tl.constexpr,
+        field_output_offset: tl.constexpr,
+        output_offset: tl.constexpr,
+        BLOCK_N: tl.constexpr,
+        BLOCK_M: tl.constexpr,
+    ):
+        pid_n = tl.program_id(0)
+        pid_m = tl.program_id(1)
+        offs_n = pid_n * BLOCK_N + tl.arange(0, BLOCK_N)
+        offs_m = pid_m * BLOCK_M + tl.arange(0, BLOCK_M)
+        row_mask = offs_n < rows
+        col_mask = offs_m < output_dim
+        candidate = tl.load(row_candidate_ptr + offs_n, mask=row_mask, other=0).to(tl.int64)
+        seed = tl.load(seed_ptr + candidate, mask=row_mask, other=0).to(tl.uint32)
+        sign = tl.load(sign_ptr + candidate, mask=row_mask, other=1).to(tl.float32)
+
+        acc = tl.zeros((BLOCK_N, BLOCK_M), dtype=tl.float32)
+        for r in range(rank):
+            z = tl.load(z_ptr + offs_n * rank + r, mask=row_mask, other=0.0).to(tl.float32)
+            normal = _normal_from_counter(seed[:, None], target_hash, field_output_offset + offs_m[None, :], r)
+            acc += z[:, None] * normal * sign[:, None] * beta
+
+        out_offsets = offs_n[:, None] * output_stride + output_offset + offs_m[None, :]
+        base = tl.load(out_ptr + out_offsets, mask=row_mask[:, None] & col_mask[None, :], other=0.0).to(tl.float32)
+        tl.store(out_ptr + out_offsets, base + acc, mask=row_mask[:, None] & col_mask[None, :])
 else:
     _subspace_expand_kernel = None
     _subspace_counter_kernel = None
+    _subspace_counter_add_kernel = None
 
 
 def triton_subspace_expand(
@@ -168,6 +208,7 @@ def triton_subspace_expand_counter(
     target_hash: int,
     beta: float,
     output_dim: int,
+    field_output_offset: int = 0,
     output_offset: int = 0,
     block_n: int = 16,
     block_m: int = 32,
@@ -182,6 +223,10 @@ def triton_subspace_expand_counter(
         raise ValueError(f"expected z [rows, rank], got {tuple(z.shape)}")
     rows, rank = int(z.shape[0]), int(z.shape[1])
     output_dim = int(output_dim)
+    field_output_offset = int(field_output_offset)
+    output_offset = int(output_offset)
+    if field_output_offset == 0 and output_offset != 0:
+        field_output_offset = output_offset
     if output_dim < 0:
         raise ValueError("output_dim must be nonnegative")
     mapping = row_candidate_indices.to(device=z.device, dtype=torch.int32, non_blocking=True).contiguous()
@@ -205,9 +250,89 @@ def triton_subspace_expand_counter(
         rank,
         target_hash=int(target_hash) & 0xFFFFFFFF,
         beta=float(beta),
-        output_offset=int(output_offset),
+        field_output_offset=field_output_offset,
+        output_offset=output_offset,
         BLOCK_N=int(block_n),
         BLOCK_M=int(block_m),
         num_warps=4,
     )
     return out
+
+
+def triton_subspace_add_counter_(
+    z: torch.Tensor,
+    direction_seeds: torch.Tensor,
+    signs: torch.Tensor,
+    row_candidate_indices: torch.Tensor,
+    output: torch.Tensor,
+    *,
+    target_hash: int,
+    beta: float,
+    output_dim: int,
+    field_output_offset: int = 0,
+    output_offset: int = 0,
+    block_n: int = 16,
+    block_m: int = 32,
+) -> torch.Tensor:
+    """In-place ``output += beta * G_c @ z`` for ``counter_gaussian_v1`` fields.
+
+    ``output`` is a two-dimensional row-major view of the linear output. The
+    kernel may write a contiguous output slice by setting ``output_offset`` and
+    ``output_dim``. ``field_output_offset`` is separate because target-split
+    fused-qkv fields use local q/v output indices while writing into global qkv
+    output slices.
+    """
+
+    if triton is None or _subspace_counter_add_kernel is None:
+        raise RuntimeError("OPTIMUS_LAZY_DELTA_BACKEND=triton-counter-inplace requires triton")
+    if not z.is_cuda or not output.is_cuda:
+        raise RuntimeError("triton_subspace_add_counter_ requires CUDA tensors")
+    if z.ndim != 2 or output.ndim != 2:
+        raise ValueError(f"expected z [rows, rank] and output [rows, output], got {tuple(z.shape)} and {tuple(output.shape)}")
+    rows, rank = int(z.shape[0]), int(z.shape[1])
+    if int(output.shape[0]) != rows:
+        raise ValueError(f"output row count {int(output.shape[0])} does not match z rows {rows}")
+    output_dim = int(output_dim)
+    field_output_offset = int(field_output_offset)
+    output_offset = int(output_offset)
+    if output_dim < 0:
+        raise ValueError("output_dim must be nonnegative")
+    if output_dim == 0 or rows == 0:
+        return output
+    if field_output_offset < 0:
+        raise ValueError("field_output_offset must be nonnegative")
+    if output_offset < 0 or output_offset + output_dim > int(output.shape[1]):
+        raise ValueError(
+            f"output slice [{output_offset}, {output_offset + output_dim}) is out of bounds for output width {int(output.shape[1])}"
+        )
+    mapping = row_candidate_indices.to(device=z.device, dtype=torch.int32, non_blocking=True).contiguous()
+    if int(mapping.numel()) != rows:
+        raise ValueError(f"row_candidate_indices length {int(mapping.numel())} does not match rows {rows}")
+    seeds = direction_seeds.to(device=z.device, dtype=torch.int64, non_blocking=True).contiguous()
+    sign_values = signs.to(device=z.device, dtype=torch.int32, non_blocking=True).contiguous()
+    if seeds.ndim != 1 or sign_values.ndim != 1 or int(seeds.numel()) != int(sign_values.numel()):
+        raise ValueError("direction_seeds and signs must be one-dimensional tensors with matching length")
+    if not output.is_contiguous():
+        raise ValueError("triton_subspace_add_counter_ requires a contiguous row-major output view")
+    z_contig = z.contiguous()
+    output_stride = int(output.stride(0))
+    grid = (triton.cdiv(rows, int(block_n)), triton.cdiv(output_dim, int(block_m)))
+    _subspace_counter_add_kernel[grid](
+        z_contig,
+        seeds,
+        sign_values,
+        mapping,
+        output,
+        rows,
+        output_stride,
+        output_dim,
+        rank,
+        target_hash=int(target_hash) & 0xFFFFFFFF,
+        beta=float(beta),
+        field_output_offset=field_output_offset,
+        output_offset=output_offset,
+        BLOCK_N=int(block_n),
+        BLOCK_M=int(block_m),
+        num_warps=4,
+    )
+    return output
