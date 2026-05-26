@@ -257,8 +257,10 @@ def subspace_lora_tensors(
                 beta = beta_by_target[fused_target]
 
         prefix = f"base_model.model.{module_name}"
-        tensors[f"{prefix}.lora_A.weight"] = q.to(dtype=dtype).contiguous()
-        tensors[f"{prefix}.lora_B.weight"] = (float(scale_multiplier) * float(beta) * field).to(dtype=dtype).contiguous()
+        # q/v often share the same activation-site basis object. Clone after
+        # dtype conversion so safetensors does not reject aliased LoRA tensors.
+        tensors[f"{prefix}.lora_A.weight"] = q.to(dtype=dtype).contiguous().clone()
+        tensors[f"{prefix}.lora_B.weight"] = (float(scale_multiplier) * float(beta) * field).to(dtype=dtype).contiguous().clone()
     return tensors
 
 

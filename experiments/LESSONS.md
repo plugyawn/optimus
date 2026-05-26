@@ -63,3 +63,16 @@
   step; the useful production path is vLLM scheduling/custom-op integration
   that computes one `Qx` per activation site and applies counter expand/add
   without Python per-target overhead.
+- Staged A6000 run-level parity separates kernel correctness from adapter
+  replay semantics. Zero-scale adapter-vs-lazy parity is exact, but nonzero
+  target-split replay still fails strict signature parity even for torch
+  materialized lazy and vLLM-LoRA-kernel-in-hook backends. The in-place counter
+  kernel is not the culprit; the remaining gap is hook-vs-vLLM-adapter
+  injection semantics plus accumulated kernel-order drift. Treat vLLM adapter
+  replay as an integration reference, not the final production target for the
+  lazy kernel.
+- Adapter export must clone repeated activation bases before writing
+  safetensors. q/v share the same activation-site `Q`; when tensor dtype is
+  already float32, `to(...).contiguous()` can preserve storage aliasing and
+  `safetensors` rejects the file. The bridge now clones LoRA tensors after dtype
+  conversion.

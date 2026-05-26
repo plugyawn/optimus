@@ -332,6 +332,32 @@ inside `90.57s` scoring. The next production lever remains deeper vLLM
 integration: remove hook dispatch and route `Qx`, counter expand, and in-place
 add as a first-class operator under vLLM scheduling.
 
+## A6000 Run-Level Parity Post-Fix
+
+After the in-place q/v target-split offset fix, the A6000 staged probe shows:
+
+| probe | status | generated match | max generated logprob diff | max common top-logprob diff |
+| --- | --- | ---: | ---: | ---: |
+| zero scale, target-split, in-place | pass | 4/4 | `0.0000` | `0.0000` |
+| nonzero, target-split, in-place | fail | 3/4 | `0.0568` | `0.7487` |
+| nonzero, target-split, out-of-place counter | fail | 4/4 | `0.1201` | `0.7487` |
+| nonzero, target-split, torch materialized | fail | 4/4 | `0.0776` | `0.6240` |
+| nonzero, target-split, vLLM-LoRA-kernel-in-hook | fail | 4/4 | `0.0667` | `0.7487` |
+| nonzero, target-split, fp32 adapter/fp32 lazy c1p1 | fail | 1/1 | `0.0467` | `0.3750` |
+| nonzero, fused-qkv-exact c1p1 | fail | 1/1 | `0.0902` | `0.6250` |
+
+Artifact root:
+
+- `results/remote_lazy_kernel_validation/a6000_vllm_parity_postfix/`
+
+This rules out the in-place counter kernel as the remaining strict-parity
+blocker: zero-delta parity is exact, and nonzero strict adapter parity also
+fails for torch materialized lazy and vLLM-LoRA-kernel-in-hook paths. The
+remaining issue is hook-vs-adapter injection semantics and kernel-order drift.
+Use the torch reference and injection-point checks for arithmetic development;
+use vLLM adapter replay as an integration reference, not as the fused-kernel
+contract itself.
+
 ## Benchmark Ladder
 
 All benchmark rows must record hardware, vLLM version, FlashInfer version,

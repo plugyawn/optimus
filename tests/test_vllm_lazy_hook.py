@@ -1079,6 +1079,9 @@ def test_subspace_adapter_bridge_target_split_uses_requested_targets_only():
     assert "base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight" in tensors
     assert "base_model.model.model.layers.0.self_attn.v_proj.lora_B.weight" in tensors
     assert not any(".k_proj." in key for key in tensors)
+    q_a = tensors["base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight"]
+    v_a = tensors["base_model.model.model.layers.0.self_attn.v_proj.lora_A.weight"]
+    assert q_a.data_ptr() != v_a.data_ptr()
 
 
 def test_vllm_lazy_replay_expands_fused_qkv_betas_and_scales():
