@@ -250,6 +250,9 @@ def _evaluate_candidates(
     total_tokens = 0
     total_qx = 0.0
     total_delta = 0.0
+    total_stack = 0.0
+    total_meta = 0.0
+    total_kernel = 0.0
     total_delta_rows = 0
     total_delta_calls = 0
     started_all = time.perf_counter()
@@ -277,6 +280,9 @@ def _evaluate_candidates(
             raise RuntimeError("vLLM lazy hook did not apply any perturbation rows; refusing to report true-lazy results")
         total_qx += runtime.qx_time_s
         total_delta += runtime.delta_time_s
+        total_stack += runtime.stack_time_s
+        total_meta += runtime.meta_time_s
+        total_kernel += runtime.kernel_time_s
         total_delta_rows += runtime.delta_rows
         total_delta_calls += runtime.delta_calls
         for candidate in candidate_chunk:
@@ -302,6 +308,9 @@ def _evaluate_candidates(
         "output_tokens": total_tokens,
         "qx_time_s": total_qx,
         "lazy_delta_time_s": total_delta,
+        "lazy_stack_time_s": total_stack,
+        "lazy_meta_time_s": total_meta,
+        "lazy_kernel_time_s": total_kernel,
         "delta_rows": total_delta_rows,
         "delta_calls": total_delta_calls,
         "candidate_replay_sec": elapsed_all / max(len(candidates), 1),

@@ -57,6 +57,7 @@ def validate(args: argparse.Namespace) -> dict[str, Any]:
     _check_file(parity_json, failures)
     _check_png(plot_dir / "quality.png", failures)
     _check_png(plot_dir / "throughput.png", failures)
+    _check_png(plot_dir / "lazy_timing_breakdown.png", failures)
 
     rows: list[dict[str, str]] = []
     if summary_csv.exists():

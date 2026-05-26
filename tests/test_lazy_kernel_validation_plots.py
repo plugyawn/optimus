@@ -36,6 +36,15 @@ def _run_dir(root: Path, name: str, *, kind: str, population: int, best_id: str)
                 "confirmed_best_candidate_id": best_id,
                 "mixed_candidate_sec": 0.5,
                 "confirmed_mixed_candidate_sec": 0.4,
+                "lazy_timing": {
+                    "elapsed_s": 10.0,
+                    "lazy_delta_time_s": 4.0,
+                    "lazy_kernel_time_s": 1.5,
+                    "lazy_meta_time_s": 0.5,
+                    "lazy_stack_time_s": 0.25,
+                    "output_tokens": 1000,
+                    "qx_time_s": 0.0,
+                },
             },
             sort_keys=True,
         )
@@ -72,6 +81,7 @@ def test_plotter_reports_primary_and_confirmed_parity(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(plot, "_plot_quality", fake_plot)
     monkeypatch.setattr(plot, "_plot_throughput", fake_plot)
+    monkeypatch.setattr(plot, "_plot_lazy_timing", fake_plot)
     monkeypatch.setattr(plot, "_plot_parity", fake_plot)
     out = tmp_path / "plots"
     monkeypatch.setattr(
@@ -114,7 +124,13 @@ def test_validation_report_flags_strict_parity_threshold(tmp_path: Path) -> None
         "label,kind,population,base_score,best_score,candidate_sec,run_dir\n"
         f"lazy,vllm_lazy_k1_final_replay,1024,0.125,0.25,0.5,{run}\n"
     )
-    for name in ("quality.png", "throughput.png", "candidate_score_parity.png", "confirmed_candidate_score_parity.png"):
+    for name in (
+        "quality.png",
+        "throughput.png",
+        "lazy_timing_breakdown.png",
+        "candidate_score_parity.png",
+        "confirmed_candidate_score_parity.png",
+    ):
         (plot_dir / name).write_bytes(PNG_HEADER + b"fake")
     (plot_dir / "parity_summary.json").write_text(
         json.dumps(

@@ -217,6 +217,110 @@ def test_vllm_lazy_hook_zero_radius_counts_rows_and_returns_zero_delta():
     assert runtime.delta_calls == 1
 
 
+def test_vllm_lazy_hook_reuses_vllm_kernel_factor_stacks():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+        input_dim=2,
+        output_dim=3,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.basis_by_site[target.site_id] = torch.eye(2)
+    runtime.beta_by_target[target.target_id] = 0.25
+    candidates = [_candidate("a", 11), _candidate("b", 29)]
+    basis = runtime.basis_for(target.site_id, device=torch.device("cpu"), dtype=torch.float32)
+    assert basis is not None
+
+    a_first = runtime._vllm_a_stack(
+        target,
+        basis,
+        num_loras=2,
+        input_dim=2,
+        rank=2,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    a_second = runtime._vllm_a_stack(
+        target,
+        basis,
+        num_loras=2,
+        input_dim=2,
+        rank=2,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    b_first = runtime._vllm_b_stack(
+        target,
+        candidates,
+        output_dim=3,
+        rank=2,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+        beta=0.25,
+        target_id=target.target_id,
+    )
+    b_second = runtime._vllm_b_stack(
+        target,
+        candidates,
+        output_dim=3,
+        rank=2,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+        beta=0.25,
+        target_id=target.target_id,
+    )
+
+    assert a_first.data_ptr() == a_second.data_ptr()
+    assert b_first.data_ptr() == b_second.data_ptr()
+    runtime.set_candidate(None)
+    assert runtime._vllm_a_stack_cache == {}
+    assert runtime._vllm_b_stack_cache == {}
+
+
+def test_vllm_lazy_hook_reuses_prepared_vllm_kernel_metadata():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+    )
+    runtime = LazyHookRuntime([target])
+    mapping = torch.tensor([0, 0, 1, 1], dtype=torch.int16)
+    cand_a = _candidate("a", 11)
+    cand_b = _candidate("b", 29)
+
+    class FakeMeta:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def prepare_tensors(self, token_mapping: torch.Tensor) -> None:
+            self.calls += 1
+            assert torch.equal(token_mapping.cpu(), mapping.to(dtype=torch.int32))
+
+    meta = FakeMeta()
+    token_mapping, mapping_key = runtime._token_mapping_for(mapping, device=torch.device("cpu"), rows=4, num_loras=2)
+    meta_key = ("cpu", 2, 4)
+
+    runtime._prepare_vllm_meta(meta, token_mapping, meta_key=meta_key, mapping_key=mapping_key)
+    runtime._prepare_vllm_meta(meta, token_mapping, meta_key=meta_key, mapping_key=mapping_key)
+
+    assert meta.calls == 1
+    token_mapping_again, mapping_key_again = runtime._token_mapping_for(mapping, device=torch.device("cpu"), rows=4, num_loras=2)
+    assert token_mapping.data_ptr() == token_mapping_again.data_ptr()
+    assert mapping_key == mapping_key_again
+    runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=1)
+    runtime.update_row_candidates(["0", "1"], [0, 2, 4])
+    assert runtime._mapping_cache_key(device=torch.device("cpu"), rows=4, num_loras=2) != mapping_key
+
+
 def test_vllm_lazy_hook_vllm_kernel_backend_fails_closed_on_cpu():
     target = HookTarget(
         module_name="model.layers.0.self_attn.q_proj",
@@ -247,12 +351,18 @@ class _FakeLazyRuntime:
         self._order_prompt_count = 0
         self.qx_time_s = 0.0
         self.delta_time_s = 0.0
+        self.stack_time_s = 0.0
+        self.meta_time_s = 0.0
+        self.kernel_time_s = 0.0
         self.delta_rows = 0
         self.delta_calls = 0
 
     def reset_timing(self) -> None:
         self.qx_time_s = 0.0
         self.delta_time_s = 0.0
+        self.stack_time_s = 0.0
+        self.meta_time_s = 0.0
+        self.kernel_time_s = 0.0
         self.delta_rows = 0
         self.delta_calls = 0
 

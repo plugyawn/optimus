@@ -121,10 +121,17 @@ def _parity_summary(
 
 def _summary_row(label: str, run: Path) -> dict[str, Any]:
     summary = _read_json(run / "summary.json")
+    aggregate = summary.get("aggregate") or {}
+    lazy_timing = summary.get("lazy_timing") or {}
     base = float(summary.get("base_final_score", summary.get("base_holdout_score", 0.0)))
     best = summary.get("confirmed_best_candidate_final_score")
     if best is None:
         best = summary.get("best_candidate_final_score", summary.get("promoted_best_holdout_score", base))
+    elapsed_s = aggregate.get("elapsed_s", lazy_timing.get("elapsed_s"))
+    output_tokens = aggregate.get("output_tokens", lazy_timing.get("output_tokens"))
+    output_tokens_per_sec = aggregate.get("tokens_per_sec")
+    if output_tokens_per_sec is None and elapsed_s and output_tokens:
+        output_tokens_per_sec = float(output_tokens) / float(elapsed_s)
     return {
         "label": label,
         "run_dir": str(run),
@@ -142,6 +149,14 @@ def _summary_row(label: str, run: Path) -> dict[str, Any]:
         "confirmed_candidate_sec": summary.get("confirmed_mixed_candidate_sec"),
         "candidate_replay_sec": summary.get("candidate_replay_sec"),
         "confirmed_candidate_replay_sec": summary.get("confirmed_candidate_replay_sec"),
+        "elapsed_s": elapsed_s,
+        "output_tokens": output_tokens,
+        "output_tokens_per_sec": output_tokens_per_sec,
+        "lazy_delta_time_s": lazy_timing.get("lazy_delta_time_s", summary.get("lazy_delta_time_s")),
+        "lazy_kernel_time_s": lazy_timing.get("lazy_kernel_time_s", summary.get("lazy_kernel_time_s")),
+        "lazy_meta_time_s": lazy_timing.get("lazy_meta_time_s", summary.get("lazy_meta_time_s")),
+        "lazy_stack_time_s": lazy_timing.get("lazy_stack_time_s", summary.get("lazy_stack_time_s")),
+        "lazy_qx_time_s": lazy_timing.get("qx_time_s", summary.get("qx_time_s")),
     }
 
 
@@ -205,6 +220,54 @@ def _plot_throughput(path: Path, rows: list[dict[str, Any]]) -> None:
     ax.set_title("Search/replay throughput")
     ax.tick_params(axis="x", rotation=25)
     ax.grid(axis="y", alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
+def _plot_lazy_timing(path: Path, rows: list[dict[str, Any]]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    selected = [row for row in rows if row.get("lazy_delta_time_s") is not None]
+    fig, ax = plt.subplots(figsize=(max(6, 1.3 * max(1, len(selected))), 4.6))
+    if not selected:
+        ax.text(0.5, 0.5, "No lazy timing fields", ha="center", va="center")
+        ax.axis("off")
+        fig.tight_layout()
+        fig.savefig(path, dpi=180)
+        plt.close(fig)
+        return
+
+    labels = [str(row["label"]) for row in selected]
+    stack = [float(row.get("lazy_stack_time_s") or 0.0) for row in selected]
+    meta = [float(row.get("lazy_meta_time_s") or 0.0) for row in selected]
+    kernel = [float(row.get("lazy_kernel_time_s") or 0.0) for row in selected]
+    qx = [float(row.get("lazy_qx_time_s") or 0.0) for row in selected]
+    delta = [float(row.get("lazy_delta_time_s") or 0.0) for row in selected]
+    elapsed = [float(row.get("elapsed_s") or 0.0) for row in selected]
+    other_lazy = [max(0.0, d - s - m - k - q) for d, s, m, k, q in zip(delta, stack, meta, kernel, qx)]
+    non_lazy = [max(0.0, e - d) for e, d in zip(elapsed, delta)]
+    x = list(range(len(selected)))
+    bottoms = [0.0 for _ in selected]
+    parts = [
+        ("factor stack", stack, "#2f6f73"),
+        ("metadata", meta, "#7c3aed"),
+        ("vLLM kernel", kernel, "#2563eb"),
+        ("other lazy", other_lazy, "#9ca3af"),
+        ("non-lazy", non_lazy, "#d1d5db"),
+    ]
+    for name, values, color in parts:
+        ax.bar(x, values, bottom=bottoms, label=name, color=color)
+        bottoms = [a + b for a, b in zip(bottoms, values)]
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=25, ha="right")
+    ax.set_ylabel("seconds")
+    ax.set_title("Lazy replay timing breakdown")
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -296,11 +359,29 @@ def main() -> int:
         "best_candidate_id",
         "candidate_sec",
         "confirmed_candidate_sec",
+        "output_tokens_per_sec",
+        "lazy_delta_time_s",
+        "lazy_kernel_time_s",
+        "lazy_meta_time_s",
+        "lazy_stack_time_s",
     ]
-    _write_csv(args.out / "summary.csv", summary_rows, summary_cols + ["run_dir", "candidate_replay_sec", "confirmed_candidate_replay_sec"])
+    _write_csv(
+        args.out / "summary.csv",
+        summary_rows,
+        summary_cols
+        + [
+            "run_dir",
+            "candidate_replay_sec",
+            "confirmed_candidate_replay_sec",
+            "elapsed_s",
+            "output_tokens",
+            "lazy_qx_time_s",
+        ],
+    )
     (args.out / "summary.md").write_text("# Lazy Kernel Validation\n\n" + _md_table(summary_rows, summary_cols) + "\n")
     _plot_quality(args.out / "quality.png", summary_rows)
     _plot_throughput(args.out / "throughput.png", summary_rows)
+    _plot_lazy_timing(args.out / "lazy_timing_breakdown.png", summary_rows)
 
     if args.trusted_run and args.candidate_run:
         primary = _write_parity_artifacts(

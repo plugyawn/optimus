@@ -89,18 +89,41 @@ class LazyHookRuntime:
         self.activation_rows: dict[str, list[torch.Tensor]] = {}
         self.qx_time_s = 0.0
         self.delta_time_s = 0.0
+        self.stack_time_s = 0.0
+        self.meta_time_s = 0.0
+        self.kernel_time_s = 0.0
         self.delta_rows = 0
         self.delta_calls = 0
         self._field_cache: dict[tuple[str, str, str, torch.dtype, int, int, int], torch.Tensor] = {}
         self._scaled_field_cache: dict[tuple[str, str, str, torch.dtype, int, int, int, float], torch.Tensor] = {}
         self._basis_cache: dict[tuple[str, str, torch.dtype], torch.Tensor] = {}
         self._vllm_meta_cache: dict[tuple[str, int, int], Any] = {}
+        self._vllm_meta_prepared_keys: dict[tuple[str, int, int], tuple[Any, ...]] = {}
+        self._vllm_mapping_cache: dict[tuple[Any, ...], torch.Tensor] = {}
+        self._vllm_a_stack_cache: dict[tuple[str, str, torch.dtype, int, int, int], torch.Tensor] = {}
+        self._vllm_b_stack_cache: dict[
+            tuple[str, tuple[tuple[str, int], ...], str, torch.dtype, int, int, int, float],
+            torch.Tensor,
+        ] = {}
+        self._row_mapping_generation = 0
 
     def reset_timing(self) -> None:
         self.qx_time_s = 0.0
         self.delta_time_s = 0.0
+        self.stack_time_s = 0.0
+        self.meta_time_s = 0.0
+        self.kernel_time_s = 0.0
         self.delta_rows = 0
         self.delta_calls = 0
+
+    def _clear_candidate_caches(self) -> None:
+        self._field_cache.clear()
+        self._scaled_field_cache.clear()
+        self._vllm_a_stack_cache.clear()
+        self._vllm_b_stack_cache.clear()
+        self._vllm_meta_prepared_keys.clear()
+        self._vllm_mapping_cache.clear()
+        self._row_mapping_generation += 1
 
     def set_candidate(self, candidate: SubspaceCandidate | None) -> None:
         self.active_candidate = candidate
@@ -112,8 +135,7 @@ class LazyHookRuntime:
         self._row_candidate_indices_cpu = None
         self._row_candidate_spans = []
         self._row_candidate_indices_len = 0
-        self._field_cache.clear()
-        self._scaled_field_cache.clear()
+        self._clear_candidate_caches()
 
     def set_candidate_batch(self, request_candidate_by_id: dict[str, SubspaceCandidate]) -> None:
         self.active_candidate = None
@@ -132,8 +154,7 @@ class LazyHookRuntime:
         self._row_candidate_indices_cpu = None
         self._row_candidate_spans = []
         self._row_candidate_indices_len = 0
-        self._field_cache.clear()
-        self._scaled_field_cache.clear()
+        self._clear_candidate_caches()
 
     def set_candidate_batch_by_order(self, candidates: list[SubspaceCandidate], *, prompt_count: int) -> None:
         self.active_candidate = None
@@ -145,8 +166,7 @@ class LazyHookRuntime:
         self._row_candidate_indices_cpu = None
         self._row_candidate_spans = []
         self._row_candidate_indices_len = 0
-        self._field_cache.clear()
-        self._scaled_field_cache.clear()
+        self._clear_candidate_caches()
 
     def update_row_candidates(self, req_ids: list[str], query_start_loc: Any) -> None:
         if not self.request_candidate_by_id and not (self.active_candidates and self._order_prompt_count > 0):
@@ -202,6 +222,9 @@ class LazyHookRuntime:
         self._row_candidate_indices_cpu = row_indices
         self._row_candidate_spans = spans
         self._row_candidate_indices_len = int(row_indices.numel())
+        self._vllm_meta_prepared_keys.clear()
+        self._vllm_mapping_cache.clear()
+        self._row_mapping_generation += 1
 
     def basis_for(self, site_id: str, *, device: torch.device, dtype: torch.dtype) -> torch.Tensor | None:
         basis = self.basis_by_site.get(site_id)
@@ -387,6 +410,96 @@ class LazyHookRuntime:
         self._vllm_meta_cache[key] = meta
         return meta
 
+    def _mapping_cache_key(self, *, device: torch.device, rows: int, num_loras: int) -> tuple[Any, ...]:
+        return (int(self._row_mapping_generation), str(device), int(rows), int(num_loras))
+
+    def _token_mapping_for(
+        self,
+        row_mapping: torch.Tensor,
+        *,
+        device: torch.device,
+        rows: int,
+        num_loras: int,
+    ) -> tuple[torch.Tensor, tuple[Any, ...]]:
+        key = self._mapping_cache_key(device=device, rows=rows, num_loras=num_loras)
+        cached = self._vllm_mapping_cache.get(key)
+        if cached is not None:
+            return cached, key
+        token_mapping = row_mapping.to(device=device, dtype=torch.int32, non_blocking=True).contiguous()
+        self._vllm_mapping_cache[key] = token_mapping
+        return token_mapping, key
+
+    def _prepare_vllm_meta(
+        self,
+        meta: Any,
+        token_mapping: torch.Tensor,
+        *,
+        meta_key: tuple[str, int, int],
+        mapping_key: tuple[Any, ...],
+    ) -> None:
+        if self._vllm_meta_prepared_keys.get(meta_key) == mapping_key:
+            return
+        started = time.perf_counter()
+        meta.prepare_tensors(token_mapping)
+        self.meta_time_s += time.perf_counter() - started
+        self._vllm_meta_prepared_keys[meta_key] = mapping_key
+
+    def _vllm_a_stack(
+        self,
+        target: HookTarget,
+        basis: torch.Tensor,
+        *,
+        num_loras: int,
+        input_dim: int,
+        rank: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        key = (target.site_id, str(device), dtype, int(input_dim), int(rank), int(num_loras))
+        cached = self._vllm_a_stack_cache.get(key)
+        if cached is not None:
+            return cached
+        stack = basis[:rank].unsqueeze(0).expand(int(num_loras), -1, -1).contiguous()
+        self._vllm_a_stack_cache[key] = stack
+        return stack
+
+    def _vllm_b_stack(
+        self,
+        target: HookTarget,
+        candidates: list[SubspaceCandidate],
+        *,
+        output_dim: int,
+        rank: int,
+        device: torch.device,
+        dtype: torch.dtype,
+        beta: float,
+        target_id: str,
+    ) -> torch.Tensor:
+        candidate_key = tuple((candidate.candidate_id, int(candidate.basis_rank)) for candidate in candidates)
+        source_rank = max([int(rank), *(int(candidate.basis_rank) for candidate in candidates)])
+        key = (target_id, candidate_key, str(device), dtype, int(output_dim), int(source_rank), int(rank), float(beta))
+        cached = self._vllm_b_stack_cache.get(key)
+        if cached is not None:
+            return cached
+        stack = torch.stack(
+            [
+                self.scaled_field(
+                    target,
+                    candidate,
+                    output_dim=output_dim,
+                    rank=rank,
+                    device=device,
+                    dtype=dtype,
+                    beta=float(beta),
+                    target_id=target_id,
+                )
+                for candidate in candidates
+            ],
+            dim=0,
+        ).contiguous()
+        self._vllm_b_stack_cache[key] = stack
+        return stack
+
     def _vllm_lora_kernel_delta_for_target(
         self,
         target: HookTarget,
@@ -417,33 +530,47 @@ class LazyHookRuntime:
         if int(basis.shape[-1]) != input_dim:
             raise RuntimeError(f"basis width mismatch for {target.site_id}: basis={tuple(basis.shape)} x={tuple(flat_x.shape)}")
         num_loras = max(1, len(candidates))
-        a_stack = basis.unsqueeze(0).expand(num_loras, -1, -1).contiguous()
-        b_stack = torch.stack(
-            [
-                self.scaled_field(
-                    target,
-                    candidate,
-                    output_dim=output_dim,
-                    rank=rank,
-                    device=flat_x.device,
-                    dtype=dtype,
-                    beta=float(beta),
-                    target_id=target_id,
-                )
-                for candidate in candidates
-            ],
-            dim=0,
-        ).contiguous()
+        stack_started = time.perf_counter()
+        a_stack = self._vllm_a_stack(
+            target,
+            basis,
+            num_loras=num_loras,
+            input_dim=input_dim,
+            rank=rank,
+            device=flat_x.device,
+            dtype=dtype,
+        )
+        b_stack = self._vllm_b_stack(
+            target,
+            candidates,
+            output_dim=output_dim,
+            rank=rank,
+            device=flat_x.device,
+            dtype=dtype,
+            beta=float(beta),
+            target_id=target_id,
+        )
+        self.stack_time_s += time.perf_counter() - stack_started
 
         rows = int(flat_x.shape[0])
+        meta_key = (str(flat_x.device), num_loras, rows)
         meta = self._vllm_meta(device=flat_x.device, max_loras=num_loras, rows=rows)
-        token_mapping = row_mapping.to(device=flat_x.device, dtype=torch.int32, non_blocking=True).contiguous()
-        meta.prepare_tensors(token_mapping)
+        meta_started = time.perf_counter()
+        token_mapping, mapping_key = self._token_mapping_for(
+            row_mapping,
+            device=flat_x.device,
+            rows=rows,
+            num_loras=num_loras,
+        )
+        self.meta_time_s += time.perf_counter() - meta_started
+        self._prepare_vllm_meta(meta, token_mapping, meta_key=meta_key, mapping_key=mapping_key)
         x_kernel = flat_x.to(dtype=dtype).contiguous()
         buffer = torch.empty((1, rows, rank), device=flat_x.device, dtype=torch.float32)
         delta = torch.zeros((rows, output_dim), device=flat_x.device, dtype=dtype)
+        kernel_started = time.perf_counter()
         lora_shrink(x_kernel, (a_stack,), buffer, *meta.meta_args(rows, True), 1.0)
         lora_expand(buffer, (b_stack,), delta, *meta.meta_args(rows, True), offset_start=0, add_inputs=True)
+        self.kernel_time_s += time.perf_counter() - kernel_started
         return delta
 
     def _delta_vllm_lora_kernel(
@@ -1092,6 +1219,9 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
         total_output_tokens = 0
         total_qx = 0.0
         total_delta = 0.0
+        total_stack = 0.0
+        total_meta = 0.0
+        total_kernel = 0.0
         total_delta_rows = 0
         total_delta_calls = 0
         candidate_batch_size = _candidate_batch_size(args, population)
@@ -1168,6 +1298,9 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
                 raise RuntimeError("vLLM lazy hook did not apply any perturbation rows; refusing to report true-vLLM results")
             total_qx += runtime.qx_time_s
             total_delta += runtime.delta_time_s
+            total_stack += runtime.stack_time_s
+            total_meta += runtime.meta_time_s
+            total_kernel += runtime.kernel_time_s
             total_delta_rows += runtime.delta_rows
             total_delta_calls += runtime.delta_calls
             outputs_by_candidate = (
@@ -1218,6 +1351,9 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             holdout_score, holdout_tokens, holdout_rows = _score_outputs(holdout, holdout_outputs, max_new_tokens=int(args.max_new_tokens or 32))
             total_qx += runtime.qx_time_s
             total_delta += runtime.delta_time_s
+            total_stack += runtime.stack_time_s
+            total_meta += runtime.meta_time_s
+            total_kernel += runtime.kernel_time_s
             total_delta_rows += runtime.delta_rows
             total_delta_calls += runtime.delta_calls
             total_output_tokens += holdout_tokens
@@ -1418,6 +1554,9 @@ def run_vllm_lazy_hook_search(args: Any) -> dict[str, Any]:
             "base_model_time_s": max(scoring_time_s + holdout_elapsed_total - total_qx - total_delta, 1e-9),
             "qx_time_s": total_qx,
             "lazy_delta_time_s": total_delta,
+            "lazy_stack_time_s": total_stack,
+            "lazy_meta_time_s": total_meta,
+            "lazy_kernel_time_s": total_kernel,
             "base_eval_time_s": base_screen_elapsed + base_holdout_elapsed,
             "selected_holdout_eval_time_s": float(holdout_score_rows[0]["elapsed_s"]) if holdout_score_rows else 0.0,
             "promoted_holdout_eval_time_s": holdout_elapsed_total,
