@@ -529,6 +529,7 @@ def main() -> int:
             "dtype": dtype,
             "candidate_batch_size": int(args.candidate_batch_size),
             "routing_patch": routing_handle is not None,
+            "lazy_delta_backend": runtime.delta_backend,
             "candidate_ids": [candidate.candidate_id for candidate in selected],
             "base_final_score": base_score,
             "candidate_final_scores": candidate_final_scores,

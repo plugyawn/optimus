@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -29,9 +30,9 @@ def _labelled_run(text: str) -> tuple[str, Path]:
     return label, Path(raw)
 
 
-def _candidate_scores(run: Path) -> dict[str, float]:
+def _candidate_scores(run: Path, *, score_file: str = "candidate_scores.jsonl") -> dict[str, float]:
     out: dict[str, float] = {}
-    for row in _jsonl(run / "candidate_scores.jsonl"):
+    for row in _jsonl(run / score_file):
         candidate_id = str(row.get("candidate_id") or row.get("candidate") or "")
         if candidate_id in {"", "base", "__base__"}:
             continue
@@ -41,6 +42,81 @@ def _candidate_scores(run: Path) -> dict[str, float]:
         elif "exact_mean" in row:
             out[candidate_id] = float(row["exact_mean"])
     return out
+
+
+def _mean(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _parity_rows(trusted: dict[str, float], candidate: dict[str, float]) -> list[dict[str, Any]]:
+    common = sorted(set(trusted) & set(candidate))
+    return [
+        {
+            "candidate_id": candidate_id,
+            "trusted_exact": trusted[candidate_id],
+            "candidate_exact": candidate[candidate_id],
+            "diff": candidate[candidate_id] - trusted[candidate_id],
+            "abs_diff": abs(candidate[candidate_id] - trusted[candidate_id]),
+            "exact_match": candidate[candidate_id] == trusted[candidate_id],
+        }
+        for candidate_id in common
+    ]
+
+
+def _best(scores: dict[str, float]) -> tuple[str | None, float | None]:
+    if not scores:
+        return None, None
+    candidate_id = max(scores, key=lambda item: (scores[item], item))
+    return candidate_id, scores[candidate_id]
+
+
+def _parity_summary(
+    *,
+    label: str,
+    trusted_run: Path,
+    candidate_run: Path,
+    trusted_score_file: str,
+    candidate_score_file: str,
+    trusted: dict[str, float],
+    candidate: dict[str, float],
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    diffs = [float(row["diff"]) for row in rows]
+    abs_diffs = [abs(diff) for diff in diffs]
+    trusted_best_id, trusted_best_score = _best({key: value for key, value in trusted.items() if key in candidate})
+    candidate_best_id, candidate_best_score = _best({key: value for key, value in candidate.items() if key in trusted})
+    candidate_best_trusted_score = trusted.get(candidate_best_id) if candidate_best_id is not None else None
+    selected_regret = (
+        None
+        if trusted_best_score is None or candidate_best_trusted_score is None
+        else float(trusted_best_score) - float(candidate_best_trusted_score)
+    )
+    max_abs = max(abs_diffs, default=None)
+    return {
+        "label": label,
+        "trusted_run": str(trusted_run),
+        "candidate_run": str(candidate_run),
+        "trusted_score_file": trusted_score_file,
+        "candidate_score_file": candidate_score_file,
+        "trusted_candidates": len(trusted),
+        "candidate_candidates": len(candidate),
+        "common_candidates": len(rows),
+        "max_abs_score_diff": max_abs,
+        "mean_abs_score_diff": _mean(abs_diffs),
+        "mean_signed_score_diff": _mean(diffs),
+        "rmse_score_diff": None if not diffs else math.sqrt(sum(diff * diff for diff in diffs) / len(diffs)),
+        "exact_match_count": sum(1 for row in rows if row["exact_match"]),
+        "exact_score_match": max_abs == 0.0 if max_abs is not None else False,
+        "trusted_best_candidate": trusted_best_id,
+        "trusted_best_score": trusted_best_score,
+        "candidate_best_candidate": candidate_best_id,
+        "candidate_best_score": candidate_best_score,
+        "candidate_best_trusted_score": candidate_best_trusted_score,
+        "best_candidate_match": trusted_best_id is not None and trusted_best_id == candidate_best_id,
+        "selected_regret_vs_trusted": selected_regret,
+    }
 
 
 def _summary_row(label: str, run: Path) -> dict[str, Any]:
@@ -134,7 +210,7 @@ def _plot_throughput(path: Path, rows: list[dict[str, Any]]) -> None:
     plt.close(fig)
 
 
-def _plot_parity(path: Path, rows: list[dict[str, Any]]) -> None:
+def _plot_parity(path: Path, rows: list[dict[str, Any]], *, title: str = "Candidate-score parity") -> None:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -150,11 +226,46 @@ def _plot_parity(path: Path, rows: list[dict[str, Any]]) -> None:
     ax.plot([lo - pad, hi + pad], [lo - pad, hi + pad], color="#6b7280", linestyle="--", linewidth=1.0)
     ax.set_xlabel("trusted adapter exact")
     ax.set_ylabel("true lazy exact")
-    ax.set_title("Candidate-score parity")
+    ax.set_title(title)
     ax.grid(alpha=0.25)
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
+
+
+def _write_parity_artifacts(
+    *,
+    out: Path,
+    label: str,
+    prefix: str,
+    trusted_run: Path,
+    candidate_run: Path,
+    trusted_score_file: str,
+    candidate_score_file: str,
+) -> dict[str, Any] | None:
+    trusted = _candidate_scores(trusted_run, score_file=trusted_score_file)
+    candidate = _candidate_scores(candidate_run, score_file=candidate_score_file)
+    rows = _parity_rows(trusted, candidate)
+    if not rows and not trusted and not candidate:
+        return None
+    csv_name = f"{prefix}_parity.csv"
+    png_name = f"{prefix}_score_parity.png"
+    _write_csv(out / csv_name, rows, ["candidate_id", "trusted_exact", "candidate_exact", "diff", "abs_diff", "exact_match"])
+    if rows:
+        _plot_parity(out / png_name, rows, title=f"{label} score parity")
+    summary = _parity_summary(
+        label=label,
+        trusted_run=trusted_run,
+        candidate_run=candidate_run,
+        trusted_score_file=trusted_score_file,
+        candidate_score_file=candidate_score_file,
+        trusted=trusted,
+        candidate=candidate,
+        rows=rows,
+    )
+    summary["csv"] = csv_name
+    summary["plot"] = png_name if rows else None
+    return summary
 
 
 def main() -> int:
@@ -163,6 +274,9 @@ def main() -> int:
     parser.add_argument("--run", action="append", required=True, help="label=RUN_DIR")
     parser.add_argument("--trusted-run", type=Path, help="Adapter/materialized run used as candidate-score parity reference.")
     parser.add_argument("--candidate-run", type=Path, help="True-lazy run compared against --trusted-run.")
+    parser.add_argument("--trusted-score-file", default="candidate_scores.jsonl")
+    parser.add_argument("--candidate-score-file", default="candidate_scores.jsonl")
+    parser.add_argument("--confirmed-score-file", default="confirmed_candidate_scores.jsonl")
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -189,29 +303,35 @@ def main() -> int:
     _plot_throughput(args.out / "throughput.png", summary_rows)
 
     if args.trusted_run and args.candidate_run:
-        trusted = _candidate_scores(args.trusted_run)
-        candidate = _candidate_scores(args.candidate_run)
-        common = sorted(set(trusted) & set(candidate))
-        parity_rows = [
-            {
-                "candidate_id": candidate_id,
-                "trusted_exact": trusted[candidate_id],
-                "candidate_exact": candidate[candidate_id],
-                "diff": candidate[candidate_id] - trusted[candidate_id],
-            }
-            for candidate_id in common
-        ]
-        _write_csv(args.out / "candidate_parity.csv", parity_rows, ["candidate_id", "trusted_exact", "candidate_exact", "diff"])
-        if parity_rows:
-            _plot_parity(args.out / "candidate_score_parity.png", parity_rows)
-        max_abs = max((abs(row["diff"]) for row in parity_rows), default=None)
-        parity_summary = {
-            "trusted_run": str(args.trusted_run),
-            "candidate_run": str(args.candidate_run),
-            "common_candidates": len(common),
-            "max_abs_score_diff": max_abs,
-            "exact_score_match": max_abs == 0.0 if max_abs is not None else False,
-        }
+        primary = _write_parity_artifacts(
+            out=args.out,
+            label="candidate",
+            prefix="candidate",
+            trusted_run=args.trusted_run,
+            candidate_run=args.candidate_run,
+            trusted_score_file=args.trusted_score_file,
+            candidate_score_file=args.candidate_score_file,
+        )
+        confirmed = _write_parity_artifacts(
+            out=args.out,
+            label="confirmed candidate",
+            prefix="confirmed_candidate",
+            trusted_run=args.trusted_run,
+            candidate_run=args.candidate_run,
+            trusted_score_file=args.confirmed_score_file,
+            candidate_score_file=args.confirmed_score_file,
+        )
+        parity_summary = {"candidate_scores": primary, "confirmed_candidate_scores": confirmed}
+        if primary is not None:
+            parity_summary.update(
+                {
+                    "trusted_run": primary["trusted_run"],
+                    "candidate_run": primary["candidate_run"],
+                    "common_candidates": primary["common_candidates"],
+                    "max_abs_score_diff": primary["max_abs_score_diff"],
+                    "exact_score_match": primary["exact_score_match"],
+                }
+            )
         (args.out / "parity_summary.json").write_text(json.dumps(parity_summary, indent=2, sort_keys=True) + "\n")
     return 0
 

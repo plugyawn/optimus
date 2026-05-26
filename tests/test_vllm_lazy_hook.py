@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import torch
+import pytest
 
 from optimus.backends.vllm_lazy_hook import HookTarget, LazyHookRuntime
 from optimus.backends.vllm_lazy_hook import _ensemble_input_rows
@@ -155,6 +156,39 @@ def test_vllm_lazy_hook_input_order_candidate_batch_matches_serial_deltas():
     assert torch.allclose(batched[2:], serial_b)
 
 
+def test_vllm_lazy_hook_numeric_request_ids_route_candidate_batch_when_scheduler_reorders():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+        input_dim=2,
+        output_dim=3,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.basis_by_site[target.site_id] = torch.eye(2)
+    runtime.beta_by_target[target.target_id] = 0.25
+    x = torch.tensor([[1.0, 0.0], [2.0, 1.0], [0.5, 1.5], [1.0, -1.0]])
+    y = torch.zeros((4, 3))
+    cand_a = _candidate("a", 11)
+    cand_b = _candidate("b", 29)
+
+    runtime.set_candidate(cand_a)
+    serial_a = runtime.delta(target, x[:2], y[:2])
+    runtime.set_candidate(cand_b)
+    serial_b = runtime.delta(target, x[2:], y[2:])
+
+    runtime.set_candidate_batch_by_order([cand_a, cand_b], prompt_count=2)
+    runtime.update_row_candidates(["101-any", "100-any", "102-any"], [0, 1, 2, 4])
+    batched = runtime.delta(target, x, y)
+
+    assert torch.allclose(batched[:2], serial_a)
+    assert torch.allclose(batched[2:], serial_b)
+
+
 def test_vllm_lazy_hook_zero_radius_counts_rows_and_returns_zero_delta():
     target = HookTarget(
         module_name="model.layers.0.self_attn.q_proj",
@@ -179,6 +213,29 @@ def test_vllm_lazy_hook_zero_radius_counts_rows_and_returns_zero_delta():
     assert torch.equal(delta, torch.zeros_like(y))
     assert runtime.delta_rows == 2
     assert runtime.delta_calls == 1
+
+
+def test_vllm_lazy_hook_vllm_kernel_backend_fails_closed_on_cpu():
+    target = HookTarget(
+        module_name="model.layers.0.self_attn.q_proj",
+        target_id="layer_0.self_attn.q_proj",
+        site_id="layer_0.attn_in",
+        layer_index=0,
+        block_path="model.layers.0",
+        suffix="q_proj",
+        module=torch.nn.Linear(2, 3),
+        input_dim=2,
+        output_dim=3,
+    )
+    runtime = LazyHookRuntime([target])
+    runtime.delta_backend = "vllm-lora-kernel"
+    runtime.compute_dtype_policy = "bfloat16"
+    runtime.basis_by_site[target.site_id] = torch.eye(2)
+    runtime.beta_by_target[target.target_id] = 0.25
+    runtime.set_candidate(_candidate("a", 11))
+
+    with pytest.raises(RuntimeError, match="requires CUDA tensors"):
+        runtime.delta(target, torch.ones((2, 2)), torch.zeros((2, 3)))
 
 
 def test_vllm_lora_hook_matches_canonical_lora_delta():

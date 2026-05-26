@@ -73,12 +73,14 @@ class LazyHookRuntime:
         self.max_activation_rows_per_site = max_activation_rows_per_site
         self.sync_timing = _env_flag("OPTIMUS_SYNC_LAZY_TIMING", default=False) if sync_timing is None else bool(sync_timing)
         self.compute_dtype_policy = os.environ.get("OPTIMUS_LAZY_COMPUTE_DTYPE", "activation").strip().lower()
+        self.delta_backend = os.environ.get("OPTIMUS_LAZY_DELTA_BACKEND", "torch").strip().lower() or "torch"
         self.collecting = False
         self.active_candidate: SubspaceCandidate | None = None
         self.active_candidates: list[SubspaceCandidate] = []
         self.request_candidate_by_id: dict[str, SubspaceCandidate] = {}
         self._candidate_index_by_id: dict[str, int] = {}
         self._order_prompt_count = 0
+        self._order_request_id_start: int | None = None
         self._row_candidate_indices_cpu: torch.Tensor | None = None
         self._row_candidate_spans: list[tuple[int, int, int]] = []
         self._row_candidate_indices_len = 0
@@ -92,6 +94,7 @@ class LazyHookRuntime:
         self._field_cache: dict[tuple[str, str, str, torch.dtype, int, int, int], torch.Tensor] = {}
         self._scaled_field_cache: dict[tuple[str, str, str, torch.dtype, int, int, int, float], torch.Tensor] = {}
         self._basis_cache: dict[tuple[str, str, torch.dtype], torch.Tensor] = {}
+        self._vllm_meta_cache: dict[tuple[str, int, int], Any] = {}
 
     def reset_timing(self) -> None:
         self.qx_time_s = 0.0
@@ -105,6 +108,7 @@ class LazyHookRuntime:
         self.request_candidate_by_id = {}
         self._candidate_index_by_id = {}
         self._order_prompt_count = 0
+        self._order_request_id_start = None
         self._row_candidate_indices_cpu = None
         self._row_candidate_spans = []
         self._row_candidate_indices_len = 0
@@ -124,6 +128,7 @@ class LazyHookRuntime:
         self.active_candidates = candidates
         self._candidate_index_by_id = {candidate.candidate_id: idx for idx, candidate in enumerate(candidates)}
         self._order_prompt_count = 0
+        self._order_request_id_start = None
         self._row_candidate_indices_cpu = None
         self._row_candidate_spans = []
         self._row_candidate_indices_len = 0
@@ -136,6 +141,7 @@ class LazyHookRuntime:
         self.active_candidates = list(candidates)
         self._candidate_index_by_id = {candidate.candidate_id: idx for idx, candidate in enumerate(candidates)}
         self._order_prompt_count = max(1, int(prompt_count))
+        self._order_request_id_start = None
         self._row_candidate_indices_cpu = None
         self._row_candidate_spans = []
         self._row_candidate_indices_len = 0
@@ -152,6 +158,13 @@ class LazyHookRuntime:
             loc = query_start_loc.detach().cpu().tolist()
         else:
             loc = list(query_start_loc)
+        request_ordinals = [_request_ordinal(req_id) for req_id in req_ids]
+        if not self.request_candidate_by_id:
+            numeric = [ordinal for ordinal in request_ordinals if ordinal is not None]
+            if numeric:
+                current_min = min(numeric)
+                if self._order_request_id_start is None or current_min < self._order_request_id_start:
+                    self._order_request_id_start = int(current_min)
         pieces: list[torch.Tensor] = []
         spans: list[tuple[int, int, int]] = []
         for req_index, req_id in enumerate(req_ids):
@@ -166,7 +179,17 @@ class LazyHookRuntime:
                 candidate = self.request_candidate_by_id.get(str(req_id))
                 candidate_index = -1 if candidate is None else self._candidate_index_by_id[candidate.candidate_id]
             else:
-                candidate_index = min(req_index // self._order_prompt_count, len(self.active_candidates) - 1)
+                ordinal = request_ordinals[req_index] if req_index < len(request_ordinals) else None
+                if ordinal is not None and self._order_request_id_start is not None:
+                    candidate_index = (int(ordinal) - int(self._order_request_id_start)) // self._order_prompt_count
+                else:
+                    candidate_index = req_index // self._order_prompt_count
+                if candidate_index < 0 or candidate_index >= len(self.active_candidates):
+                    raise RuntimeError(
+                        "vLLM lazy hook could not route request id to candidate: "
+                        f"req_id={req_id!r} ordinal={ordinal!r} start={self._order_request_id_start!r} "
+                        f"prompt_count={self._order_prompt_count} candidates={len(self.active_candidates)}"
+                    )
             pieces.append(torch.full((count,), candidate_index, dtype=torch.int16))
             if candidate_index >= 0:
                 spans.append((candidate_index, start, end))
@@ -351,6 +374,146 @@ class LazyHookRuntime:
         )
         return z @ field.T
 
+    def _vllm_meta(self, *, device: torch.device, max_loras: int, rows: int) -> Any:
+        key = (str(device), int(max_loras), int(rows))
+        cached = self._vllm_meta_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            from vllm.lora.ops.triton_ops import LoRAKernelMeta
+        except Exception as exc:  # pragma: no cover - exercised on GPU hosts with vLLM.
+            raise RuntimeError("OPTIMUS_LAZY_DELTA_BACKEND=vllm-lora-kernel requires vLLM Triton LoRA ops") from exc
+        meta = LoRAKernelMeta.make(int(max_loras), int(rows), device=device)
+        self._vllm_meta_cache[key] = meta
+        return meta
+
+    def _vllm_lora_kernel_delta_for_target(
+        self,
+        target: HookTarget,
+        candidates: list[SubspaceCandidate],
+        row_mapping: torch.Tensor,
+        flat_x: torch.Tensor,
+        *,
+        output_dim: int,
+        rank: int,
+        dtype: torch.dtype,
+        beta: float,
+        target_id: str,
+    ) -> torch.Tensor:
+        if not flat_x.is_cuda:
+            raise RuntimeError("vllm-lora-kernel lazy delta backend requires CUDA tensors")
+        if dtype not in {torch.float16, torch.bfloat16}:
+            raise RuntimeError("vllm-lora-kernel lazy delta backend requires fp16/bf16 compute dtype")
+        try:
+            from vllm.lora.ops.triton_ops import lora_expand, lora_shrink
+        except Exception as exc:  # pragma: no cover - exercised on GPU hosts with vLLM.
+            raise RuntimeError("OPTIMUS_LAZY_DELTA_BACKEND=vllm-lora-kernel requires vLLM Triton LoRA ops") from exc
+
+        basis = self.basis_for(target.site_id, device=flat_x.device, dtype=dtype)
+        if basis is None:
+            raise RuntimeError(f"missing lazy basis for activation site {target.site_id}")
+        basis = basis[:rank].contiguous()
+        input_dim = int(flat_x.shape[-1])
+        if int(basis.shape[-1]) != input_dim:
+            raise RuntimeError(f"basis width mismatch for {target.site_id}: basis={tuple(basis.shape)} x={tuple(flat_x.shape)}")
+        num_loras = max(1, len(candidates))
+        a_stack = basis.unsqueeze(0).expand(num_loras, -1, -1).contiguous()
+        b_stack = torch.stack(
+            [
+                self.scaled_field(
+                    target,
+                    candidate,
+                    output_dim=output_dim,
+                    rank=rank,
+                    device=flat_x.device,
+                    dtype=dtype,
+                    beta=float(beta),
+                    target_id=target_id,
+                )
+                for candidate in candidates
+            ],
+            dim=0,
+        ).contiguous()
+
+        rows = int(flat_x.shape[0])
+        meta = self._vllm_meta(device=flat_x.device, max_loras=num_loras, rows=rows)
+        token_mapping = row_mapping.to(device=flat_x.device, dtype=torch.int32, non_blocking=True).contiguous()
+        meta.prepare_tensors(token_mapping)
+        x_kernel = flat_x.to(dtype=dtype).contiguous()
+        buffer = torch.empty((1, rows, rank), device=flat_x.device, dtype=torch.float32)
+        delta = torch.zeros((rows, output_dim), device=flat_x.device, dtype=dtype)
+        lora_shrink(x_kernel, (a_stack,), buffer, *meta.meta_args(rows, True), 1.0)
+        lora_expand(buffer, (b_stack,), delta, *meta.meta_args(rows, True), offset_start=0, add_inputs=True)
+        return delta
+
+    def _delta_vllm_lora_kernel(
+        self,
+        target: HookTarget,
+        flat_x: torch.Tensor,
+        y: torch.Tensor,
+        *,
+        candidate: SubspaceCandidate | None,
+        row_candidates: list[SubspaceCandidate],
+        row_candidate_indices: torch.Tensor | None,
+        output_dim: int,
+        rank: int,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if candidate is not None:
+            candidates = [candidate]
+            row_mapping = torch.zeros((int(flat_x.shape[0]),), dtype=torch.int32)
+        else:
+            if row_candidate_indices is None or not row_candidates:
+                raise RuntimeError("missing row-candidate routing for vllm-lora-kernel lazy delta backend")
+            candidates = row_candidates
+            row_mapping = row_candidate_indices.to(dtype=torch.int32)
+            if row_mapping.numel():
+                min_index = int(row_mapping.min().item())
+                max_index = int(row_mapping.max().item())
+                if min_index < 0 or max_index >= len(candidates):
+                    raise RuntimeError(
+                        "vLLM lazy hook row-candidate mapping is out of bounds: "
+                        f"min={min_index} max={max_index} candidates={len(candidates)}"
+                    )
+
+        if target.suffix == "qkv_proj" and target.fused_qkv_slices:
+            delta = torch.zeros((int(flat_x.shape[0]), output_dim), device=flat_x.device, dtype=dtype)
+            for suffix in target.fused_qkv_slices:
+                beta = self._beta_for_split(target, suffix)
+                if beta is None or float(beta) == 0.0:
+                    continue
+                output_slice = self._qkv_slice_for(target, suffix, output_dim)
+                width = int(output_slice.stop - output_slice.start)
+                split = self._vllm_lora_kernel_delta_for_target(
+                    target,
+                    candidates,
+                    row_mapping,
+                    flat_x,
+                    output_dim=width,
+                    rank=rank,
+                    dtype=dtype,
+                    beta=float(beta),
+                    target_id=self._split_target_id(target, suffix),
+                )
+                delta[:, output_slice] = split
+            return delta.reshape(y.shape).to(dtype=y.dtype)
+
+        beta = self._beta_for_split(target)
+        if beta is None or float(beta) == 0.0:
+            return torch.zeros_like(y)
+        delta = self._vllm_lora_kernel_delta_for_target(
+            target,
+            candidates,
+            row_mapping,
+            flat_x,
+            output_dim=output_dim,
+            rank=rank,
+            dtype=dtype,
+            beta=float(beta),
+            target_id=target.target_id,
+        )
+        return delta.reshape(y.shape).to(dtype=y.dtype)
+
     def delta(self, target: HookTarget, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor | None:
         candidate = self.active_candidate
         row_candidate_indices = self._row_candidate_indices_cpu
@@ -384,6 +547,29 @@ class LazyHookRuntime:
             self.delta_rows += int(flat_x.shape[0])
             self.delta_calls += 1
             return torch.zeros_like(y)
+        if self.delta_backend in {"vllm-lora", "vllm-lora-kernel"}:
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
+            delta_start = time.perf_counter()
+            delta = self._delta_vllm_lora_kernel(
+                target,
+                flat_x,
+                y,
+                candidate=candidate,
+                row_candidates=row_candidates,
+                row_candidate_indices=row_candidate_indices,
+                output_dim=output_dim,
+                rank=rank,
+                dtype=compute_dtype,
+            )
+            if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
+                torch.cuda.synchronize(flat_x.device)
+            self.delta_time_s += time.perf_counter() - delta_start
+            self.delta_rows += int(flat_x.shape[0])
+            self.delta_calls += 1
+            return delta
+        if self.delta_backend != "torch":
+            raise RuntimeError(f"unknown lazy delta backend {self.delta_backend!r}")
         if self.sync_timing and torch.cuda.is_available() and flat_x.is_cuda:
             torch.cuda.synchronize(flat_x.device)
         qx_start = time.perf_counter()
@@ -433,6 +619,11 @@ def _env_flag(name: str, *, default: bool = False) -> bool:
     if text is None:
         return default
     return text.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _request_ordinal(req_id: str) -> int | None:
+    prefix = str(req_id).split("-", 1)[0]
+    return int(prefix) if prefix.isdigit() else None
 
 
 def _target_suffix(module_name: str) -> str | None:

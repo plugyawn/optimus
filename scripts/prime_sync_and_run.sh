@@ -44,6 +44,7 @@ else
   bundle="$tmp_bundle"
   COPYFILE_DISABLE=1 tar \
     --exclude='.git' \
+    --exclude='.venv' \
     --exclude='.opencode' \
     --exclude='.pytest_cache' \
     --exclude='__pycache__' \
