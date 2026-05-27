@@ -330,6 +330,13 @@ Degenerate calibration stats must fail closed unless explicitly overridden:
 zero effective rank, tiny `H_s`, zero/NaN `P_t`, or unstable scale estimates
 must block `relative-output-rms`.
 
+Replay must preserve the same scale law. If an evaluator slices a stored
+activation-SVD or shuffled-SVD basis to a smaller `effective_rank`, it must
+recompute `H_s(r)` from the stored singular values and rescale `beta_t` by
+`sqrt(H_source / H_s(r))`. If the artifact does not contain enough per-rank
+energy information, for example a random-orthonormal basis artifact, replay
+must fail closed and require a fresh run at the requested `--basis-rank`.
+
 ### Budget Policies
 
 Supported v1 policies:
@@ -1141,6 +1148,8 @@ Mathematical tests:
   grows with `sqrt(H_s(r))`.
 - Relative-RMS rank invariance: under `relative-output-rms`, measured relative
   output RMS is invariant to rank within tolerance.
+- Effective-rank replay scale: slicing an SVD basis recomputes `H_s(r)` and
+  rescales `beta_t`; slicing a basis without per-rank energy fails closed.
 - Budget invariance: normalized budgets do not silently increase total squared
   budget when targets are added.
 - `rho=0` and `rank=0` reproduce base logits within deterministic dtype

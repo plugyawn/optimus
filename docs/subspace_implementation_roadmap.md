@@ -39,6 +39,12 @@ Current saved state, 2026-05-26:
 - The public substrate must stay fail-closed until the named phase gates land.
   Future implementation must preserve these checks before touching vLLM hooks,
   basis capture, lazy kernels, optimized kernels, or new search experiments.
+- Replay paths that slice a stored basis to a smaller `effective_rank` must not
+  reuse full-rank `relative-output-rms` betas. For activation-SVD and
+  shuffled-SVD artifacts, replay recomputes `H_s(r)` from stored singular
+  values and rescales beta by `sqrt(H_source / H_r)`. For random bases or
+  missing per-rank energy, replay must fail closed and require a fresh
+  `--basis-rank` run.
 - `optimus search` and `optimus bench` are the final public command families.
   Any runnable plan, launcher, release gate, or validation contract that still
   depends on `peft-search`, `vllm-search`, `vllm-bench`, `vllm-halving`,

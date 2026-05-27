@@ -11,6 +11,7 @@ import torch
 from optimus.modeling.lora import AdapterSpec, adapter_config, write_adapter_json
 from optimus.modeling.qwen import qwen_lora_shapes
 from optimus.subspace import SubspaceCandidate, random_field_tensor, sign_value
+from optimus.subspace.scaling import resolved_betas_by_target
 
 
 _LAYER_RE = re.compile(r"\.layers\.(\d+)\.")
@@ -141,18 +142,19 @@ def _candidate_field(
     )
 
 
-def _scale_by_target(summary: dict[str, Any], radius: float) -> dict[str, float]:
-    key = f"{radius:g}"
-    out: dict[str, float] = {}
-    for row in summary.get("resolved_target_scales") or []:
-        target_id = str(row["target_id"])
-        by_radius = row.get("beta_t_by_radius") or {}
-        if key not in by_radius:
-            raise ValueError(f"summary has no beta for radius {key!r} on {target_id}")
-        out[target_id] = float(by_radius[key])
-    if not out:
-        raise ValueError("source summary is missing resolved_target_scales")
-    return out
+def _scale_by_target(
+    summary: dict[str, Any],
+    radius: float,
+    *,
+    state_summary: dict[str, Any] | None = None,
+    effective_rank: int | None = None,
+) -> dict[str, float]:
+    return resolved_betas_by_target(
+        summary,
+        radius=radius,
+        state_summary=state_summary,
+        effective_rank=effective_rank,
+    )
 
 
 def _basis_by_site(state_payload: dict[str, Any], state_summary: dict[str, Any]) -> dict[str, torch.Tensor]:
@@ -203,7 +205,13 @@ def subspace_lora_tensors(
         raise ValueError("--adapter-policy must be fused-qkv-exact or target-split")
     dtype = _dtype(tensor_dtype)
     basis = _basis_by_site(state_payload, state_summary)
-    beta_by_target = _scale_by_target(source_summary, candidate.rho_or_sigma_w)
+    requested_rank = int(adapter_rank) if adapter_rank is not None else None
+    beta_by_target = _scale_by_target(
+        source_summary,
+        candidate.rho_or_sigma_w,
+        state_summary=state_summary,
+        effective_rank=requested_rank,
+    )
     q_out, kv_out = _qkv_dims(config)
     target_list = list(targets)
     tensors: dict[str, torch.Tensor] = {}

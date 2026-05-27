@@ -1489,6 +1489,64 @@ def test_vllm_lazy_replay_expands_fused_qkv_betas_and_scales():
     assert betas["layer_0.self_attn.v_proj"] == 0.5
 
 
+def test_vllm_lazy_replay_recomputes_relative_rms_beta_for_sliced_svd_rank():
+    source_summary = {
+        "scale_mode": "relative-output-rms",
+        "resolved_target_scales": [
+            {
+                "target_id": "layer_0.self_attn.qkv_proj",
+                "beta_t_by_radius": {"0.4": 0.25},
+            }
+        ],
+    }
+    state_summary = {
+        "activation_sites": [
+            {
+                "site_id": "layer_0.attn_in",
+                "basis_kind": "activation-svd",
+                "effective_rank": 3,
+                "H_s": 14.0,
+                "singular_values": [3.0, 2.0, 1.0],
+                "num_calibration_tokens": 1,
+                "target_module_ids": ["layer_0.self_attn.qkv_proj"],
+            }
+        ],
+    }
+
+    betas = _load_betas(source_summary, radius=0.4, state_summary=state_summary, effective_rank=2)
+
+    assert betas["layer_0.self_attn.qkv_proj"] == pytest.approx(0.25 * (14.0 / 13.0) ** 0.5)
+    assert betas["layer_0.self_attn.q_proj"] == pytest.approx(betas["layer_0.self_attn.qkv_proj"])
+
+
+def test_vllm_lazy_replay_fails_closed_for_sliced_random_basis_beta():
+    source_summary = {
+        "scale_mode": "relative-output-rms",
+        "resolved_target_scales": [
+            {
+                "target_id": "layer_0.self_attn.qkv_proj",
+                "beta_t_by_radius": {"0.4": 0.25},
+            }
+        ],
+    }
+    state_summary = {
+        "activation_sites": [
+            {
+                "site_id": "layer_0.attn_in",
+                "basis_kind": "random-orthonormal",
+                "effective_rank": 3,
+                "H_s": 14.0,
+                "singular_values": [],
+                "num_calibration_tokens": 1,
+                "target_module_ids": ["layer_0.self_attn.qkv_proj"],
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="rerun search with --basis-rank 2"):
+        _load_betas(source_summary, radius=0.4, state_summary=state_summary, effective_rank=2)
+
+
 def test_vllm_lazy_replay_matches_target_split_subspace_adapter_rank_and_scale():
     basis = torch.eye(4)[:3].contiguous()
     state_payload = {"basis_tensors": {"basis/layer_0.attn_in": basis}}

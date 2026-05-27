@@ -575,7 +575,13 @@ def _run_lazy_signatures(
     runtime.basis_by_site.update(_load_basis(Path(args.source_run), effective_rank=args.adapter_rank))
     radius = _single_radius(candidates)
     runtime.beta_by_target.update(
-        _load_betas(source_summary, radius=radius, scale_multiplier=float(args.scale_multiplier))
+        _load_betas(
+            source_summary,
+            radius=radius,
+            scale_multiplier=float(args.scale_multiplier),
+            state_summary=json.loads((Path(args.source_run) / "subspace_state_summary.json").read_text()),
+            effective_rank=args.adapter_rank,
+        )
     )
     route_handle = install_model_runner_routing(runtime, model_runner)
     hook_handles = install_hooks(runtime)

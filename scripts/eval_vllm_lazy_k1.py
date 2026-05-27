@@ -37,6 +37,7 @@ from optimus.serving.runtime import (
     write_json,
 )
 from optimus.subspace import SubspaceCandidate
+from optimus.subspace.scaling import resolved_betas_by_target
 from optimus.subspace.reference import config_hash, git_commit, git_dirty, sha256_bytes
 from optimus.tasks.countdown import load_examples
 from optimus.tasks.prompt_variants import make_variant_prompts
@@ -114,20 +115,22 @@ def _expand_fused_qkv_betas(beta_by_target: dict[str, float]) -> dict[str, float
     return out
 
 
-def _load_betas(summary: dict[str, Any], *, radius: float | None = None, scale_multiplier: float = 1.0) -> dict[str, float]:
-    out = {}
-    for row in summary["resolved_target_scales"]:
-        values = row["beta_t_by_radius"]
-        if not values:
-            continue
-        key = f"{radius:g}" if radius is not None else None
-        if key is not None and key not in values:
-            raise ValueError(f"summary has no beta for radius {key!r} on {row['target_id']}")
-        value = values[key] if key is not None else next(iter(values.values()))
-        out[row["target_id"]] = float(scale_multiplier) * float(value)
-    if not out:
-        raise ValueError("source summary is missing resolved_target_scales")
-    return _expand_fused_qkv_betas(out)
+def _load_betas(
+    summary: dict[str, Any],
+    *,
+    radius: float | None = None,
+    scale_multiplier: float = 1.0,
+    state_summary: dict[str, Any] | None = None,
+    effective_rank: int | None = None,
+) -> dict[str, float]:
+    betas = resolved_betas_by_target(
+        summary,
+        radius=radius,
+        scale_multiplier=scale_multiplier,
+        state_summary=state_summary,
+        effective_rank=effective_rank,
+    )
+    return _expand_fused_qkv_betas(betas)
 
 
 def _default_targets(source_summary: dict[str, Any]) -> list[str]:
@@ -491,7 +494,15 @@ def main() -> int:
     )
     runtime = LazyHookRuntime(targets)
     runtime.basis_by_site.update(_load_basis(source, effective_rank=effective_rank))
-    runtime.beta_by_target.update(_load_betas(source_summary, radius=radius, scale_multiplier=float(args.scale_multiplier)))
+    runtime.beta_by_target.update(
+        _load_betas(
+            source_summary,
+            radius=radius,
+            scale_multiplier=float(args.scale_multiplier),
+            state_summary=state_summary,
+            effective_rank=effective_rank,
+        )
+    )
     handles = install_hooks(runtime)
     routing_handle = None
     if int(args.candidate_batch_size) > 1:
