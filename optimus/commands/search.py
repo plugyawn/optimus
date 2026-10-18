@@ -123,11 +123,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         from optimus.search.peft import main as transformers_main
 
+        # dense_gaussian is the only family the dense backend accepts, and the
+        # public parser does not expose --family, so the route supplies it.
+        family = ["--family", "dense_gaussian"] if ns.method == "dense" else []
         return int(
             transformers_main(
                 [
                     "search",
                     *passthrough,
+                    *family,
                     "--perturbation-backend",
                     "dense" if ns.method == "dense" else "lora",
                 ]

@@ -204,6 +204,20 @@ def test_subspace_vllm_route_requires_artifact_root():
     assert "requires --out" in result.stderr
 
 
+def test_transformers_dense_route_supplies_dense_family(monkeypatch):
+    import optimus.search.peft as peft
+    from optimus.commands.search import main as search_main
+
+    seen = {}
+    monkeypatch.setattr(peft, "main", lambda argv: seen.setdefault("argv", argv) and 0)
+
+    search_main(["--backend", "transformers", "--method", "dense", "--out", "r", "--sigma", "0.0075"])
+
+    argv = seen["argv"]
+    assert argv[argv.index("--family") + 1] == "dense_gaussian"
+    assert argv[argv.index("--perturbation-backend") + 1] == "dense"
+
+
 def test_search_rejects_hidden_adapter_era_passthrough_for_public_surface():
     result = subprocess.run(
         [

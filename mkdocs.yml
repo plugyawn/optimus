@@ -1,0 +1,49 @@
+site_name: Optimus
+site_description: Zeroth-order post-training for language models, with thousands of candidates batched through vLLM.
+repo_url: https://github.com/plugyawn/optimus
+repo_name: plugyawn/optimus
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/mark.svg
+  favicon: assets/mark.svg
+  font: false
+  palette:
+    scheme: default
+    primary: white
+    accent: blue
+  features:
+    - content.code.copy
+    - navigation.footer
+    - search.highlight
+
+extra_css:
+  - stylesheets/extra.css
+
+exclude_docs: |
+  requirements.txt
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Overview: index.md
+  - How it works: how-it-works.md
+  - Results: results.md
+  - Quickstart: quickstart.md
+  - Related work: related-work.md
+  - Reference:
+      - API: api.md
+      - Design: optimus_design.md
+      - Subspace kernel design: full_model_lazy_kernel_design.md
+      - Subspace roadmap: subspace_implementation_roadmap.md
+      - GPU suite: gpu_suite.md
+      - Evaluation: evaluation.md
+      - Prime GPU runbook: prime_gpu_runbook.md
+      - Release checklist: release_checklist.md

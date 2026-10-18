@@ -1,0 +1,14 @@
+/* Figures are drawn on white; keep them full width with a hairline frame. */
+.md-typeset img[src$=".svg"] {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #e1e0d9;
+  border-radius: 8px;
+}
+
+.md-header__button.md-logo img {
+  height: 1.6rem;
+  width: auto;
+  border: 0;
+}

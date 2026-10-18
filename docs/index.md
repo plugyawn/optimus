@@ -1,19 +1,42 @@
-# Optimus Documentation
+# Optimus
 
-Optimus is a focused library for GPU-oriented zeroth-order optimization on
-large language models. The public documentation is intentionally small: it
-describes the library surface, GPU validation contract, and operating discipline
-needed to produce auditable research results.
+Optimus is a research library for zeroth-order post-training of language
+models. It samples many small perturbations of a pretrained model, scores each
+one on a task, and keeps the best. Evaluating candidates is the expensive part,
+so Optimus runs thousands of them through a single vLLM model copy, many
+candidates per batch.
 
-## Core Documents
+![Systems view of an Optimus search](assets/system.svg)
+
+## Start here
+
+- [How it works](how-it-works.md): the perturbation inside one decoder layer,
+  then inside the serving stack.
+- [Results](results.md): where time goes, the in-kernel random field, and
+  end-to-end throughput.
+- [Quickstart](quickstart.md): install and run a search.
+- [Related work](related-work.md): RandOpt, Punica and S-LoRA, zeroth-order
+  fine-tuning.
+
+## Status
+
+| path | state |
+| --- | --- |
+| Dense and LoRA search through Transformers | supported; the trusted reference |
+| LoRA search through vLLM, many adapters per batch | supported; the baseline |
+| Subspace search through vLLM | runs from a forward hook with Triton kernels, measured to population 1,024 |
+| Fused subspace custom op | not written yet |
+| Strict hook-versus-adapter logprob parity | open |
+
+## Reference
 
 | document | purpose |
 | --- | --- |
-| `api.md` | Supported Python packages, CLI commands, and import discipline. |
-| `optimus_design.md` | Package structure, API boundaries, migration contract, and completion criteria. |
-| `full_model_lazy_kernel_design.md` | Source-of-truth design for transformer-linear subspace search over vLLM. |
-| `subspace_implementation_roadmap.md` | Phased implementation roadmap and acceptance gates for subspace search. |
-| `gpu_suite.md` | Required P1024/P4096 workloads, acceptance gates, and output contracts. |
-| `prime_gpu_runbook.md` | Prime GPU launch, sync, validation, and cleanup workflow. |
-| `release_checklist.md` | Pre-release identity, evidence, systems, and upstreaming gates. |
-| `evaluation.md` | LightEval-backed confirmation lane and trusted-eval policy. |
+| [API](api.md) | Supported Python packages, CLI commands, and import discipline. |
+| [Design](optimus_design.md) | Package structure, API boundaries, and completion criteria. |
+| [Subspace kernel design](full_model_lazy_kernel_design.md) | Source of truth for transformer-linear subspace search over vLLM. |
+| [Subspace roadmap](subspace_implementation_roadmap.md) | Phases and acceptance gates for subspace search. |
+| [GPU suite](gpu_suite.md) | Required P1024/P4096 workloads and output contracts. |
+| [Evaluation](evaluation.md) | LightEval confirmation and trusted-eval policy. |
+| [Prime GPU runbook](prime_gpu_runbook.md) | Launch, sync, validation, and cleanup on Prime pods. |
+| [Release checklist](release_checklist.md) | Identity, evidence, systems, and upstreaming gates. |
