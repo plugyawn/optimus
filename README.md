@@ -7,7 +7,6 @@
 
 <p align="center">
   Zeroth-order post-training for language models.<br>
-  Thousands of candidate models, evaluated through one copy of the weights.
 </p>
 
 <p align="center">
@@ -20,9 +19,9 @@
 ---
 
 Optimus samples small random perturbations of a pretrained model, scores each
-one on a task, and keeps the best. Each candidate is a rank-`r` delta,
-`β · G_c · Q · x`, computed inside the forward pass. `Q` is an activation basis
-shared by every candidate; `G_c` is a random field rebuilt from the candidate's
+one on a task, and keeps the best. Each candidate is a rank-$r$ delta,
+$β \cdot G_c \cdot Q \cdot x$, computed inside the forward pass. $Q$ is an activation basis
+shared by every candidate; $G_c$ is a random field rebuilt from the candidate's
 seed inside a Triton kernel. Nothing per candidate is stored or loaded, so one
 vLLM model copy serves the whole population.
 
